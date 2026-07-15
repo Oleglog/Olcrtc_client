@@ -19,6 +19,7 @@ import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.net.URL
 import java.security.cert.Certificate
+import java.util.Base64
 import javax.net.ssl.HttpsURLConnection
 
 @RunWith(AndroidJUnit4::class)
@@ -119,7 +120,7 @@ class SubscriptionRefresherTest {
             encrypted = true,
             algorithm = "AES-256-GCM",
         )),
-        mirrorKey = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8",
+        mirrorKey = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32) { it.toByte() }),
         deduplication = true,
         updateWhenConnectedOnly = false,
         profiles = listOf(ImportedProfile.Olcrtc(OlcrtcProfile(
