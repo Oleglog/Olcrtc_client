@@ -11,6 +11,7 @@ ifeq ($(filter $(modules-get-list),hev-task-system),)
 include $(HEV_PATH)/third-part/hev-task-system/Android.mk
 endif
 
+LOCAL_PATH := $(HEV_PATH)
 SRCDIR := $(HEV_PATH)/src
 include $(CLEAR_VARS)
 include $(HEV_PATH)/build.mk
