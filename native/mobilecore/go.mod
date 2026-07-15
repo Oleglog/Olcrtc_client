@@ -9,3 +9,5 @@ require (
 )
 
 replace github.com/openlibrecommunity/olcrtc => github.com/Oleglog/Olcrtc_manager v0.0.0-20260714011601-10917350c92c
+
+replace github.com/zarazaex69/j => github.com/Oleglog/j v0.0.0-20260530000013-1e4e663285ad
