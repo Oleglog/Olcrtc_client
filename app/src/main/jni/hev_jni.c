@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "hev-socks5-tunnel.h"
+#include "hev-main.h"
 
 JNIEXPORT jint JNICALL
 Java_io_github_oleglog_olcrtc_client_vpn_HevTunnel_nativeRun(
