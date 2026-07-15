@@ -4,6 +4,7 @@ import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import io.github.oleglog.olcrtc.client.importer.SubscriptionBundle
 import io.github.oleglog.olcrtc.client.profile.ImportedProfile
+import io.github.oleglog.olcrtc.client.profile.ProfileIdentity
 import io.github.oleglog.olcrtc.client.profile.olcrtc.OlcrtcProfile
 import io.github.oleglog.olcrtc.client.profile.standard.StandardProfile
 import io.github.oleglog.olcrtc.client.routing.RoutingRule
