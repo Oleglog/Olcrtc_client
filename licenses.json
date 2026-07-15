@@ -1,0 +1,53 @@
+{
+  "allowed_licenses": [
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "EPL-1.0",
+    "MIT",
+    "MPL-2.0",
+    "WTFPL"
+  ],
+  "components": [
+    {"name": "AndroidX", "license": "Apache-2.0"},
+    {"name": "AndroidX Room", "license": "Apache-2.0"},
+    {"name": "AndroidX CameraX", "license": "Apache-2.0"},
+    {"name": "AndroidX Test", "license": "Apache-2.0"},
+    {"name": "Kotlin", "license": "Apache-2.0"},
+    {"name": "Kotlin Symbol Processing", "license": "Apache-2.0"},
+    {"name": "Material Components for Android", "license": "Apache-2.0"},
+    {"name": "ZXing Core 3.5.4", "license": "Apache-2.0"},
+    {"name": "JUnit 4", "license": "EPL-1.0"},
+    {"name": "Espresso", "license": "Apache-2.0"}
+  ],
+  "native_sources": [
+    {
+      "name": "Xray-core",
+      "source": "https://github.com/XTLS/Xray-core",
+      "ref": "v26.2.6",
+      "commit": "12ee51e4bb1d02ece4ef4b7114efa2bcdc130995",
+      "license": "MPL-2.0"
+    },
+    {
+      "name": "olcRTC mobile/core",
+      "source": "https://github.com/Oleglog/Olcrtc_manager",
+      "ref": "server-v1.9.45",
+      "commit": "10917350c92ca25d47e53d7996f06de6f91c0ecb",
+      "license": "WTFPL"
+    },
+    {
+      "name": "hev-socks5-tunnel",
+      "source": "https://github.com/heiher/hev-socks5-tunnel",
+      "ref": "2.15.0",
+      "commit": "00c7eb9ad7ca381b0f1fee880abc1077fe9b93be",
+      "license": "MIT"
+    },
+    {
+      "name": "gomobile",
+      "source": "https://github.com/golang/mobile",
+      "ref": "v0.0.0-20260410095206-2cfb76559b7b",
+      "commit": "2cfb76559b7b64602788d193d8f1387d81bbb481",
+      "license": "BSD-3-Clause"
+    }
+  ]
+}

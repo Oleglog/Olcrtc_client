@@ -1,0 +1,85 @@
+package io.github.oleglog.olcrtc.client.profile.standard
+
+import java.util.Base64
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class StandardUriTest {
+    private val uuid = "00000000-0000-0000-0000-000000000001"
+
+    @Test
+    fun parsesVlessRealityVision() {
+        val profile = StandardUri.parse(
+            "vless://$uuid@example.com:443?encryption=none&type=tcp&security=reality&flow=xtls-rprx-vision&sni=www.example.com&fp=chrome&pbk=public-key&sid=short-id&spx=%2F#Main",
+        )
+
+        assertEquals(StandardProfile.Protocol.VLESS, profile.protocol)
+        assertEquals(StandardProfile.Transport.TCP, profile.transport)
+        assertEquals(StandardProfile.Security.REALITY, profile.security)
+        assertEquals(StandardProfile.VISION_FLOW, profile.flow)
+        assertEquals("public-key", profile.realityPublicKey)
+        assertEquals("Main", profile.name)
+    }
+
+    @Test
+    fun parsesVlessWebSocketAndXhttp() {
+        val webSocket = StandardUri.parse(
+            "vless://$uuid@example.com:443?encryption=none&type=ws&security=tls&host=cdn.example.com&path=%2Fws&sni=example.com",
+        )
+        val xhttp = StandardUri.parse(
+            "vless://$uuid@example.com:443?encryption=none&type=xhttp&security=reality&mode=auto&path=%2Fxhttp&pbk=key&sid=short",
+        )
+
+        assertEquals("/ws", webSocket.webSocketPath)
+        assertEquals("cdn.example.com", webSocket.webSocketHost)
+        assertEquals(StandardProfile.Transport.XHTTP, xhttp.transport)
+        assertEquals("auto", xhttp.xhttpMode)
+    }
+
+    @Test
+    fun parsesTrojanGrpcReality() {
+        val profile = StandardUri.parse(
+            "trojan://secret@example.com:443?type=grpc&security=reality&serviceName=proxy&pbk=key&sid=short#Trojan",
+        )
+
+        assertEquals(StandardProfile.Protocol.TROJAN, profile.protocol)
+        assertEquals("secret", profile.password)
+        assertEquals("proxy", profile.grpcServiceName)
+        assertEquals(StandardProfile.Security.REALITY, profile.security)
+    }
+
+    @Test
+    fun parsesLegacyVmessBase64Json() {
+        val json = """{"v":"2","ps":"VMess","add":"example.com","port":"443","id":"$uuid","aid":"0","scy":"auto","net":"ws","type":"none","host":"cdn.example.com","path":"/vmess","tls":"tls","sni":"example.com","fp":"chrome"}"""
+        val uri = "vmess://" + Base64.getEncoder().withoutPadding().encodeToString(json.encodeToByteArray())
+
+        val profile = StandardUri.parse(uri)
+
+        assertEquals(StandardProfile.Protocol.VMESS, profile.protocol)
+        assertEquals(StandardProfile.Transport.WS, profile.transport)
+        assertEquals(StandardProfile.Security.TLS, profile.security)
+        assertEquals("/vmess", profile.webSocketPath)
+    }
+
+    @Test
+    fun rejectsUnknownDuplicateUnsafeAndMalformedParameters() {
+        assertThrows(IllegalArgumentException::class.java) {
+            StandardUri.parse("vless://$uuid@example.com:443?type=tcp&security=tls&security=none")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            StandardUri.parse("trojan://secret@example.com:443?type=tcp&security=tls&insecure=1")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            StandardUri.parse("vmess://" + Base64.getEncoder().encodeToString("{\"v\":true}".encodeToByteArray()))
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            StandardUri.parse("vmess://" + Base64.getEncoder().encodeToString("{\"add\":\"example.com\",\"port\":\"443\",\"id\":\"$uuid\",\"aid\":\"bad\"}".encodeToByteArray()))
+        }
+        val error = assertThrows(IllegalArgumentException::class.java) {
+            StandardUri.parse("vmess://not-base64")
+        }
+        assertTrue(error.message!!.contains("Base64"))
+    }
+}

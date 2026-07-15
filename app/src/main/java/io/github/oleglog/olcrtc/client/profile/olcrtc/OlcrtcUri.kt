@@ -1,0 +1,118 @@
+package io.github.oleglog.olcrtc.client.profile.olcrtc
+
+import java.net.URI
+import java.net.URLDecoder
+import java.net.URLEncoder
+import java.nio.charset.StandardCharsets
+
+object OlcrtcUri {
+    private val allowedParameters = setOf(
+        "key", "k",
+        "transport", "t",
+        "vp8_fps", "f",
+        "vp8_batch", "b",
+        "client_id", "c",
+        "auth_token", "auth.token", "a",
+        "dns", "d",
+        "room_password", "rp",
+        "keepalive", "ka",
+    )
+
+    fun parse(raw: String): OlcrtcProfile {
+        val uri = URI(raw)
+        require(uri.scheme.equals("olcrtc", ignoreCase = true)) { "Unsupported URI scheme" }
+        val provider = uri.userInfo?.let(OlcrtcProfile.Provider::parse)
+            ?: throw IllegalArgumentException("Provider is required")
+        require(uri.host.equals("r", ignoreCase = true) || uri.host.equals("room", ignoreCase = true)) {
+            "Unsupported olcRTC URI host"
+        }
+
+        val params = parseQuery(uri.rawQuery)
+        val unknown = params.keys - allowedParameters
+        require(unknown.isEmpty()) { "Unsupported olcRTC parameters: ${unknown.sorted().joinToString()}" }
+
+        val transport = parameter(params, "transport", "t")
+            ?.let(OlcrtcProfile.Transport::parse)
+            ?: OlcrtcProfile.Transport.DATACHANNEL
+        val roomId = decode(uri.rawPath.removePrefix("/"))
+        val keyHex = required(params, "key", "k")
+        val clientId = required(params, "client_id", "c")
+
+        return OlcrtcProfile(
+            name = uri.rawFragment?.let(::decode).orEmpty(),
+            provider = provider,
+            transport = transport,
+            roomId = roomId,
+            roomPassword = parameter(params, "room_password", "rp"),
+            clientId = clientId,
+            keyHex = keyHex,
+            authToken = parameter(params, "auth_token", "auth.token", "a"),
+            dnsServer = parameter(params, "dns", "d")?.takeIf(String::isNotBlank),
+            vp8Fps = integer(params, OlcrtcProfile.LEGACY_VP8_FPS, "vp8_fps", "f"),
+            vp8BatchSize = integer(params, OlcrtcProfile.LEGACY_VP8_BATCH, "vp8_batch", "b"),
+            keepaliveIntervalSeconds = integer(
+                params,
+                OlcrtcProfile.DEFAULT_KEEPALIVE_SECONDS,
+                "keepalive",
+                "ka",
+            ),
+        )
+    }
+
+    fun serialize(profile: OlcrtcProfile, includeAuthToken: Boolean = false): String {
+        val query = buildList {
+            add("k=${encode(profile.keyHex)}")
+            add("t=${encode(profile.transport.value)}")
+            if (profile.transport == OlcrtcProfile.Transport.VP8CHANNEL) {
+                add("f=${profile.vp8Fps}")
+                add("b=${profile.vp8BatchSize}")
+            }
+            add("c=${encode(profile.clientId)}")
+            profile.roomPassword?.takeIf(String::isNotEmpty)?.let { add("rp=${encode(it)}") }
+            if (includeAuthToken) {
+                profile.authToken?.takeIf(String::isNotEmpty)?.let { add("a=${encode(it)}") }
+            }
+            profile.dnsServer?.let { add("d=${encode(it)}") }
+            add("ka=${profile.keepaliveIntervalSeconds}")
+        }.joinToString("&")
+        val fragment = profile.name.takeIf(String::isNotEmpty)?.let { "#${encode(it)}" }.orEmpty()
+        return "olcrtc://${profile.provider.value}@r/${encodePath(profile.roomId)}?$query$fragment"
+    }
+
+    private fun parseQuery(rawQuery: String?): Map<String, String> {
+        if (rawQuery.isNullOrEmpty()) return emptyMap()
+        val result = linkedMapOf<String, String>()
+        rawQuery.split('&').forEach { item ->
+            val pair = item.split('=', limit = 2)
+            val key = decode(pair[0])
+            require(key.isNotEmpty()) { "Empty olcRTC parameter" }
+            require(pair.size == 2) { "Missing value for olcRTC parameter: $key" }
+            require(key !in result) { "Duplicate olcRTC parameter: $key" }
+            result[key] = decode(pair[1])
+        }
+        return result
+    }
+
+    private fun parameter(params: Map<String, String>, vararg names: String): String? {
+        val values = names.mapNotNull(params::get)
+        require(values.size <= 1) { "Duplicate aliases for ${names.first()}" }
+        return values.singleOrNull()
+    }
+
+    private fun required(params: Map<String, String>, vararg names: String): String =
+        parameter(params, *names)?.takeIf(String::isNotBlank)
+            ?: throw IllegalArgumentException("${names.first()} is required")
+
+    private fun integer(params: Map<String, String>, default: Int, vararg names: String): Int {
+        val value = parameter(params, *names) ?: return default
+        return value.toIntOrNull()
+            ?: throw IllegalArgumentException("${names.first()} must be an integer")
+    }
+
+    private fun decode(value: String): String = URLDecoder.decode(value, StandardCharsets.UTF_8)
+
+    private fun encode(value: String): String =
+        URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20")
+
+    private fun encodePath(value: String): String = encode(value)
+}

@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/main_navigation"
+    app:startDestination="@id/connectionFragment">
+
+    <fragment
+        android:id="@+id/connectionFragment"
+        android:name="io.github.oleglog.olcrtc.client.connection.ConnectionFragment"
+        android:label="@string/navigation_connection" />
+    <fragment
+        android:id="@+id/profilesFragment"
+        android:name="io.github.oleglog.olcrtc.client.profiles.ProfilesFragment"
+        android:label="@string/navigation_profiles" />
+    <fragment
+        android:id="@+id/statisticsFragment"
+        android:name="io.github.oleglog.olcrtc.client.statistics.StatisticsFragment"
+        android:label="@string/navigation_statistics" />
+    <fragment
+        android:id="@+id/settingsFragment"
+        android:name="io.github.oleglog.olcrtc.client.settings.SettingsFragment"
+        android:label="@string/navigation_settings" />
+
+</navigation>
