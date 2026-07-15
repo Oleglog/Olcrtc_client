@@ -69,7 +69,8 @@ object StandardUri {
     private fun parseVmess(raw: String): StandardProfile {
         val payload = raw.substringAfter(':').removePrefix("//")
         require(payload.isNotBlank()) { "VMess payload is required" }
-        val json = decodeBase64(payload).decodeToString()
+        val json = decodeVmessPayload(payload)
+        require(json.trimStart().startsWith('{')) { "Invalid VMess Base64" }
         val values = FlatJson.parse(json)
         val allowed = setOf("v", "ps", "add", "port", "id", "aid", "scy", "net", "type", "host", "path", "tls", "sni", "alpn", "fp", "allowInsecure", "dns")
         val unknown = values.keys - allowed
@@ -136,11 +137,15 @@ object StandardUri {
         return result
     }
 
-    private fun decodeBase64(value: String): ByteArray {
+    private fun decodeVmessPayload(value: String): String {
         val normalized = value.trim().replace('-', '+').replace('_', '/')
         val padded = normalized + "=".repeat((4 - normalized.length % 4) % 4)
         return runCatching { Base64.getDecoder().decode(padded) }
             .getOrElse { throw IllegalArgumentException("Invalid VMess Base64", it) }
+            .let { bytes ->
+                runCatching { bytes.decodeToString() }
+                    .getOrElse { throw IllegalArgumentException("Invalid VMess Base64", it) }
+            }
     }
 
     private fun decode(value: String): String = URLDecoder.decode(value, StandardCharsets.UTF_8)
