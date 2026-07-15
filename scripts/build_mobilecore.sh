@@ -11,7 +11,7 @@ go install "golang.org/x/mobile/cmd/gomobile@$GOMOBILE_VERSION"
 gomobile init
 (
   cd "$MODULE"
-  go mod download
+  go mod tidy
   test -z "$(gofmt -l .)"
   go test ./...
   gomobile bind -target=android -androidapi 26 -o "$OUTPUT" .
