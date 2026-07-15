@@ -14,5 +14,5 @@ gomobile init
   go mod tidy
   test -z "$(gofmt -l .)"
   go test ./...
-  gomobile bind -target=android -androidapi 26 -o "$OUTPUT" .
+  gomobile bind -target=android -androidapi 26 -ldflags="-checklinkname=0" -o "$OUTPUT" .
 )
