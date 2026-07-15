@@ -4,7 +4,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
 
-class HevTunnel : NativeTunnel {
+internal class HevTunnel : NativeTunnel {
     private val worker: ExecutorService = Executors.newSingleThreadExecutor()
     private var run: Future<Int>? = null
 
