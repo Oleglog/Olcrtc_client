@@ -75,8 +75,10 @@ jobs:
           set -euo pipefail
           TAG="${{ github.event.inputs.tag || github.ref_name }}"
           mkdir -p release-artifacts
-          cp app/build/outputs/apk/release/app-release.apk "release-artifacts/olcRTC-Client-${TAG}.apk"
-          (cd release-artifacts && sha256sum "olcRTC-Client-${TAG}.apk" > SHA256SUMS.txt)
+          cp app/build/outputs/apk/release/app-arm64-v8a-release.apk "release-artifacts/olcRTC-Client-${TAG}-arm64-v8a.apk"
+          cp app/build/outputs/apk/release/app-armeabi-v7a-release.apk "release-artifacts/olcRTC-Client-${TAG}-armeabi-v7a.apk"
+          cp app/build/outputs/apk/release/app-universal-release.apk "release-artifacts/olcRTC-Client-${TAG}-universal.apk"
+          (cd release-artifacts && sha256sum *.apk > SHA256SUMS.txt)
           cat release-artifacts/SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
