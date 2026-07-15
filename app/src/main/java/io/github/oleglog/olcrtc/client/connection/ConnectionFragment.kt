@@ -188,7 +188,7 @@ class ConnectionFragment : Fragment() {
 
     private fun cardStrokeState(selected: Boolean, connected: Boolean): Int {
         val attr = when {
-            connected -> com.google.android.material.R.attr.colorPrimary
+            connected -> android.R.attr.colorPrimary
             selected -> com.google.android.material.R.attr.colorSecondary
             else -> com.google.android.material.R.attr.colorOutline
         }

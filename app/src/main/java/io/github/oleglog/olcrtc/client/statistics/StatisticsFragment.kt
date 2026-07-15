@@ -97,7 +97,7 @@ class StatisticsFragment : Fragment() {
             }
         })
         row.addView(TextView(requireContext()).apply {
-            text = text
+            this.text = text
             setTextAppearance(android.R.style.TextAppearance_Material_Body1)
             setOnClickListener { showReasonDialog(session) }
         }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
