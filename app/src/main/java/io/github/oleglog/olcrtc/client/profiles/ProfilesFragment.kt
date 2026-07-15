@@ -20,6 +20,8 @@ import io.github.oleglog.olcrtc.client.data.ProfileSummary
 import io.github.oleglog.olcrtc.client.data.SubscriptionProfileSummary
 import io.github.oleglog.olcrtc.client.data.SubscriptionSummary
 import io.github.oleglog.olcrtc.client.databinding.FragmentProfilesBinding
+import io.github.oleglog.olcrtc.client.profile.ImportedProfile
+import io.github.oleglog.olcrtc.client.profile.ProfileUri
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import java.text.DateFormat
 import java.util.Date
@@ -104,6 +106,10 @@ class ProfilesFragment : Fragment() {
             setOnClickListener { testLocalLatency(profile.id) }
         })
         row.addView(Button(requireContext()).apply {
+            setText(R.string.edit)
+            setOnClickListener { editLocalProfile(profile) }
+        })
+        row.addView(Button(requireContext()).apply {
             setText(R.string.copy)
             setOnClickListener { copyLocalProfileLink(profile.id) }
         })
@@ -134,6 +140,10 @@ class ProfilesFragment : Fragment() {
             setText(R.string.profile_test_latency)
             isEnabled = profile.type != "OLCRTC"
             setOnClickListener { testSubscriptionLatency(profile.id) }
+        })
+        row.addView(Button(requireContext()).apply {
+            setText(R.string.edit)
+            setOnClickListener { editSubscriptionProfile(profile) }
         })
         row.addView(Button(requireContext()).apply {
             setText(R.string.copy)
@@ -290,6 +300,77 @@ class ProfilesFragment : Fragment() {
                     values["url"].orEmpty(),
                 )
             }
+            activity?.runOnUiThread {
+                result.onFailure { showError(it) }
+                loadProfiles()
+            }
+        }
+    }
+
+    private fun editLocalProfile(profile: ProfileSummary) {
+        storage.execute {
+            val result = runCatching { profiles.exportProfileUri(profile.id, includeAuthToken = true) }
+            activity?.runOnUiThread {
+                result.onSuccess { raw ->
+                    val input = EditText(requireContext()).apply {
+                        setSingleLine(false)
+                        minLines = 4
+                        setText(raw)
+                    }
+                    AlertDialog.Builder(requireContext())
+                        .setTitle(getString(R.string.profile_edit_title, profile.name))
+                        .setView(input)
+                        .setNegativeButton(R.string.cancel, null)
+                        .setPositiveButton(android.R.string.ok) { _, _ ->
+                            saveLocalProfileEdit(profile.id, input.text?.toString().orEmpty())
+                        }
+                        .show()
+                }.onFailure { showError(it) }
+            }
+        }
+    }
+
+    private fun saveLocalProfileEdit(profileId: Long, raw: String) {
+        storage.execute {
+            val result = runCatching {
+                when (val imported = ProfileUri.parse(raw.trim())) {
+                    is ImportedProfile.Olcrtc -> profiles.update(profileId, imported.value)
+                    is ImportedProfile.Standard -> profiles.update(profileId, imported.value)
+                }
+            }
+            activity?.runOnUiThread {
+                result.onFailure { showError(it) }
+                loadProfiles()
+            }
+        }
+    }
+
+    private fun editSubscriptionProfile(profile: SubscriptionProfileSummary) {
+        storage.execute {
+            val result = runCatching { profiles.exportSubscriptionProfileUri(profile.id, includeAuthToken = true) }
+            activity?.runOnUiThread {
+                result.onSuccess { raw ->
+                    val input = EditText(requireContext()).apply {
+                        setSingleLine(false)
+                        minLines = 4
+                        setText(raw)
+                    }
+                    AlertDialog.Builder(requireContext())
+                        .setTitle(getString(R.string.profile_edit_title, profile.name))
+                        .setView(input)
+                        .setNegativeButton(R.string.cancel, null)
+                        .setPositiveButton(android.R.string.ok) { _, _ ->
+                            saveSubscriptionProfileEdit(profile.id, input.text?.toString().orEmpty())
+                        }
+                        .show()
+                }.onFailure { showError(it) }
+            }
+        }
+    }
+
+    private fun saveSubscriptionProfileEdit(profileId: String, raw: String) {
+        storage.execute {
+            val result = runCatching { profiles.updateSubscriptionProfile(profileId, ProfileUri.parse(raw.trim())) }
             activity?.runOnUiThread {
                 result.onFailure { showError(it) }
                 loadProfiles()

@@ -20,6 +20,7 @@
     <string name="subscription_delete_message">Удалить %1$s? Импортированные профили можно оставить как локальные копии.</string>
     <string name="subscription_keep_profiles">Оставить профили</string>
     <string name="subscription_last_success">обновлено %1$s</string>
+    <string name="profile_edit_title">????????????? %1$s</string>
     <string name="profile_export_secret_warning_title">Скопировать ссылку профиля?</string>
     <string name="profile_export_secret_warning_message">Ссылки профилей содержат секреты подключения. Передавайте их только тем, кому доверяете.</string>
     <string name="profile_delete_title">Удалить профиль?</string>
@@ -54,6 +55,7 @@
     <string name="settings_include_system_apps">Показывать системные приложения</string>
     <string name="settings_refresh_app_list">Обновить список приложений</string>
     <string name="settings_select_apps">Выбрать приложения</string>
+    <string name="settings_select_apps_description">???????? ??????????, ?? ??????? ?????? ????????? ????? ?????????????.</string>
     <string name="settings_app_routing_summary">Установлено приложений: %1$d · выбрано: %2$d</string>
     <string name="settings_add_routing_rule">Добавить правило маршрутизации</string>
     <string name="settings_update_geo_assets">Обновить GeoIP/GeoSite</string>
@@ -61,6 +63,7 @@
     <string name="settings_routing_rule_hint">ACTION TYPE VALUE, например DIRECT DOMAIN_SUFFIX example.com</string>
     <string name="settings_routing_rules_summary">Включено правил: %1$d</string>
     <string name="settings_system_title">Системная интеграция</string>
+    <string name="settings_system_description">??????? ???????? ? ????????? ?????????? VPN, ??????? ? ??????????.</string>
     <string name="settings_always_on">Настройки Always-on VPN</string>
     <string name="settings_battery_optimization">Настройки оптимизации батареи</string>
     <string name="settings_check_update">Проверить обновление приложения</string>
@@ -73,6 +76,7 @@
     <string name="settings_update_no_asset">Релиз найден, но совместимый APK отсутствует</string>
     <string name="settings_system_screen_unavailable">Системный экран настроек недоступен на этом устройстве</string>
     <string name="settings_diagnostics_title">Диагностика</string>
+    <string name="settings_diagnostics_description">????????? ???? ??? ??????????? ? ?????????? ?????????. ????????????? ?????? ?? ????????????.</string>
     <string name="settings_view_diagnostics">Показать очищенную диагностику</string>
     <string name="settings_copy_diagnostics">Копировать очищенную диагностику</string>
     <string name="settings_export_diagnostics">Экспорт очищенной диагностики</string>
@@ -87,6 +91,10 @@
     <string name="settings_saved">Настройки сохранены</string>
     <string name="olcrtc_uri_hint">Вставьте ссылку профиля или подписки</string>
     <string name="no_profile">Профиль не выбран</string>
+    <string name="connect">????????????</string>
+    <string name="add_connection">???????? ???????????</string>
+    <string name="connection_saved_profiles">??????????? ???????????</string>
+    <string name="connection_selected_profile">???????: %1$s</string>
     <string name="import_and_connect">Импортировать и подключиться</string>
     <string name="paste_clipboard">Вставить из буфера</string>
     <string name="scan_qr">Сканировать QR</string>

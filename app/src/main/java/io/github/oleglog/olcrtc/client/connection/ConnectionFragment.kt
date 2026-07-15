@@ -10,7 +10,10 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Button
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
@@ -50,6 +53,8 @@ class ConnectionFragment : Fragment() {
     private var cameraProvider: ProcessCameraProvider? = null
     @Volatile private var scanning = false
     private var currentState = VpnState.NO_PROFILE
+    private var selectedProfileId: Long? = null
+    private var selectedSubscriptionProfileId: String? = null
 
     private val qrImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let(::decodeQrImage)
@@ -58,7 +63,7 @@ class ConnectionFragment : Fragment() {
         uri?.let(::readImportFile)
     }
     private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) startScanner() else binding.status.setText(R.string.camera_permission_denied)
+        if (granted) startScanner() else _binding?.status?.setText(R.string.camera_permission_denied)
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View {
@@ -68,7 +73,7 @@ class ConnectionFragment : Fragment() {
 
     override fun onViewCreated(view: View, state: Bundle?) {
         binding.connect.setOnClickListener {
-            if (currentState == VpnState.CONNECTED) activityHost.stopVpn() else if (currentState !in BUSY_STATES) importAndConnect()
+            if (currentState == VpnState.CONNECTED) activityHost.stopVpn() else if (currentState !in BUSY_STATES) connectSelectedOrImport()
         }
         binding.pasteClipboard.setOnClickListener { pasteClipboard() }
         binding.scanQr.setOnClickListener { if (scanning) stopScanner() else requestScanner() }
@@ -80,7 +85,10 @@ class ConnectionFragment : Fragment() {
         }
         binding.manualOlcrtc.setOnClickListener { showManualOlcrtcDialog() }
         binding.manualStandard.setOnClickListener { showManualStandardDialog() }
+        binding.addProfile.setOnClickListener { showAddConnectionMenu() }
+        binding.testSelected.setOnClickListener { testSelectedProfile() }
         storage.execute { SubscriptionRefresher(profiles).refreshStale() }
+        loadProfiles()
     }
 
     override fun onStart() {
@@ -107,12 +115,124 @@ class ConnectionFragment : Fragment() {
         super.onDestroy()
     }
 
-    private fun showVpnState(state: VpnState, error: String?) {
+
+    private fun loadProfiles() {
+        storage.execute {
+            val result = runCatching { profiles.listLocal() to profiles.listSubscriptions().flatMap { profiles.listSubscriptionProfiles(it.id) } }
+            activity?.runOnUiThread {
+                if (_binding == null) return@runOnUiThread
+                result.onSuccess { (localItems, subscriptionItems) ->
+                    binding.profileList.removeAllViews()
+                    if (localItems.isEmpty() && subscriptionItems.isEmpty()) {
+                        binding.profileList.addView(TextView(requireContext()).apply {
+                            setText(R.string.profiles_placeholder)
+                            setPadding(0, 12.dp, 0, 12.dp)
+                        })
+                    } else {
+                        if (selectedProfileId == null && selectedSubscriptionProfileId == null && localItems.isNotEmpty()) selectProfile(localItems.first().id, localItems.first().name, localItems.first().type, localItems.first().endpoint)
+                        localItems.forEach { profile -> binding.profileList.addView(profileCard(profile.id, profile.name, profile.type, profile.endpoint)) }
+                        subscriptionItems.forEach { profile -> binding.profileList.addView(subscriptionProfileCard(profile.id, profile.name, profile.type, profile.endpoint)) }
+                    }
+                }.onFailure { binding.status.text = it.message }
+            }
+        }
+    }
+
+    private fun profileCard(id: Long, name: String, type: String, endpoint: String): View = LinearLayout(requireContext()).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(16.dp, 14.dp, 16.dp, 14.dp)
+        isClickable = true
+        isFocusable = true
+        addView(TextView(requireContext()).apply {
+            text = name
+            textSize = 18f
+        })
+        addView(TextView(requireContext()).apply { text = "$type - $endpoint" })
+        setOnClickListener { selectProfile(id, name, type, endpoint) }
+    }
+
+
+    private fun subscriptionProfileCard(id: String, name: String, type: String, endpoint: String): View = LinearLayout(requireContext()).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(16.dp, 14.dp, 16.dp, 14.dp)
+        isClickable = true
+        isFocusable = true
+        addView(TextView(requireContext()).apply {
+            text = name
+            textSize = 18f
+        })
+        addView(TextView(requireContext()).apply { text = "$type - $endpoint" })
+        setOnClickListener { selectSubscriptionProfile(id, name, type, endpoint) }
+    }
+
+    private fun selectSubscriptionProfile(id: String, name: String, type: String, endpoint: String) {
+        selectedProfileId = null
+        selectedSubscriptionProfileId = id
+        binding.selectedProfile.text = "$name\n$type - $endpoint"
+        binding.status.text = getString(R.string.connection_selected_profile, name)
+        binding.connect.isEnabled = currentState !in BUSY_STATES
+    }
+
+    private fun selectProfile(id: Long, name: String, type: String, endpoint: String) {
+        selectedSubscriptionProfileId = null
+        selectedProfileId = id
+        binding.selectedProfile.text = "$name\n$type - $endpoint"
+        binding.status.text = getString(R.string.connection_selected_profile, name)
+        binding.connect.isEnabled = currentState !in BUSY_STATES
+    }
+
+    private fun connectSelectedOrImport() {
+        selectedProfileId?.let { activityHost.requestVpnPermission(it); return }
+        selectedSubscriptionProfileId?.let { activityHost.requestSubscriptionVpnPermission(it); return }
+        importAndConnect()
+    }
+
+    private fun testSelectedProfile() {
+        val localId = selectedProfileId
+        val subscriptionId = selectedSubscriptionProfileId
+        storage.execute {
+            val result = runCatching {
+                when {
+                    localId != null -> profiles.testLocalProfileLatency(localId)
+                    subscriptionId != null -> profiles.testSubscriptionProfileLatency(subscriptionId)
+                    else -> throw IllegalArgumentException(getString(R.string.no_profile))
+                }
+            }
+            activity?.runOnUiThread {
+                result.onSuccess { binding.status.text = getString(R.string.profile_latency_result, it) }
+                    .onFailure { binding.status.text = it.message ?: getString(R.string.invalid_profile) }
+            }
+        }
+    }
+
+    private fun showAddConnectionMenu() {
+        val actions = arrayOf(
+            getString(R.string.paste_clipboard),
+            getString(R.string.scan_qr),
+            getString(R.string.import_qr_image),
+            getString(R.string.import_file),
+            getString(R.string.manual_olcrtc),
+            getString(R.string.manual_standard),
+        )
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.add_connection)
+            .setItems(actions) { _, which ->
+                when (which) {
+                    0 -> pasteClipboard()
+                    1 -> requestScanner()
+                    2 -> qrImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                    3 -> filePicker.launch(arrayOf("text/plain", "application/octet-stream"))
+                    4 -> showManualOlcrtcDialog()
+                    5 -> showManualStandardDialog()
+                }
+            }
+            .show()
+    }    private fun showVpnState(state: VpnState, error: String?) {
         if (_binding == null) return
         currentState = state
         binding.status.text = error ?: state.name
-        binding.connect.text = getString(if (state == VpnState.CONNECTED) R.string.disconnect else R.string.import_and_connect)
-        binding.connect.isEnabled = state !in BUSY_STATES
+        binding.connect.text = getString(if (state == VpnState.CONNECTED) R.string.disconnect else R.string.connect)
+        binding.connect.isEnabled = state !in BUSY_STATES && (state == VpnState.CONNECTED || selectedProfileId != null || !binding.profileUri.text.isNullOrBlank())
     }
 
     private fun requestScanner() {
@@ -126,9 +246,15 @@ class ConnectionFragment : Fragment() {
     private fun startScanner() {
         val providerFuture = ProcessCameraProvider.getInstance(requireContext())
         providerFuture.addListener({
+            val currentBinding = _binding ?: return@addListener
             runCatching {
                 val provider = providerFuture.get()
-                val preview = Preview.Builder().build().also { it.surfaceProvider = binding.cameraPreview.surfaceProvider }
+                val cameraSelector = if (provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)) {
+                    CameraSelector.DEFAULT_BACK_CAMERA
+                } else {
+                    CameraSelector.DEFAULT_FRONT_CAMERA
+                }
+                val preview = Preview.Builder().build().also { it.surfaceProvider = currentBinding.cameraPreview.surfaceProvider }
                 val analysis = ImageAnalysis.Builder()
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .build()
@@ -146,12 +272,12 @@ class ConnectionFragment : Fragment() {
                     }
                 }
                 provider.unbindAll()
-                provider.bindToLifecycle(viewLifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, preview, analysis)
+                provider.bindToLifecycle(viewLifecycleOwner, cameraSelector, preview, analysis)
                 cameraProvider = provider
                 scanning = true
-                binding.cameraPreview.visibility = View.VISIBLE
-                binding.profileUri.visibility = View.GONE
-                binding.scanQr.setText(R.string.stop_scan)
+                currentBinding.cameraPreview.visibility = View.VISIBLE
+                currentBinding.profileUri.visibility = View.GONE
+                currentBinding.scanQr.setText(R.string.stop_scan)
             }.onFailure {
                 stopScanner()
                 binding.status.text = it.message ?: getString(R.string.camera_error)
@@ -227,6 +353,10 @@ class ConnectionFragment : Fragment() {
             preview.profileUri?.let(binding.profileUri::setText)
             val description = if (preview.profileUri == null) preview.description
             else "${preview.description}\n${getString(R.string.import_preview)}"
+            selectedProfileId = null
+            selectedSubscriptionProfileId = null
+            binding.selectedProfile.text = preview.description
+            binding.connect.isEnabled = preview.profileUri != null && currentState !in BUSY_STATES
             binding.status.text = "${getString(R.string.import_source, getString(source))}\n$description"
         }.onFailure { binding.status.text = it.message ?: getString(fallbackError) }
     }
@@ -330,13 +460,17 @@ class ConnectionFragment : Fragment() {
                 }
             }
             activity?.runOnUiThread {
-                result.onSuccess(activityHost::requestVpnPermission)
+                result.onSuccess { id ->
+                    loadProfiles()
+                    activityHost.requestVpnPermission(id)
+                }
                     .onFailure { binding.status.text = it.message ?: getString(R.string.invalid_profile) }
             }
         }
     }
 
     private val activityHost get() = requireActivity() as MainActivity
+    private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
 
     private data class ImportPreview(val description: String, val profileUri: String?)
 

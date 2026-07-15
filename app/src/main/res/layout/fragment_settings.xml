@@ -127,6 +127,13 @@
             android:text="@string/settings_system_title"
             android:textAppearance="?attr/textAppearanceTitleMedium" />
 
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/settings_system_description"
+            android:textAppearance="?attr/textAppearanceBodyMedium" />
+
         <Button
             android:id="@+id/open_always_on"
             android:layout_width="match_parent"
@@ -161,6 +168,13 @@
             android:layout_marginTop="24dp"
             android:text="@string/settings_diagnostics_title"
             android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:text="@string/settings_diagnostics_description"
+            android:textAppearance="?attr/textAppearanceBodyMedium" />
 
         <Button
             android:id="@+id/view_diagnostics"

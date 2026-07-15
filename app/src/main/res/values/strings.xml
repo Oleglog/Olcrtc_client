@@ -19,6 +19,7 @@
     <string name="subscription_delete_message">Delete %1$s? You can keep imported profiles as local copies.</string>
     <string name="subscription_keep_profiles">Keep profiles</string>
     <string name="subscription_last_success">updated %1$s</string>
+    <string name="profile_edit_title">Edit %1$s</string>
     <string name="profile_export_secret_warning_title">Copy profile link?</string>
     <string name="profile_export_secret_warning_message">Profile links contain connection secrets. Share them only with people you trust.</string>
     <string name="profile_delete_title">Delete profile?</string>
@@ -53,6 +54,7 @@
     <string name="settings_include_system_apps">Show system apps</string>
     <string name="settings_refresh_app_list">Refresh installed apps</string>
     <string name="settings_select_apps">Select applications</string>
+    <string name="settings_select_apps_description">Choose which apps are affected by the selected per-app routing mode.</string>
     <string name="settings_app_routing_summary">Installed apps: %1$d · selected: %2$d</string>
     <string name="settings_add_routing_rule">Add routing rule</string>
     <string name="settings_update_geo_assets">Update GeoIP/GeoSite assets</string>
@@ -60,6 +62,7 @@
     <string name="settings_routing_rule_hint">ACTION TYPE VALUE, for example DIRECT DOMAIN_SUFFIX example.com</string>
     <string name="settings_routing_rules_summary">Enabled rules: %1$d</string>
     <string name="settings_system_title">System integration</string>
+    <string name="settings_system_description">Shortcuts for Android VPN, battery and update integration.</string>
     <string name="settings_always_on">Always-on VPN settings</string>
     <string name="settings_battery_optimization">Battery optimization settings</string>
     <string name="settings_check_update">Check application update</string>
@@ -72,6 +75,7 @@
     <string name="settings_update_no_asset">Release found, but no compatible APK asset is available</string>
     <string name="settings_system_screen_unavailable">System settings screen is unavailable on this device</string>
     <string name="settings_diagnostics_title">Diagnostics</string>
+    <string name="settings_diagnostics_description">Local troubleshooting logs with secrets removed. Nothing is sent automatically.</string>
     <string name="settings_view_diagnostics">View redacted diagnostics</string>
     <string name="settings_copy_diagnostics">Copy redacted diagnostics</string>
     <string name="settings_export_diagnostics">Export redacted diagnostics</string>
@@ -86,6 +90,10 @@
     <string name="settings_saved">Settings saved</string>
     <string name="olcrtc_uri_hint">Paste an olcrtc:// profile URI</string>
     <string name="no_profile">No profile imported</string>
+    <string name="connect">Connect</string>
+    <string name="add_connection">Add connection</string>
+    <string name="connection_saved_profiles">Saved connections</string>
+    <string name="connection_selected_profile">Selected: %1$s</string>
     <string name="import_and_connect">Import and connect</string>
     <string name="paste_clipboard">Paste</string>
     <string name="scan_qr">Scan QR</string>

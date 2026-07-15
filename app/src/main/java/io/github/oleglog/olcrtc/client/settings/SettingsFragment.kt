@@ -11,7 +11,10 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
+import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.ScrollView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
@@ -176,11 +179,28 @@ class SettingsFragment : Fragment() {
                 }
             }
             result.onSuccess { (apps, selectedPackages) ->
-                val labels = apps.map { "${it.label}\n${it.packageName}" }.toTypedArray()
                 val checked = apps.map { it.packageName in selectedPackages }.toBooleanArray()
+                val list = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
+                val iconSize = 36.dp
+                apps.forEachIndexed { index, app ->
+                    list.addView(CheckBox(requireContext()).apply {
+                        text = "${app.label}\n${app.packageName}"
+                        isChecked = checked[index]
+                        setPadding(12.dp, 8.dp, 12.dp, 8.dp)
+                        runCatching { requireContext().packageManager.getApplicationIcon(app.packageName) }
+                            .onSuccess { icon ->
+                                icon.setBounds(0, 0, iconSize, iconSize)
+                                setCompoundDrawables(icon, null, null, null)
+                                compoundDrawablePadding = 12.dp
+                            }
+                        setOnCheckedChangeListener { _, isChecked -> checked[index] = isChecked }
+                    })
+                }
+                val scroll = ScrollView(requireContext()).apply { addView(list) }
                 AlertDialog.Builder(requireContext())
                     .setTitle(R.string.settings_select_apps)
-                    .setMultiChoiceItems(labels, checked) { _, which, isChecked -> checked[which] = isChecked }
+                    .setMessage(R.string.settings_select_apps_description)
+                    .setView(scroll)
                     .setNegativeButton(R.string.cancel, null)
                     .setPositiveButton(android.R.string.ok) { _, _ ->
                         val selected = apps.filterIndexed { index, _ -> checked[index] }
@@ -384,6 +404,8 @@ class SettingsFragment : Fragment() {
         runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
             .onFailure { _binding?.status?.text = it.message }
     }
+
+    private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
 
     private data class LoadedSettings(
         val routingPolicy: RoutingPolicy,
