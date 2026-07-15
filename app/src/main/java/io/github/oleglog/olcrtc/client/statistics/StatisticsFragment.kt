@@ -1,32 +1,31 @@
 package io.github.oleglog.olcrtc.client.statistics
 
+import android.graphics.Color
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
 import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
+import com.google.android.material.card.MaterialCardView
 import io.github.oleglog.olcrtc.client.R
 import io.github.oleglog.olcrtc.client.data.ConnectionSessionEntity
-import io.github.oleglog.olcrtc.client.databinding.FragmentSectionBinding
+import io.github.oleglog.olcrtc.client.databinding.FragmentStatisticsBinding
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
 
 class StatisticsFragment : Fragment() {
-    private var _binding: FragmentSectionBinding? = null
+    private var _binding: FragmentStatisticsBinding? = null
     private val statistics by lazy { ConnectionSessionRepository.open(requireContext().applicationContext) }
     private val storage = Executors.newSingleThreadExecutor()
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View {
-        val binding = FragmentSectionBinding.inflate(inflater, container, false)
-        _binding = binding
-        binding.title.setText(R.string.navigation_statistics)
-        binding.content.setText(R.string.statistics_loading)
-        addClearButton(binding)
+        _binding = FragmentStatisticsBinding.inflate(inflater, container, false)
+        binding.clearHistory.setOnClickListener { confirmClearHistory() }
         return binding.root
     }
 
@@ -45,31 +44,89 @@ class StatisticsFragment : Fragment() {
         super.onDestroy()
     }
 
-    private fun addClearButton(binding: FragmentSectionBinding) {
-        val root = binding.root as? LinearLayout ?: return
-        root.addView(
-            Button(requireContext()).apply {
-                setText(R.string.statistics_clear_history)
-                setOnClickListener { confirmClearHistory() }
-            },
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = 16.dp },
-        )
-    }
-
     private fun loadStatistics() {
         storage.execute {
             val result = runCatching { statistics.summary() }
             activity?.runOnUiThread {
-                val binding = _binding ?: return@runOnUiThread
-                binding.content.text = result.fold(
-                    onSuccess = ::formatSummary,
-                    onFailure = { it.message ?: getString(R.string.statistics_error) },
-                )
+                val b = _binding ?: return@runOnUiThread
+                result.onSuccess(::showSummary).onFailure {
+                    b.activeContent.text = it.message ?: getString(R.string.statistics_error)
+                    b.todayContent.text = ""
+                    b.monthContent.text = ""
+                    b.historyEmpty.visibility = View.VISIBLE
+                    b.historyList.removeAllViews()
+                }
             }
         }
+    }
+
+    private fun showSummary(summary: StatisticsSummary) {
+        val b = binding
+        b.activeContent.text = summary.current?.let(::formatCurrentSession) ?: getString(R.string.statistics_no_active_session)
+        b.todayContent.text = formatTotals(summary.today)
+        b.monthContent.text = formatTotals(summary.month)
+        b.historyList.removeAllViews()
+        if (summary.recent.isEmpty()) {
+            b.historyEmpty.visibility = View.VISIBLE
+        } else {
+            b.historyEmpty.visibility = View.GONE
+            summary.recent.take(8).forEach { b.historyList.addView(recentSessionRow(it)) }
+        }
+    }
+
+    private fun recentSessionRow(session: ConnectionSessionEntity): View {
+        val started = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(session.startedAt))
+        val endedAt = session.endedAt ?: System.currentTimeMillis()
+        val text = getString(
+            R.string.statistics_recent_session_format,
+            started,
+            session.profileNameSnapshot,
+            formatDuration(endedAt - session.startedAt),
+            formatBytes(session.bytesUp + session.bytesDown),
+            session.disconnectReason ?: getString(R.string.statistics_disconnect_unknown),
+        )
+        val row = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            setPadding(0, 6.dp, 0, 6.dp)
+        }
+        row.addView(View(requireContext()).apply {
+            setBackgroundColor(disconnectColor(session.disconnectReason))
+            layoutParams = LinearLayout.LayoutParams(8.dp, 8.dp).apply {
+                marginEnd = 12.dp
+            }
+        })
+        row.addView(TextView(requireContext()).apply {
+            text = text
+            setTextAppearance(android.R.style.TextAppearance_Material_Body1)
+            setOnClickListener { showReasonDialog(session) }
+        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        return row
+    }
+
+    private fun disconnectColor(reason: String?): Int = when {
+        reason == null -> Color.parseColor("#4CAF50")
+        reason.startsWith("error", ignoreCase = true) || reason.contains("fail", ignoreCase = true) -> Color.parseColor("#E53935")
+        reason.startsWith("manual", ignoreCase = true) || reason.equals("user", ignoreCase = true) -> Color.parseColor("#FBC02D")
+        else -> Color.parseColor("#9E9E9E")
+    }
+
+    private fun showReasonDialog(session: ConnectionSessionEntity) {
+        AlertDialog.Builder(requireContext())
+            .setTitle(session.profileNameSnapshot)
+            .setMessage(
+                buildString {
+                    appendLine("Started: ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(session.startedAt))}")
+                    session.endedAt?.let { appendLine("Ended: ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))}") }
+                    appendLine("Duration: ${formatDuration((session.endedAt ?: System.currentTimeMillis()) - session.startedAt)}")
+                    appendLine("Up: ${formatBytes(session.bytesUp)}")
+                    appendLine("Down: ${formatBytes(session.bytesDown)}")
+                    appendLine("Reason: ${session.disconnectReason ?: getString(R.string.statistics_disconnect_unknown)}")
+                    appendLine("Network: ${session.networkType}")
+                },
+            )
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     private fun confirmClearHistory() {
@@ -86,23 +143,7 @@ class StatisticsFragment : Fragment() {
             .show()
     }
 
-    private fun formatSummary(summary: StatisticsSummary): String = buildString {
-        appendLine(getString(R.string.statistics_current_session))
-        appendLine(summary.current?.let(::formatCurrentSession) ?: getString(R.string.statistics_no_active_session))
-        appendLine()
-        appendLine(getString(R.string.statistics_today))
-        appendLine(formatTotals(summary.today))
-        appendLine()
-        appendLine(getString(R.string.statistics_month))
-        appendLine(formatTotals(summary.month))
-        appendLine()
-        appendLine(getString(R.string.statistics_recent_sessions))
-        if (summary.recent.isEmpty()) {
-            appendLine(getString(R.string.statistics_no_history))
-        } else {
-            summary.recent.take(8).forEach { appendLine(formatRecentSession(it)) }
-        }
-    }
+    private val binding get() = requireNotNull(_binding)
 
     private fun formatCurrentSession(session: ConnectionSessionEntity): String = getString(
         R.string.statistics_active_session_format,
@@ -111,19 +152,6 @@ class StatisticsFragment : Fragment() {
         formatDuration(System.currentTimeMillis() - session.startedAt),
         session.networkType,
     )
-
-    private fun formatRecentSession(session: ConnectionSessionEntity): String {
-        val started = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(session.startedAt))
-        val endedAt = session.endedAt ?: System.currentTimeMillis()
-        return getString(
-            R.string.statistics_recent_session_format,
-            started,
-            session.profileNameSnapshot,
-            formatDuration(endedAt - session.startedAt),
-            formatBytes(session.bytesUp + session.bytesDown),
-            session.disconnectReason ?: getString(R.string.statistics_disconnect_unknown),
-        )
-    }
 
     private fun formatTotals(totals: StatisticsTotals): String = getString(
         R.string.statistics_totals_format,

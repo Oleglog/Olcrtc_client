@@ -70,23 +70,45 @@ class ProfilesFragment : Fragment() {
         val isEmpty = model.local.isEmpty() && model.subscriptions.isEmpty()
         binding.empty.visibility = if (isEmpty) View.VISIBLE else View.GONE
         binding.profileList.removeAllViews()
-        if (model.local.isNotEmpty()) {
+        model.local.takeIf { it.isNotEmpty() }?.let { local ->
             binding.profileList.addView(sectionTitle(getString(R.string.profile_group_local)))
-            model.local.forEach { binding.profileList.addView(localProfileRow(it)) }
+            binding.profileList.addView(materialCard().apply {
+                addView(verticalContainer().apply {
+                    local.forEach { addView(localProfileRow(it)) }
+                })
+            })
         }
         model.subscriptions.forEach { subscription ->
             binding.profileList.addView(sectionTitle(subscriptionHeader(subscription)))
-            binding.profileList.addView(subscriptionActions(subscription))
+            val card = materialCard().apply {
+                addView(verticalContainer().apply {
+                    addView(subscriptionActions(subscription))
+                })
+            }
+            binding.profileList.addView(card)
             storage.execute {
                 val result = runCatching { profiles.listSubscriptionProfiles(subscription.id) }
                 activity?.runOnUiThread {
                     val current = _binding ?: return@runOnUiThread
+                    val innerContainer = (card.getChildAt(0) as? LinearLayout) ?: return@runOnUiThread
                     result.getOrDefault(emptyList()).forEach { item ->
-                        current.profileList.addView(subscriptionProfileRow(item))
+                        innerContainer.addView(subscriptionProfileRow(item))
                     }
                 }
             }
         }
+    }
+
+    private fun materialCard(): com.google.android.material.card.MaterialCardView =
+        com.google.android.material.card.MaterialCardView(requireContext()).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                bottomMargin = 8.dp
+            }
+        }
+
+    private fun verticalContainer(): LinearLayout = LinearLayout(requireContext()).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(16.dp, 12.dp, 16.dp, 12.dp)
     }
 
     private fun localProfileRow(profile: ProfileSummary): View {

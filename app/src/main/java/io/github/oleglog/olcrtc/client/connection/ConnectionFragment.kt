@@ -23,6 +23,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import com.google.android.material.card.MaterialCardView
 import io.github.oleglog.olcrtc.client.MainActivity
 import io.github.oleglog.olcrtc.client.R
 import io.github.oleglog.olcrtc.client.data.ProfileRepository
@@ -55,6 +56,8 @@ class ConnectionFragment : Fragment() {
     private var currentState = VpnState.NO_PROFILE
     private var selectedProfileId: Long? = null
     private var selectedSubscriptionProfileId: String? = null
+    private var connectedProfileId: Long? = null
+    private var connectedSubscriptionProfileId: String? = null
 
     private val qrImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         uri?.let(::decodeQrImage)
@@ -138,31 +141,82 @@ class ConnectionFragment : Fragment() {
         }
     }
 
-    private fun profileCard(id: Long, name: String, type: String, endpoint: String): View = LinearLayout(requireContext()).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(16.dp, 14.dp, 16.dp, 14.dp)
-        isClickable = true
-        isFocusable = true
-        addView(TextView(requireContext()).apply {
-            text = name
-            textSize = 18f
-        })
-        addView(TextView(requireContext()).apply { text = "$type - $endpoint" })
-        setOnClickListener { selectProfile(id, name, type, endpoint) }
+    private fun profileCard(id: Long, name: String, type: String, endpoint: String): View =
+        MaterialCardView(requireContext()).apply {
+            tag = "local:$id"
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = 8.dp
+            }
+            isClickable = true
+            isFocusable = true
+            strokeColor = cardStrokeState(id == selectedProfileId, id == connectedProfileId)
+            strokeWidth = cardStrokeWidth(id == selectedProfileId, id == connectedProfileId)
+            addView(LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(16.dp, 14.dp, 16.dp, 14.dp)
+                addView(TextView(requireContext()).apply {
+                    text = name
+                    textSize = 18f
+                })
+                addView(TextView(requireContext()).apply { text = "$type - $endpoint" })
+            })
+            setOnClickListener { selectProfile(id, name, type, endpoint) }
+        }
+
+
+    private fun subscriptionProfileCard(id: String, name: String, type: String, endpoint: String): View =
+        MaterialCardView(requireContext()).apply {
+            tag = "sub:$id"
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                topMargin = 8.dp
+            }
+            isClickable = true
+            isFocusable = true
+            strokeColor = cardStrokeState(id == selectedSubscriptionProfileId, id == connectedSubscriptionProfileId)
+            strokeWidth = cardStrokeWidth(id == selectedSubscriptionProfileId, id == connectedSubscriptionProfileId)
+            addView(LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(16.dp, 14.dp, 16.dp, 14.dp)
+                addView(TextView(requireContext()).apply {
+                    text = name
+                    textSize = 18f
+                })
+                addView(TextView(requireContext()).apply { text = "$type - $endpoint" })
+            })
+            setOnClickListener { selectSubscriptionProfile(id, name, type, endpoint) }
+        }
+
+    private fun cardStrokeState(selected: Boolean, connected: Boolean): Int {
+        val attr = when {
+            connected -> com.google.android.material.R.attr.colorPrimary
+            selected -> com.google.android.material.R.attr.colorSecondary
+            else -> com.google.android.material.R.attr.colorOutline
+        }
+        val ta = requireContext().obtainStyledAttributes(intArrayOf(attr))
+        return ta.getColor(0, 0).also { ta.recycle() }
     }
 
+    private fun cardStrokeWidth(selected: Boolean, connected: Boolean): Int =
+        (if (connected) 3.dp else if (selected) 2.dp else 1.dp)
 
-    private fun subscriptionProfileCard(id: String, name: String, type: String, endpoint: String): View = LinearLayout(requireContext()).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(16.dp, 14.dp, 16.dp, 14.dp)
-        isClickable = true
-        isFocusable = true
-        addView(TextView(requireContext()).apply {
-            text = name
-            textSize = 18f
-        })
-        addView(TextView(requireContext()).apply { text = "$type - $endpoint" })
-        setOnClickListener { selectSubscriptionProfile(id, name, type, endpoint) }
+    private fun refreshAllCardStrokes() {
+        for (i in 0 until binding.profileList.childCount) {
+            (binding.profileList.getChildAt(i) as? MaterialCardView)?.let { card ->
+                val (sel, conn) = when (val tag = card.tag?.toString()) {
+                    null -> false to false
+                    else -> {
+                        val parts = tag.split(":", limit = 2)
+                        when (parts.firstOrNull()) {
+                            "local" -> (parts.getOrNull(1)?.toLongOrNull() == selectedProfileId) to (parts.getOrNull(1)?.toLongOrNull() == connectedProfileId)
+                            "sub" -> (parts.getOrNull(1) == selectedSubscriptionProfileId) to (parts.getOrNull(1) == connectedSubscriptionProfileId)
+                            else -> false to false
+                        }
+                    }
+                }
+                card.strokeColor = cardStrokeState(sel, conn)
+                card.strokeWidth = cardStrokeWidth(sel, conn)
+            }
+        }
     }
 
     private fun selectSubscriptionProfile(id: String, name: String, type: String, endpoint: String) {
@@ -171,6 +225,7 @@ class ConnectionFragment : Fragment() {
         binding.selectedProfile.text = "$name\n$type - $endpoint"
         binding.status.text = getString(R.string.connection_selected_profile, name)
         binding.connect.isEnabled = currentState !in BUSY_STATES
+        refreshAllCardStrokes()
     }
 
     private fun selectProfile(id: Long, name: String, type: String, endpoint: String) {
@@ -179,6 +234,7 @@ class ConnectionFragment : Fragment() {
         binding.selectedProfile.text = "$name\n$type - $endpoint"
         binding.status.text = getString(R.string.connection_selected_profile, name)
         binding.connect.isEnabled = currentState !in BUSY_STATES
+        refreshAllCardStrokes()
     }
 
     private fun connectSelectedOrImport() {
@@ -230,9 +286,21 @@ class ConnectionFragment : Fragment() {
     }    private fun showVpnState(state: VpnState, error: String?) {
         if (_binding == null) return
         currentState = state
+        when (state) {
+            VpnState.CONNECTED -> {
+                connectedProfileId = selectedProfileId
+                connectedSubscriptionProfileId = selectedSubscriptionProfileId
+            }
+            VpnState.DISCONNECTED, VpnState.ERROR, VpnState.NO_PROFILE -> {
+                connectedProfileId = null
+                connectedSubscriptionProfileId = null
+            }
+            else -> {}
+        }
         binding.status.text = error ?: state.name
         binding.connect.text = getString(if (state == VpnState.CONNECTED) R.string.disconnect else R.string.connect)
-        binding.connect.isEnabled = state !in BUSY_STATES && (state == VpnState.CONNECTED || selectedProfileId != null || !binding.profileUri.text.isNullOrBlank())
+        binding.connect.isEnabled = state !in BUSY_STATES && (state == VpnState.CONNECTED || selectedProfileId != null || selectedSubscriptionProfileId != null || !binding.profileUri.text.isNullOrBlank())
+        refreshAllCardStrokes()
     }
 
     private fun requestScanner() {
@@ -267,6 +335,8 @@ class ConnectionFragment : Fragment() {
                                 validatePreview(raw, R.string.source_camera)
                             }
                         }
+                    } catch (_: Throwable) {
+                        // ponytail: defensive — single bad frame should not kill scanner
                     } finally {
                         image.close()
                     }

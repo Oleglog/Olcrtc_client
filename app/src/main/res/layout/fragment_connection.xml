@@ -16,16 +16,22 @@
             android:text="@string/navigation_connection"
             android:textAppearance="?attr/textAppearanceHeadlineMedium" />
 
-        <TextView
-            android:id="@+id/selected_profile"
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/selected_profile_card"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:padding="16dp"
-            android:text="@string/no_profile"
-            android:textAppearance="?attr/textAppearanceTitleMedium" />
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp">
 
-        <Button
+            <TextView
+                android:id="@+id/selected_profile"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:padding="16dp"
+                android:text="@string/no_profile"
+                android:textAppearance="?attr/textAppearanceTitleMedium" />
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/connect"
             android:layout_width="match_parent"
             android:layout_height="72dp"
@@ -39,15 +45,17 @@
             android:layout_marginTop="12dp"
             android:orientation="horizontal">
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/add_profile"
+                style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="@string/add_connection" />
 
-            <Button
+            <com.google.android.material.button.MaterialButton
                 android:id="@+id/test_selected"
+                style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="8dp"

@@ -18,8 +18,14 @@ internal object QrFrameDecoder {
         DecodeHintType.CHARACTER_SET to "UTF-8",
     )
 
-    fun decode(image: ImageProxy): String? {
-        require(image.format == ImageFormat.YUV_420_888) { "Unsupported camera image format" }
+    fun decode(image: ImageProxy): String? = try {
+        decodeInternal(image)
+    } catch (_: Throwable) {
+        null
+    }
+
+    private fun decodeInternal(image: ImageProxy): String? {
+        if (image.format != ImageFormat.YUV_420_888) return null
         val plane = image.planes[0]
         val width = image.width
         val height = image.height
