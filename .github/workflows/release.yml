@@ -31,7 +31,16 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25.7"
-          cache: false
+          cache: true
+          cache-dependency-path: native/mobilecore/go.mod
+
+      - name: Cache gomobile and HEV sources
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/bin/gomobile
+            native/hev-socks5-tunnel/upstream
+          key: release-native-${{ runner.os }}-${{ hashFiles('scripts/build_mobilecore.sh', 'scripts/build_hev.sh', 'native/mobilecore/go.mod') }}
 
       - uses: android-actions/setup-android@v3
 
@@ -60,11 +69,13 @@ jobs:
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
+          MOBILECORE_TARGET: android/arm,android/arm64
 
       - name: Build HEV tunnel
         run: scripts/build_hev.sh
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
+          HEV_APP_ABI: armeabi-v7a arm64-v8a
 
       - name: Assemble signed release APK
         run: ./gradlew --no-daemon :app:assembleRelease

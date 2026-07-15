@@ -23,7 +23,15 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25.7"
-          cache: false
+          cache: true
+          cache-dependency-path: native/mobilecore/go.mod
+      - name: Cache gomobile and HEV sources
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/bin/gomobile
+            native/hev-socks5-tunnel/upstream
+          key: android-native-${{ runner.os }}-${{ hashFiles('scripts/build_mobilecore.sh', 'scripts/build_hev.sh', 'native/mobilecore/go.mod') }}
       - uses: android-actions/setup-android@v3
       - run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
       - run: python scripts/verify_licenses.py

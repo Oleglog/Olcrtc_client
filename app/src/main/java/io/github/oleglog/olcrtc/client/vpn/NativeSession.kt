@@ -38,6 +38,8 @@ internal class NativeSession(
         }
     }
 
+    fun trafficCounters(): TrafficCounters = hevTunnel.trafficCounters()
+
     override fun close() {
         stop(null)
     }

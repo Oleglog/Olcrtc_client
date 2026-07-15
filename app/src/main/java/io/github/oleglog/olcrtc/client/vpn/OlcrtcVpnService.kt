@@ -477,7 +477,7 @@ class OlcrtcVpnService : VpnService() {
     private fun finishConnectionSession(reason: String?) {
         val sessionId = activeSessionId ?: return
         activeSessionId = null
-        val counters = runCatching { GomobileCore.trafficCounters() }.getOrDefault(TrafficCounters())
+        val counters = runCatching { nativeSession?.trafficCounters() ?: TrafficCounters() }.getOrDefault(TrafficCounters())
         runCatching {
             connectionSessions.finish(
                 id = sessionId,
@@ -663,7 +663,7 @@ class OlcrtcVpnService : VpnService() {
 
     private fun startNotificationTicker() {
         if (notificationTicker != null) return
-        lastTrafficCounters = runCatching { GomobileCore.trafficCounters() }.getOrDefault(TrafficCounters())
+        lastTrafficCounters = runCatching { nativeSession?.trafficCounters() ?: TrafficCounters() }.getOrDefault(TrafficCounters())
         lastTrafficSampleAt = System.currentTimeMillis()
         notificationTicker = commands.scheduleAtFixedRate({ sampleTrafficAndNotify() }, 1, 1, TimeUnit.SECONDS)
     }
@@ -677,7 +677,7 @@ class OlcrtcVpnService : VpnService() {
     private fun sampleTrafficAndNotify() {
         if (publishedState != VpnState.CONNECTED) return
         val now = System.currentTimeMillis()
-        val counters = runCatching { GomobileCore.trafficCounters() }.getOrDefault(lastTrafficCounters)
+        val counters = runCatching { nativeSession?.trafficCounters() ?: lastTrafficCounters }.getOrDefault(lastTrafficCounters)
         val elapsedMillis = (now - lastTrafficSampleAt).coerceAtLeast(1)
         val upPerSecond = ((counters.bytesUp - lastTrafficCounters.bytesUp).coerceAtLeast(0) * 1000) / elapsedMillis
         val downPerSecond = ((counters.bytesDown - lastTrafficCounters.bytesDown).coerceAtLeast(0) * 1000) / elapsedMillis

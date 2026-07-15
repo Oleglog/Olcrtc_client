@@ -25,6 +25,14 @@ class HevTunnel : NativeTunnel {
 
     fun stats(): LongArray = nativeStats()
 
+    override fun trafficCounters(): TrafficCounters {
+        val values = runCatching { nativeStats() }.getOrElse { return TrafficCounters() }
+        return TrafficCounters(
+            bytesUp = values.getOrNull(1)?.coerceAtLeast(0) ?: 0,
+            bytesDown = values.getOrNull(3)?.coerceAtLeast(0) ?: 0,
+        )
+    }
+
     override fun close() {
         try {
             stop()

@@ -53,6 +53,6 @@ trap 'rm -f "$GENERATED_BRIDGE"' EXIT
   APP_BUILD_SCRIPT="$JNI" \
   NDK_APPLICATION_MK="$ROOT/app/src/main/jni/Application.mk" \
   HEV_SOURCE="$SOURCE" \
-  APP_ABI="armeabi-v7a arm64-v8a x86_64" \
+  APP_ABI="${HEV_APP_ABI:-armeabi-v7a arm64-v8a x86_64}" \
   NDK_LIBS_OUT="$OUTPUT" \
   REV_ID="$REV_ID"
