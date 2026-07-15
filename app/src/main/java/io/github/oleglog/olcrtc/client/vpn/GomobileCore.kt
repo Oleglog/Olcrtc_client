@@ -39,6 +39,11 @@ internal object GomobileCore : NativeCore {
         Mobilecore.validateXrayConfig(assetDirectory, configJson)
     }
 
+    override fun trafficCounters(): TrafficCounters = TrafficCounters(
+        bytesUp = Mobilecore.trafficBytesUp(),
+        bytesDown = Mobilecore.trafficBytesDown(),
+    )
+
     fun isFatalError(error: Throwable): Boolean =
         Mobilecore.isFatalError(error.message.orEmpty())
 

@@ -174,6 +174,93 @@ internal data class SubscriptionGroupRow(
     @ColumnInfo(name = "subscription_id") val subscriptionId: Long,
 )
 
+@Entity(
+    tableName = "connection_sessions",
+    indices = [
+        Index(value = ["profileId"]),
+        Index(value = ["startedAt"]),
+    ],
+)
+internal data class ConnectionSessionEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val profileId: String?,
+    val profileNameSnapshot: String,
+    val protocolSnapshot: String,
+    val startedAt: Long,
+    val endedAt: Long?,
+    val bytesUp: Long,
+    val bytesDown: Long,
+    val disconnectReason: String?,
+    val networkType: String,
+)
+
+internal data class ConnectionSessionTotals(
+    val count: Int,
+    val durationMillis: Long,
+    val bytesUp: Long,
+    val bytesDown: Long,
+)
+
+@Entity(tableName = "app_routing_entries")
+internal data class AppRoutingEntryEntity(
+    @PrimaryKey val packageName: String,
+    val selected: Boolean,
+    val labelSnapshot: String,
+)
+
+@Dao
+internal interface AppRoutingEntryDao {
+    @Query("SELECT * FROM app_routing_entries ORDER BY labelSnapshot, packageName")
+    fun getAll(): List<AppRoutingEntryEntity>
+
+    @Query("SELECT packageName FROM app_routing_entries WHERE selected = 1 ORDER BY packageName")
+    fun getSelectedPackages(): List<String>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun upsert(entries: List<AppRoutingEntryEntity>)
+
+    @Query("UPDATE app_routing_entries SET selected = :selected WHERE packageName IN (:packageNames)")
+    fun setSelected(packageNames: List<String>, selected: Boolean): Int
+
+    @Query("DELETE FROM app_routing_entries WHERE packageName IN (:packageNames)")
+    fun delete(packageNames: List<String>): Int
+}
+
+@Dao
+internal interface ConnectionSessionDao {
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    fun insert(session: ConnectionSessionEntity): Long
+
+    @Query(
+        "UPDATE connection_sessions SET endedAt = :endedAt, bytesUp = :bytesUp, " +
+            "bytesDown = :bytesDown, disconnectReason = :disconnectReason WHERE id = :id AND endedAt IS NULL",
+    )
+    fun finish(
+        id: Long,
+        endedAt: Long,
+        bytesUp: Long,
+        bytesDown: Long,
+        disconnectReason: String?,
+    ): Int
+
+    @Query("SELECT * FROM connection_sessions WHERE endedAt IS NULL ORDER BY startedAt DESC LIMIT 1")
+    fun getActive(): ConnectionSessionEntity?
+
+    @Query("SELECT * FROM connection_sessions ORDER BY startedAt DESC LIMIT :limit")
+    fun getRecent(limit: Int): List<ConnectionSessionEntity>
+
+    @Query("DELETE FROM connection_sessions")
+    fun clear(): Int
+
+    @Query(
+        "SELECT COUNT(*) AS count, " +
+            "COALESCE(SUM(COALESCE(endedAt, :now) - startedAt), 0) AS durationMillis, " +
+            "COALESCE(SUM(bytesUp), 0) AS bytesUp, COALESCE(SUM(bytesDown), 0) AS bytesDown " +
+            "FROM connection_sessions WHERE startedAt >= :since",
+    )
+    fun totalsSince(since: Long, now: Long): ConnectionSessionTotals
+}
+
 @Dao
 internal abstract class SubscriptionDao {
     @Insert(onConflict = OnConflictStrategy.ABORT)
@@ -217,6 +304,12 @@ internal abstract class SubscriptionDao {
 
     @Query("SELECT * FROM subscriptions WHERE id = :id")
     abstract fun getSubscription(id: Long): SubscriptionEntity?
+
+    @Query("SELECT * FROM subscriptions ORDER BY name, id")
+    abstract fun getSubscriptions(): List<SubscriptionEntity>
+
+    @Query("UPDATE subscriptions SET name = :name, encryptedUrl = :encryptedUrl WHERE id = :id")
+    abstract fun updateSubscriptionSource(id: Long, name: String, encryptedUrl: ByteArray): Int
 
     @Query("SELECT * FROM subscription_profiles WHERE groupId = :groupId ORDER BY sortOrder")
     abstract fun getProfiles(groupId: Long): List<SubscriptionProfileEntity>
@@ -430,15 +523,19 @@ internal class RoutingRuleRepository(
         ProfileGroupEntity::class,
         SubscriptionEntity::class,
         SubscriptionProfileEntity::class,
+        ConnectionSessionEntity::class,
+        AppRoutingEntryEntity::class,
         RoutingRuleEntity::class,
     ],
-    version = 5,
+    version = 7,
     exportSchema = true,
 )
 internal abstract class ClientDatabase : RoomDatabase() {
     abstract fun olcrtcProfiles(): OlcrtcProfileDao
     abstract fun standardProfiles(): StandardProfileDao
     abstract fun subscriptions(): SubscriptionDao
+    abstract fun connectionSessions(): ConnectionSessionDao
+    abstract fun appRoutingEntries(): AppRoutingEntryDao
     abstract fun routingRules(): RoutingRuleDao
 
     companion object {
@@ -493,11 +590,29 @@ internal abstract class ClientDatabase : RoomDatabase() {
             }
         }
 
+        internal val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `connection_sessions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `profileId` TEXT, `profileNameSnapshot` TEXT NOT NULL, `protocolSnapshot` TEXT NOT NULL, `startedAt` INTEGER NOT NULL, `endedAt` INTEGER, `bytesUp` INTEGER NOT NULL, `bytesDown` INTEGER NOT NULL, `disconnectReason` TEXT, `networkType` TEXT NOT NULL)""",
+                )
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_connection_sessions_profileId` ON `connection_sessions` (`profileId`)")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_connection_sessions_startedAt` ON `connection_sessions` (`startedAt`)")
+            }
+        }
+
+        internal val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `app_routing_entries` (`packageName` TEXT NOT NULL, `selected` INTEGER NOT NULL, `labelSnapshot` TEXT NOT NULL, PRIMARY KEY(`packageName`))""",
+                )
+            }
+        }
+
         fun open(context: Context): ClientDatabase = Room.databaseBuilder(
             context.applicationContext,
             ClientDatabase::class.java,
             "olcrtc-client.db",
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
             .addCallback(localGroupCallback)
             .enableMultiInstanceInvalidation()
             .build()

@@ -21,11 +21,13 @@ import androidx.core.content.ContextCompat
 import io.github.oleglog.olcrtc.client.R
 import io.github.oleglog.olcrtc.client.data.ProfileConfig
 import io.github.oleglog.olcrtc.client.data.ProfileRepository
+import io.github.oleglog.olcrtc.client.diagnostics.DiagnosticsLogStore
 import io.github.oleglog.olcrtc.client.routing.DnsEndpoint
 import io.github.oleglog.olcrtc.client.routing.GeoAssetManager
 import io.github.oleglog.olcrtc.client.routing.PerAppPolicy
 import io.github.oleglog.olcrtc.client.routing.RoutingPolicy
 import io.github.oleglog.olcrtc.client.routing.RoutingSettings
+import io.github.oleglog.olcrtc.client.statistics.ConnectionSessionRepository
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionHttpClient
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import java.net.DatagramPacket
@@ -33,6 +35,7 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Proxy
+import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.ThreadLocalRandom
@@ -49,9 +52,16 @@ class OlcrtcVpnService : VpnService() {
     private var publishedState = VpnState.NO_PROFILE
     private lateinit var profiles: ProfileRepository
     private lateinit var routingSettings: RoutingSettings
+    private lateinit var connectionSessions: ConnectionSessionRepository
+    private lateinit var diagnostics: DiagnosticsLogStore
     private lateinit var connectivity: ConnectivityManager
     private var activeProfile: ProfileReference? = null
     private var activeProfileInfo: ProfileInfo? = null
+    private var activeSessionId: Long? = null
+    private var lastTrafficCounters = TrafficCounters()
+    private var lastTrafficSampleAt = 0L
+    private var trafficSpeedText = ""
+    private var notificationTicker: ScheduledFuture<*>? = null
     @Volatile private var activeSocksPort: Int? = null
     private var nativeSession: NativeSession? = null
     private var reconnectFuture: ScheduledFuture<*>? = null
@@ -136,6 +146,9 @@ class OlcrtcVpnService : VpnService() {
         super.onCreate()
         profiles = ProfileRepository.open(this)
         routingSettings = RoutingSettings.open(this)
+        connectionSessions = ConnectionSessionRepository.open(this)
+        diagnostics = DiagnosticsLogStore.open(this)
+        diagnostics.prune()
         connectivity = getSystemService(ConnectivityManager::class.java)
         GomobileCore.setProtector(::protect)
         createNotificationChannel()
@@ -205,6 +218,8 @@ class OlcrtcVpnService : VpnService() {
         runCatching { connectivity.unregisterNetworkCallback(networkCallback) }
         runCatching { unregisterReceiver(userUnlockedReceiver) }
         activeNetwork = null
+        stopNotificationTicker()
+        finishConnectionSession("service destroyed")
         activeSocksPort = null
         runCatching { nativeSession?.close() }
         nativeSession = null
@@ -301,8 +316,10 @@ class OlcrtcVpnService : VpnService() {
             transition(VpnState.CONNECTING)
             nativeSession = startNativeSession(profile)
             transition(VpnState.CONNECTED)
+            startConnectionSession(reference)
             refreshStaleSubscriptions()
         } catch (error: Throwable) {
+            diagnostics.append("error", "VPN start failed for ${reference.displayId}", error)
             handleConnectionFailure(error)
         }
     }
@@ -386,9 +403,11 @@ class OlcrtcVpnService : VpnService() {
             val profile = loadProfile(reference) ?: error("profile ${reference.displayId} not found")
             nativeSession = startNativeSession(profile)
             transition(VpnState.CONNECTED)
+            startConnectionSession(reference)
             cancelAutomaticReconnect()
             refreshStaleSubscriptions()
         } catch (error: Throwable) {
+            diagnostics.append("error", "Automatic reconnect failed for ${reference.displayId}", error)
             runCatching { closeNativeSession() }
             handleConnectionFailure(error)
         }
@@ -397,6 +416,7 @@ class OlcrtcVpnService : VpnService() {
     private fun handleConnectionFailure(error: Throwable) {
         if (isFatalReconnectError(error)) {
             cancelAutomaticReconnect()
+            finishConnectionSession(error.message ?: error.javaClass.simpleName)
             persistVpnIntent(false, activeProfile ?: persistedProfileReference())
             transition(VpnState.ERROR, error.message ?: error.javaClass.simpleName)
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -430,6 +450,7 @@ class OlcrtcVpnService : VpnService() {
             -> {
                 transition(VpnState.STOPPING)
                 try {
+                    finishConnectionSession("user stopped")
                     closeNativeSession()
                     transition(if (activeProfile == null) VpnState.NO_PROFILE else VpnState.DISCONNECTED)
                 } catch (error: Throwable) {
@@ -440,6 +461,42 @@ class OlcrtcVpnService : VpnService() {
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    private fun startConnectionSession(reference: ProfileReference) {
+        if (activeSessionId != null) return
+        val profile = activeProfileInfo ?: return
+        activeSessionId = connectionSessions.start(
+            profileId = reference.sessionId,
+            profileName = profile.name,
+            protocol = profile.protocol,
+            networkType = currentNetworkType(),
+        )
+    }
+
+    private fun finishConnectionSession(reason: String?) {
+        val sessionId = activeSessionId ?: return
+        activeSessionId = null
+        val counters = runCatching { GomobileCore.trafficCounters() }.getOrDefault(TrafficCounters())
+        runCatching {
+            connectionSessions.finish(
+                id = sessionId,
+                reason = reason,
+                bytesUp = counters.bytesUp,
+                bytesDown = counters.bytesDown,
+            )
+        }
+    }
+
+    private fun currentNetworkType(): String {
+        val capabilities = connectivity.getNetworkCapabilities(activeNetwork) ?: return "unknown"
+        return when {
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "mobile"
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> "vpn"
+            else -> "other"
+        }
     }
 
     private fun establishTun(dns: DnsEndpoint): TunDescriptor {
@@ -582,6 +639,13 @@ class OlcrtcVpnService : VpnService() {
     private fun transition(state: VpnState, error: String? = null) {
         stateMachine.transition(state)
         publishedState = state
+        if (::diagnostics.isInitialized) {
+            diagnostics.append(
+                if (state == VpnState.ERROR) "error" else "info",
+                "VPN state: $state${error?.let { ": $it" } ?: ""}",
+            )
+        }
+        if (state == VpnState.CONNECTED) startNotificationTicker() else if (state != VpnState.RECONNECTING) stopNotificationTicker()
         updateNotification()
         VpnTileService.update(this, state)
         val count = callbacks.beginBroadcast()
@@ -595,6 +659,36 @@ class OlcrtcVpnService : VpnService() {
         } finally {
             callbacks.finishBroadcast()
         }
+    }
+
+    private fun startNotificationTicker() {
+        if (notificationTicker != null) return
+        lastTrafficCounters = runCatching { GomobileCore.trafficCounters() }.getOrDefault(TrafficCounters())
+        lastTrafficSampleAt = System.currentTimeMillis()
+        notificationTicker = commands.scheduleAtFixedRate({ sampleTrafficAndNotify() }, 1, 1, TimeUnit.SECONDS)
+    }
+
+    private fun stopNotificationTicker() {
+        notificationTicker?.cancel(false)
+        notificationTicker = null
+        trafficSpeedText = ""
+    }
+
+    private fun sampleTrafficAndNotify() {
+        if (publishedState != VpnState.CONNECTED) return
+        val now = System.currentTimeMillis()
+        val counters = runCatching { GomobileCore.trafficCounters() }.getOrDefault(lastTrafficCounters)
+        val elapsedMillis = (now - lastTrafficSampleAt).coerceAtLeast(1)
+        val upPerSecond = ((counters.bytesUp - lastTrafficCounters.bytesUp).coerceAtLeast(0) * 1000) / elapsedMillis
+        val downPerSecond = ((counters.bytesDown - lastTrafficCounters.bytesDown).coerceAtLeast(0) * 1000) / elapsedMillis
+        lastTrafficCounters = counters
+        lastTrafficSampleAt = now
+        trafficSpeedText = getString(
+            R.string.vpn_notification_speed,
+            formatBytesPerSecond(upPerSecond),
+            formatBytesPerSecond(downPerSecond),
+        )
+        updateNotification()
     }
 
     private fun updateNotification() {
@@ -612,7 +706,7 @@ class OlcrtcVpnService : VpnService() {
                 if (profile == null) notificationStateText() else getString(
                     R.string.vpn_notification_profile,
                     profile.protocol,
-                    notificationStateText(),
+                    listOf(notificationStateText(), trafficSpeedText).filter(String::isNotBlank).joinToString(" · "),
                 ),
             )
             .setOngoing(true)
@@ -633,6 +727,17 @@ class OlcrtcVpnService : VpnService() {
             VpnState.ERROR -> R.string.vpn_notification_error
         },
     )
+
+    private fun formatBytesPerSecond(bytesPerSecond: Long): String {
+        val units = arrayOf("B/s", "KiB/s", "MiB/s", "GiB/s")
+        var value = bytesPerSecond.coerceAtLeast(0).toDouble()
+        var unit = 0
+        while (value >= 1024 && unit < units.lastIndex) {
+            value /= 1024
+            unit++
+        }
+        return if (unit == 0) "${value.toLong()} ${units[unit]}" else "%.1f %s".format(Locale.US, value, units[unit])
+    }
 
     private fun stopPendingIntent(): PendingIntent = servicePendingIntent(ACTION_STOP, STOP_REQUEST_CODE)
 
@@ -677,13 +782,16 @@ class OlcrtcVpnService : VpnService() {
 
     private sealed interface ProfileReference {
         val displayId: String
+        val sessionId: String
 
         data class Local(val value: Long) : ProfileReference {
             override val displayId = value.toString()
+            override val sessionId = "local:$value"
         }
 
         data class Subscription(val value: String) : ProfileReference {
             override val displayId = value
+            override val sessionId = "subscription:$value"
         }
     }
 

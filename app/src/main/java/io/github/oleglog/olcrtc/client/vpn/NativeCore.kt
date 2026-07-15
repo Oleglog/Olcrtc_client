@@ -8,8 +8,14 @@ internal interface NativeCore {
     fun waitOlcrtcReady(timeoutMillis: Int)
     fun startXray(assetDirectory: String, configJson: String)
     fun waitXrayReady(socksPort: Int, timeoutMillis: Int)
+    fun trafficCounters(): TrafficCounters = TrafficCounters()
     fun stopAll()
 }
+
+internal data class TrafficCounters(
+    val bytesUp: Long = 0,
+    val bytesDown: Long = 0,
+)
 
 internal fun interface SocketProtector {
     fun protect(fd: Int): Boolean

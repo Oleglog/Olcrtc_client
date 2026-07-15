@@ -2,6 +2,7 @@ package io.github.oleglog.olcrtc.client.profile.standard
 
 import java.net.URI
 import java.net.URLDecoder
+import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 
@@ -19,6 +20,12 @@ object StandardUri {
             "vmess" -> parseVmess(raw)
             else -> throw IllegalArgumentException("Unsupported standard profile scheme")
         }
+    }
+
+    fun serialize(profile: StandardProfile): String = when (profile.protocol) {
+        StandardProfile.Protocol.VLESS -> serializeUrl(profile, "vless", requireNotNull(profile.uuid))
+        StandardProfile.Protocol.TROJAN -> serializeUrl(profile, "trojan", requireNotNull(profile.password))
+        StandardProfile.Protocol.VMESS -> serializeVmess(profile)
     }
 
     private fun parseUrl(raw: String, protocol: StandardProfile.Protocol): StandardProfile {
@@ -96,10 +103,90 @@ object StandardUri {
             fingerprint = values["fp"]?.takeIf(String::isNotBlank),
             allowInsecure = parseBoolean(values["allowInsecure"]),
             webSocketHost = values["host"]?.takeIf(String::isNotBlank),
-            webSocketPath = path,
-            grpcServiceName = path,
+            webSocketPath = path.takeIf { transport == StandardProfile.Transport.WS },
+            grpcServiceName = path.takeIf { transport == StandardProfile.Transport.GRPC },
             dnsServer = values["dns"]?.takeIf(String::isNotBlank),
         )
+    }
+
+    private fun serializeUrl(profile: StandardProfile, scheme: String, credential: String): String {
+        val params = linkedMapOf<String, String>()
+        if (profile.protocol == StandardProfile.Protocol.VLESS) params["encryption"] = "none"
+        params["type"] = when (profile.transport) {
+            StandardProfile.Transport.TCP -> "tcp"
+            StandardProfile.Transport.WS -> "ws"
+            StandardProfile.Transport.GRPC -> "grpc"
+            StandardProfile.Transport.XHTTP -> "xhttp"
+        }
+        params["security"] = when (profile.security) {
+            StandardProfile.Security.NONE -> "none"
+            StandardProfile.Security.TLS -> "tls"
+            StandardProfile.Security.REALITY -> "reality"
+        }
+        profile.flow?.let { params["flow"] = it }
+        profile.serverName?.let { params["sni"] = it }
+        if (profile.alpn.isNotEmpty()) params["alpn"] = profile.alpn.joinToString(",")
+        profile.fingerprint?.let { params["fp"] = it }
+        if (profile.allowInsecure) params["allowInsecure"] = "1"
+        profile.realityPublicKey?.let { params["pbk"] = it }
+        profile.realityShortId?.let { params["sid"] = it }
+        profile.realitySpiderX?.let { params["spx"] = it }
+        when (profile.transport) {
+            StandardProfile.Transport.WS -> {
+                profile.webSocketHost?.let { params["host"] = it }
+                profile.webSocketPath?.let { params["path"] = it }
+            }
+            StandardProfile.Transport.GRPC -> profile.grpcServiceName?.let { params["serviceName"] = it }
+            StandardProfile.Transport.XHTTP -> {
+                profile.xhttpMode?.let { params["mode"] = it }
+                profile.xhttpHost?.let { params["host"] = it }
+                profile.xhttpPath?.let { params["path"] = it }
+                profile.xhttpExtraJson?.let { params["extra"] = it }
+            }
+            StandardProfile.Transport.TCP -> Unit
+        }
+        profile.dnsServer?.let { params["dns"] = it }
+        val query = params.entries.joinToString("&") { (key, value) -> "${encode(key)}=${encode(value)}" }
+        return "$scheme://${encode(credential)}@${profile.address}:${profile.port}?$query#${encode(profile.name)}"
+    }
+
+    private fun serializeVmess(profile: StandardProfile): String {
+        val values = linkedMapOf(
+            "v" to "2",
+            "ps" to profile.name,
+            "add" to profile.address,
+            "port" to profile.port.toString(),
+            "id" to profile.uuid.orEmpty(),
+            "aid" to profile.alterId.toString(),
+            "scy" to profile.cipher,
+            "net" to when (profile.transport) {
+                StandardProfile.Transport.TCP -> "tcp"
+                StandardProfile.Transport.WS -> "ws"
+                StandardProfile.Transport.GRPC -> "grpc"
+                StandardProfile.Transport.XHTTP -> "xhttp"
+            },
+            "type" to "none",
+            "tls" to when (profile.security) {
+                StandardProfile.Security.NONE -> ""
+                StandardProfile.Security.TLS -> "tls"
+                StandardProfile.Security.REALITY -> "reality"
+            },
+            "sni" to profile.serverName.orEmpty(),
+            "alpn" to profile.alpn.joinToString(","),
+            "fp" to profile.fingerprint.orEmpty(),
+            "allowInsecure" to if (profile.allowInsecure) "1" else "0",
+            "host" to profile.webSocketHost.orEmpty(),
+            "path" to when (profile.transport) {
+                StandardProfile.Transport.WS -> profile.webSocketPath.orEmpty()
+                StandardProfile.Transport.GRPC -> profile.grpcServiceName.orEmpty()
+                else -> ""
+            },
+            "dns" to profile.dnsServer.orEmpty(),
+        )
+        val json = values.entries.joinToString(prefix = "{", postfix = "}") { (key, value) ->
+            "\"${escapeJson(key)}\":\"${escapeJson(value)}\""
+        }
+        return "vmess://" + Base64.getUrlEncoder().withoutPadding().encodeToString(json.encodeToByteArray())
     }
 
     private fun parseTransport(value: String): StandardProfile.Transport = when (value.lowercase()) {
@@ -149,6 +236,28 @@ object StandardUri {
     }
 
     private fun decode(value: String): String = URLDecoder.decode(value, StandardCharsets.UTF_8.name())
+
+    private fun encode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.name()).replace("+", "%20")
+
+    private fun escapeJson(value: String): String = buildString {
+        value.forEach { character ->
+            when (character) {
+                '\\' -> append("\\\\")
+                '"' -> append("\\\"")
+                '\b' -> append("\\b")
+                '
+' -> append("\\n")
+                '\r' -> append("\\r")
+                '\t' -> append("\\t")
+                else -> if (character.code < 0x20) {
+                    append("\\u")
+                    append(character.code.toString(16).padStart(4, '0'))
+                } else {
+                    append(character)
+                }
+            }
+        }
+    }
 
     private fun Map<String, String?>.required(name: String): String =
         get(name)?.takeIf(String::isNotBlank) ?: throw IllegalArgumentException("$name is required")

@@ -16,6 +16,12 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0.0"
+        val expectedSigningCertSha256 = providers.gradleProperty("androidSigningCertSha256").orNull.orEmpty()
+        buildConfigField(
+            "String",
+            "EXPECTED_SIGNING_CERT_SHA256",
+            "\"$expectedSigningCertSha256\"",
+        )
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 

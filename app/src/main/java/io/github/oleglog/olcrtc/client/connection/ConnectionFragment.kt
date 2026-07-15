@@ -10,11 +10,13 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.EditText
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
+import androidx.appcompat.app.AlertDialog
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
@@ -28,6 +30,8 @@ import io.github.oleglog.olcrtc.client.importer.QrFrameDecoder
 import io.github.oleglog.olcrtc.client.importer.QrImageDecoder
 import io.github.oleglog.olcrtc.client.profile.ImportedProfile
 import io.github.oleglog.olcrtc.client.profile.ProfileUri
+import io.github.oleglog.olcrtc.client.profile.olcrtc.OlcrtcProfile
+import io.github.oleglog.olcrtc.client.profile.olcrtc.OlcrtcUri
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import io.github.oleglog.olcrtc.client.vpn.VpnState
 import java.io.ByteArrayOutputStream
@@ -74,6 +78,8 @@ class ConnectionFragment : Fragment() {
         binding.importFile.setOnClickListener {
             filePicker.launch(arrayOf("text/plain", "application/octet-stream"))
         }
+        binding.manualOlcrtc.setOnClickListener { showManualOlcrtcDialog() }
+        binding.manualStandard.setOnClickListener { showManualStandardDialog() }
         storage.execute { SubscriptionRefresher(profiles).refreshStale() }
     }
 
@@ -224,6 +230,71 @@ class ConnectionFragment : Fragment() {
             binding.status.text = "${getString(R.string.import_source, getString(source))}\n$description"
         }.onFailure { binding.status.text = it.message ?: getString(fallbackError) }
     }
+
+    private fun showManualOlcrtcDialog() {
+        val input = EditText(requireContext()).apply {
+            hint = getString(R.string.manual_olcrtc_hint)
+            setSingleLine(false)
+            minLines = 8
+        }
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.manual_profile_title)
+            .setView(input)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                runCatching { buildManualOlcrtcUri(input.text?.toString().orEmpty()) }
+                    .onSuccess { raw ->
+                        binding.profileUri.setText(raw)
+                        validatePreview(raw, R.string.manual_olcrtc)
+                    }
+                    .onFailure { binding.status.text = it.message }
+            }
+            .show()
+    }
+
+    private fun showManualStandardDialog() {
+        val input = EditText(requireContext()).apply {
+            hint = getString(R.string.manual_standard_hint)
+            setSingleLine(false)
+            minLines = 3
+        }
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.manual_profile_title)
+            .setView(input)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val raw = input.text?.toString().orEmpty().trim()
+                binding.profileUri.setText(raw)
+                validatePreview(raw, R.string.manual_standard)
+            }
+            .show()
+    }
+
+    private fun buildManualOlcrtcUri(raw: String): String {
+        val values = raw.lineSequence()
+            .map(String::trim)
+            .filter { it.isNotEmpty() && !it.startsWith('#') }
+            .associate { line ->
+                val parts = line.split('=', limit = 2)
+                require(parts.size == 2) { "Invalid line: $line" }
+                parts[0].trim().lowercase() to parts[1].trim()
+            }
+        val profile = OlcrtcProfile(
+            name = values["name"].orEmpty().ifBlank { "olcRTC" },
+            provider = OlcrtcProfile.Provider.parse(values.required("provider")),
+            transport = OlcrtcProfile.Transport.parse(values.required("transport")),
+            roomId = values.required("room"),
+            roomPassword = values["password"]?.takeIf(String::isNotBlank),
+            clientId = values.required("client"),
+            keyHex = values.required("key"),
+            authToken = values["auth"]?.takeIf(String::isNotBlank),
+            dnsServer = values["dns"]?.takeIf(String::isNotBlank),
+        )
+        return OlcrtcUri.serialize(profile, includeAuthToken = true)
+    }
+
+    private fun Map<String, String>.required(name: String): String =
+        get(name)?.takeIf(String::isNotBlank) ?: throw IllegalArgumentException("$name is required")
 
     private fun readText(
         resolver: ContentResolver,

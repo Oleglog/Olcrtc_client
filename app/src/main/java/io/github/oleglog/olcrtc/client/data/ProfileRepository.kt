@@ -5,7 +5,9 @@ import io.github.oleglog.olcrtc.client.importer.SubscriptionBundle
 import io.github.oleglog.olcrtc.client.profile.ImportedProfile
 import io.github.oleglog.olcrtc.client.profile.ProfileIdentity
 import io.github.oleglog.olcrtc.client.profile.olcrtc.OlcrtcProfile
+import io.github.oleglog.olcrtc.client.profile.olcrtc.OlcrtcUri
 import io.github.oleglog.olcrtc.client.profile.standard.StandardProfile
+import io.github.oleglog.olcrtc.client.profile.standard.StandardUri
 import io.github.oleglog.olcrtc.client.routing.RoutingRule
 import org.json.JSONArray
 import org.json.JSONObject
@@ -28,6 +30,30 @@ internal data class SubscriptionSource(
     val lastModified: String?,
 )
 
+internal data class SubscriptionSummary(
+    val id: Long,
+    val name: String,
+    val kind: String,
+    val serverVersion: String?,
+    val lastSuccessAt: Long?,
+    val lastAttemptAt: Long?,
+    val lastErrorCode: String?,
+    val enabled: Boolean,
+    val profileCount: Int,
+    val mirrorAvailable: Boolean,
+)
+
+internal data class SubscriptionProfileSummary(
+    val id: String,
+    val subscriptionId: Long,
+    val name: String,
+    val type: String,
+    val locallyModified: Boolean,
+    val favorite: Boolean,
+    val lastLatencyMs: Long?,
+    val endpoint: String,
+)
+
 internal class ProfileRepository(
     private val olcrtcProfiles: OlcrtcProfileDao,
     private val standardProfiles: StandardProfileDao,
@@ -46,6 +72,38 @@ internal class ProfileRepository(
             ProfileSummary(STANDARD_ID_OFFSET + it.id, it.name, it.protocol, "${it.address}:${it.port}")
         }
 
+    fun listSubscriptions(): List<SubscriptionSummary> = subscriptions.getSubscriptions().map { subscription ->
+        SubscriptionSummary(
+            id = subscription.id,
+            name = subscription.name,
+            kind = subscription.kind,
+            serverVersion = subscription.serverVersion,
+            lastSuccessAt = subscription.lastSuccessAt,
+            lastAttemptAt = subscription.lastAttemptAt,
+            lastErrorCode = subscription.lastErrorCode,
+            enabled = subscription.enabled,
+            profileCount = subscriptions.getProfiles(subscription.groupId).size,
+            mirrorAvailable = subscription.encryptedMirrorUrl != null && subscription.encryptedMirrorKey != null,
+        )
+    }
+
+    fun listSubscriptionProfiles(subscriptionId: Long): List<SubscriptionProfileSummary> {
+        val group = subscriptions.getSubscriptionGroup(subscriptionId) ?: return emptyList()
+        return subscriptions.getProfiles(group.groupId).map { profile ->
+            val imported = runCatching { profile.toImportedProfile() }.getOrNull()
+            SubscriptionProfileSummary(
+                id = profile.id,
+                subscriptionId = subscriptionId,
+                name = profile.name,
+                type = profile.type,
+                locallyModified = profile.isLocallyModified,
+                favorite = profile.favorite,
+                lastLatencyMs = profile.lastLatencyMs,
+                endpoint = imported.endpointDescription(),
+            )
+        }
+    }
+
     fun deleteLocal(id: Long) {
         val deleted = if (id >= STANDARD_ID_OFFSET) {
             standardProfiles.delete(id - STANDARD_ID_OFFSET)
@@ -63,6 +121,16 @@ internal class ProfileRepository(
 
     fun getOlcrtc(id: Long): OlcrtcProfile? =
         if (id in 1 until STANDARD_ID_OFFSET) olcrtcProfiles.get(id)?.toProfile() else null
+
+    fun exportProfileUri(id: Long, includeAuthToken: Boolean = false): String {
+        val profile = get(id) ?: throw IllegalArgumentException("Profile not found")
+        return profile.exportUri(includeAuthToken)
+    }
+
+    fun exportSubscriptionProfileUri(profileId: String, includeAuthToken: Boolean = false): String {
+        val profile = getSubscriptionProfile(profileId) ?: throw IllegalArgumentException("Subscription profile not found")
+        return profile.exportUri(includeAuthToken)
+    }
 
     fun findDuplicate(profile: OlcrtcProfile): Long? =
         olcrtcProfiles.findByIdentity(ProfileIdentity.hash(profile))?.id
@@ -112,6 +180,47 @@ internal class ProfileRepository(
                 lastModified = subscription.lastModified,
             )
         }
+
+    fun updateSubscriptionSource(subscriptionId: Long, name: String, url: String) {
+        require(name.isNotBlank()) { "Subscription name is required" }
+        require(url.startsWith("https://", ignoreCase = true)) { "Subscription URL must use HTTPS" }
+        require(subscriptions.updateSubscriptionSource(subscriptionId, name.trim(), secrets.encrypt(url.trim())) == 1) {
+            "Subscription not found"
+        }
+    }
+
+    fun insertSubscriptionSource(name: String, url: String, kind: String = "GENERIC", now: Long = System.currentTimeMillis()): Long {
+        require(name.isNotBlank()) { "Subscription name is required" }
+        require(url.startsWith("https://", ignoreCase = true)) { "Subscription URL must use HTTPS" }
+        val normalizedKind = kind.trim().uppercase().takeIf { it == "OLCRTC" || it == "GENERIC" } ?: "GENERIC"
+        return subscriptions.insertSubscriptionGroup(
+            ProfileGroupEntity(
+                name = name.trim(),
+                type = "SUBSCRIPTION",
+                subscriptionId = null,
+                sortOrder = 0,
+                createdAt = now,
+            ),
+            SubscriptionEntity(
+                groupId = 0,
+                name = name.trim(),
+                kind = normalizedKind,
+                encryptedUrl = secrets.encrypt(url.trim()),
+                serverVersion = null,
+                encryptedMirrorType = null,
+                encryptedMirrorUrl = null,
+                encryptedMirrorKey = null,
+                lastSuccessAt = null,
+                lastAttemptAt = null,
+                lastErrorCode = null,
+                updateIntervalHours = DEFAULT_SUBSCRIPTION_INTERVAL_HOURS,
+                etag = null,
+                lastModified = null,
+                enabled = true,
+            ),
+            emptyList(),
+        )
+    }
 
     fun getStaleSubscriptionIds(
         now: Long = System.currentTimeMillis(),
@@ -467,6 +576,17 @@ internal class ProfileRepository(
         xhttpExtraJson = stringOrNull("xhttpExtraJson"),
         dnsServer = stringOrNull("dnsServer"),
     )
+
+    private fun ProfileConfig.exportUri(includeAuthToken: Boolean): String = when (this) {
+        is ProfileConfig.Olcrtc -> OlcrtcUri.serialize(value, includeAuthToken)
+        is ProfileConfig.Standard -> StandardUri.serialize(value)
+    }
+
+    private fun ImportedProfile?.endpointDescription(): String = when (this) {
+        is ImportedProfile.Olcrtc -> "${value.provider.value} · ${value.roomId}"
+        is ImportedProfile.Standard -> "${value.address}:${value.port}"
+        null -> "unavailable"
+    }
 
     private fun JSONObject.stringOrNull(name: String): String? =
         if (isNull(name)) null else getString(name)

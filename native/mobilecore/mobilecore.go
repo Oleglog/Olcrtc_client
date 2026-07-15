@@ -201,6 +201,14 @@ func IsOlcrtcRunning() bool {
 	return olcrtc.IsRunning()
 }
 
+func TrafficBytesUp() int64 {
+	return 0
+}
+
+func TrafficBytesDown() int64 {
+	return 0
+}
+
 func IsFatalError(message string) bool {
 	return strings.HasPrefix(message, "load Xray config:") ||
 		strings.HasPrefix(message, "create Xray instance:") ||

@@ -64,6 +64,50 @@ class StandardUriTest {
     }
 
     @Test
+    fun serializesStandardProfilesRoundTrip() {
+        val vless = StandardProfile(
+            name = "VLESS Main",
+            protocol = StandardProfile.Protocol.VLESS,
+            address = "example.com",
+            port = 443,
+            uuid = uuid,
+            transport = StandardProfile.Transport.WS,
+            security = StandardProfile.Security.TLS,
+            serverName = "example.com",
+            webSocketHost = "cdn.example.com",
+            webSocketPath = "/ws",
+            dnsServer = "77.88.8.8:53",
+        )
+        val trojan = StandardProfile(
+            name = "Trojan Main",
+            protocol = StandardProfile.Protocol.TROJAN,
+            address = "trojan.example.com",
+            port = 443,
+            password = "secret",
+            transport = StandardProfile.Transport.GRPC,
+            security = StandardProfile.Security.REALITY,
+            realityPublicKey = "pub",
+            realityShortId = "sid",
+            grpcServiceName = "grpc",
+        )
+        val vmess = StandardProfile(
+            name = "VMess Main",
+            protocol = StandardProfile.Protocol.VMESS,
+            address = "vmess.example.com",
+            port = 443,
+            uuid = uuid,
+            transport = StandardProfile.Transport.WS,
+            security = StandardProfile.Security.TLS,
+            webSocketHost = "cdn.example.com",
+            webSocketPath = "/vmess",
+        )
+
+        assertEquals(vless, StandardUri.parse(StandardUri.serialize(vless)))
+        assertEquals(trojan, StandardUri.parse(StandardUri.serialize(trojan)))
+        assertEquals(vmess, StandardUri.parse(StandardUri.serialize(vmess)))
+    }
+
+    @Test
     fun rejectsUnknownDuplicateUnsafeAndMalformedParameters() {
         assertThrows(IllegalArgumentException::class.java) {
             StandardUri.parse("vless://$uuid@example.com:443?type=tcp&security=tls&security=none")

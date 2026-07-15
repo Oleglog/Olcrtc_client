@@ -26,6 +26,7 @@ class MainActivity : AppCompatActivity() {
     private var vpn: IOlcrtcVpnService? = null
     private var bound = false
     private var pendingProfileId: Long? = null
+    private var pendingSubscriptionProfileId: String? = null
     private var pendingImport: String? = null
     private var importListener: ((String) -> Unit)? = null
     private var stateListener: ((VpnState, String?) -> Unit)? = null
@@ -54,8 +55,10 @@ class MainActivity : AppCompatActivity() {
     private val vpnPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
         if (it.resultCode == Activity.RESULT_OK) {
             pendingProfileId?.let(::startVpn)
+            pendingSubscriptionProfileId?.let(::startSubscriptionVpn)
         } else {
             pendingProfileId = null
+            pendingSubscriptionProfileId = null
             stateListener?.invoke(VpnState.ERROR, getString(R.string.vpn_permission_denied))
         }
     }
@@ -66,6 +69,8 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         pendingProfileId = savedInstanceState?.getLong(KEY_PENDING_PROFILE_ID)?.takeIf { it > 0 }
+        pendingSubscriptionProfileId = savedInstanceState?.getString(KEY_PENDING_SUBSCRIPTION_PROFILE_ID)
+            ?.takeIf(String::isNotBlank)
         val navHost = supportFragmentManager.findFragmentById(R.id.nav_host) as NavHostFragment
         binding.bottomNavigation.setupWithNavController(navHost.navController)
         acceptExternalIntent(intent)
@@ -94,6 +99,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         pendingProfileId?.let { outState.putLong(KEY_PENDING_PROFILE_ID, it) }
+        pendingSubscriptionProfileId?.let { outState.putString(KEY_PENDING_SUBSCRIPTION_PROFILE_ID, it) }
         super.onSaveInstanceState(outState)
     }
 
@@ -117,8 +123,16 @@ class MainActivity : AppCompatActivity() {
 
     fun requestVpnPermission(profileId: Long) {
         pendingProfileId = profileId
+        pendingSubscriptionProfileId = null
         val intent = VpnService.prepare(this)
         if (intent == null) startVpn(profileId) else vpnPermission.launch(intent)
+    }
+
+    fun requestSubscriptionVpnPermission(profileId: String) {
+        pendingProfileId = null
+        pendingSubscriptionProfileId = profileId
+        val intent = VpnService.prepare(this)
+        if (intent == null) startSubscriptionVpn(profileId) else vpnPermission.launch(intent)
     }
 
     fun consumeExternalImport(): String? = pendingImport.also { pendingImport = null }
@@ -149,8 +163,20 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
+    private fun startSubscriptionVpn(profileId: String) {
+        pendingSubscriptionProfileId = null
+        val service = Intent(this, OlcrtcVpnService::class.java)
+        ContextCompat.startForegroundService(
+            this,
+            Intent(service)
+                .setAction(OlcrtcVpnService.ACTION_START)
+                .putExtra(OlcrtcVpnService.EXTRA_SUBSCRIPTION_PROFILE_ID, profileId),
+        )
+    }
+
     companion object {
         private const val KEY_PENDING_PROFILE_ID = "pending_profile_id"
+        private const val KEY_PENDING_SUBSCRIPTION_PROFILE_ID = "pending_subscription_profile_id"
         private const val MAX_EXTERNAL_IMPORT_CHARS = 16 * 1024
         private val EXTERNAL_PROFILE_SCHEMES = setOf("olcrtc", "vless", "vmess", "trojan")
     }
