@@ -61,7 +61,7 @@ internal class DiagnosticsLogStore(
 
     private fun logFiles(): List<File> = directory
         .listFiles { file -> file.isFile && file.name.endsWith(".log") }
-        ?.sortedBy(File::name)
+        ?.sortedBy { it.name }
         .orEmpty()
 
     companion object {

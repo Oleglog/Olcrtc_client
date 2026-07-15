@@ -593,6 +593,7 @@ internal class ProfileRepository(
 
     companion object {
         internal const val STANDARD_ID_OFFSET = 1L shl 62
+        private const val DEFAULT_SUBSCRIPTION_INTERVAL_HOURS = 24
 
         fun open(context: Context): ProfileRepository {
             val database = ClientDatabase.open(context)

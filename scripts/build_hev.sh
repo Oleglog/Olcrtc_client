@@ -11,9 +11,13 @@ readonly REPOSITORY="https://github.com/heiher/hev-socks5-tunnel.git"
 readonly TAG="2.15.0"
 readonly COMMIT="00c7eb9ad7ca381b0f1fee880abc1077fe9b93be"
 readonly REV_ID="${COMMIT:0:12}"
-readonly NDK_BUILD="${ANDROID_NDK_HOME:+$ANDROID_NDK_HOME/ndk-build}"
+NDK_BUILD="${ANDROID_NDK_HOME:+$ANDROID_NDK_HOME/ndk-build}"
+if [[ -n "${ANDROID_NDK_HOME:-}" && ! -x "$NDK_BUILD" && -f "$ANDROID_NDK_HOME/ndk-build.cmd" ]]; then
+  NDK_BUILD="$ANDROID_NDK_HOME/ndk-build.cmd"
+fi
+readonly NDK_BUILD
 
-if [[ -z "$NDK_BUILD" || ! -x "$NDK_BUILD" ]]; then
+if [[ -z "$NDK_BUILD" || ! -f "$NDK_BUILD" ]]; then
   printf 'ANDROID_NDK_HOME must point to an Android NDK\n' >&2
   exit 1
 fi
@@ -29,6 +33,19 @@ if [[ "$actual_commit" != "$COMMIT" ]]; then
 fi
 
 git -C "$SOURCE" submodule update --init --recursive
+# Git for Windows may check out symlinks as small text files when symlink support is disabled.
+# Materialize those links before invoking ndk-build so the native headers compile locally.
+while IFS= read -r -d '' link_file; do
+  link_target="$(cat "$link_file")"
+  case "$link_target" in
+    ../*|./*)
+      real_target="$(cd "$(dirname "$link_file")" && cd "$(dirname "$link_target")" && pwd)/$(basename "$link_target")"
+      if [[ -f "$real_target" ]]; then
+        cp "$real_target" "$link_file"
+      fi
+      ;;
+  esac
+done < <(find "$SOURCE" -type f -size -200c -print0)
 cp "$BRIDGE" "$GENERATED_BRIDGE"
 trap 'rm -f "$GENERATED_BRIDGE"' EXIT
 "$NDK_BUILD" \

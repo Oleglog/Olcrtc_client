@@ -245,8 +245,7 @@ object StandardUri {
                 '\\' -> append("\\\\")
                 '"' -> append("\\\"")
                 '\b' -> append("\\b")
-                '
-' -> append("\\n")
+                '\n' -> append("\\n")
                 '\r' -> append("\\r")
                 '\t' -> append("\\t")
                 else -> if (character.code < 0x20) {

@@ -1,9 +1,17 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.ksp)
+}
+
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.isFile) {
+        keystorePropertiesFile.inputStream().use(::load)
+    }
 }
 
 android {
@@ -16,7 +24,10 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0.0"
-        val expectedSigningCertSha256 = providers.gradleProperty("androidSigningCertSha256").orNull.orEmpty()
+        val expectedSigningCertSha256 = providers.gradleProperty("androidSigningCertSha256")
+            .orElse(providers.environmentVariable("ANDROID_SIGNING_CERT_SHA256"))
+            .orNull
+            .orEmpty()
         buildConfigField(
             "String",
             "EXPECTED_SIGNING_CERT_SHA256",
@@ -30,6 +41,17 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            if (keystorePropertiesFile.isFile) {
+                storeFile = rootProject.file(requireNotNull(keystoreProperties["storeFile"]) { "storeFile is required" })
+                storePassword = requireNotNull(keystoreProperties["storePassword"]) { "storePassword is required" }.toString()
+                keyAlias = requireNotNull(keystoreProperties["keyAlias"]) { "keyAlias is required" }.toString()
+                keyPassword = requireNotNull(keystoreProperties["keyPassword"]) { "keyPassword is required" }.toString()
+            }
+        }
+    }
+
     buildTypes {
         debug {
             ndk {
@@ -38,6 +60,7 @@ android {
             }
         }
         release {
+            signingConfig = signingConfigs.getByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
