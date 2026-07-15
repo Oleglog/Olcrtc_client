@@ -61,7 +61,7 @@ class ProfilesFragment : Fragment() {
             row.addView(
                 TextView(requireContext()).apply {
                     text = "${profile.name}\n${profile.type} · ${profile.endpoint}"
-                    textAppearance = android.R.style.TextAppearance_Material_Body1
+                    setTextAppearance(android.R.style.TextAppearance_Material_Body1)
                     setPadding(0, 12.dp, 16.dp, 12.dp)
                     setOnClickListener { activityHost.requestVpnPermission(profile.id) }
                 },

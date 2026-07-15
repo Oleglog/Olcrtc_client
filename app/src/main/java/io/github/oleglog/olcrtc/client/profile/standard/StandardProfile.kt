@@ -129,7 +129,7 @@ private object JsonObject {
                             }
                             if (escaped == 'u') {
                                 require(index + 4 <= raw.length) { "Invalid XHTTP extra JSON escape" }
-                                require(raw.substring(index, index + 4).all(Char::isHexDigit)) {
+                                require(raw.substring(index, index + 4).all { it.isHexDigit() }) {
                                     "Invalid XHTTP extra JSON escape"
                                 }
                                 index += 4

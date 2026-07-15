@@ -365,7 +365,7 @@ internal class RoutingRuleRepository(
     private val rules: RoutingRuleDao,
 ) {
     fun getEnabled(): List<RoutingRule> = rules.getEnabled()
-        .map(RoutingRuleEntity::toRule)
+        .map { it.toRule() }
         .sortedWith(
             compareByDescending<RoutingRule> { it.specificity }
                 .thenBy(RoutingRule::sortOrder)

@@ -89,7 +89,7 @@ internal class ProfileRepository(
 
     fun getSubscriptionProfiles(subscriptionId: Long): List<ImportedProfile> {
         val groupId = subscriptions.getSubscriptionGroup(subscriptionId)?.groupId ?: return emptyList()
-        return subscriptions.getProfiles(groupId).map(SubscriptionProfileEntity::toImportedProfile)
+        return subscriptions.getProfiles(groupId).map { it.toImportedProfile() }
     }
 
     fun getSubscriptionProfile(profileId: String): ProfileConfig? =
