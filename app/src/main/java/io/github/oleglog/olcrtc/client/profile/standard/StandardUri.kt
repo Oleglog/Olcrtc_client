@@ -148,7 +148,7 @@ object StandardUri {
             }
     }
 
-    private fun decode(value: String): String = URLDecoder.decode(value, StandardCharsets.UTF_8)
+    private fun decode(value: String): String = URLDecoder.decode(value, StandardCharsets.UTF_8.name())
 
     private fun Map<String, String?>.required(name: String): String =
         get(name)?.takeIf(String::isNotBlank) ?: throw IllegalArgumentException("$name is required")
