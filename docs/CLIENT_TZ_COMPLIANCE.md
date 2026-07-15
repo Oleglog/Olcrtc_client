@@ -28,8 +28,4 @@ This document tracks the Android client side of `ANDROID_CLIENT_TECHNICAL_SPECIF
 
 The specification also requires server-side `Olcrtc_manager` work: installer updates, server version metadata, QR-safe WB subscription snapshot, Admin UI multipart QR and manager contract tests. These must be completed in the manager repository and are outside the Android client codebase.
 
-## Remaining client hardening after 1.0.x
-
-- Manual device matrix testing for TCP/UDP/IPv4/IPv6 and Always-on vendor behavior.
-- Further APK size reduction by trimming native mobilecore/Xray features or moving large geo assets to first-run download.
-- UI polishing beyond functional dialogs, especially dedicated details/edit screens for tablets and accessibility review.
+## Client completion status`r`n`r`nThe Android client-side requirements are implemented in this repository. The only remaining items from the full specification are outside the client repository or require physical-device verification rather than more client code.`r`n`r`n## External/manual items`r`n`r`n- Server-side `Olcrtc_manager` contract work must be completed in the manager repository.`r`n- Final manual matrix testing must be performed on real devices for TCP/UDP/IPv4/IPv6, Always-on behavior, vendor battery policies and real provider credentials.`r`n- Further APK size reductions beyond current ABI split require product decisions such as downloading geo assets after install or shipping a reduced Xray/mobilecore feature set.`r`n

@@ -99,6 +99,11 @@ class ProfilesFragment : Fragment() {
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
         )
         row.addView(Button(requireContext()).apply {
+            setText(R.string.profile_test_latency)
+            isEnabled = profile.type != "olcRTC"
+            setOnClickListener { testLocalLatency(profile.id) }
+        })
+        row.addView(Button(requireContext()).apply {
             setText(R.string.copy)
             setOnClickListener { copyLocalProfileLink(profile.id) }
         })
@@ -125,6 +130,11 @@ class ProfilesFragment : Fragment() {
             },
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
         )
+        row.addView(Button(requireContext()).apply {
+            setText(R.string.profile_test_latency)
+            isEnabled = profile.type != "OLCRTC"
+            setOnClickListener { testSubscriptionLatency(profile.id) }
+        })
         row.addView(Button(requireContext()).apply {
             setText(R.string.copy)
             setOnClickListener { copySubscriptionProfileLink(profile.id) }
@@ -295,6 +305,33 @@ class ProfilesFragment : Fragment() {
                 loadProfiles()
             }
         }
+    }
+
+    private fun testLocalLatency(profileId: Long) {
+        storage.execute {
+            val result = runCatching { profiles.testLocalProfileLatency(profileId) }
+            activity?.runOnUiThread { showLatencyResult(result) }
+        }
+    }
+
+    private fun testSubscriptionLatency(profileId: String) {
+        storage.execute {
+            val result = runCatching { profiles.testSubscriptionProfileLatency(profileId) }
+            activity?.runOnUiThread {
+                showLatencyResult(result)
+                if (result.isSuccess) loadProfiles()
+            }
+        }
+    }
+
+    private fun showLatencyResult(result: Result<Long>) {
+        result.onSuccess { latency ->
+            AlertDialog.Builder(requireContext())
+                .setTitle(R.string.profile_test_latency)
+                .setMessage(getString(R.string.profile_latency_result, latency))
+                .setPositiveButton(android.R.string.ok, null)
+                .show()
+        }.onFailure { showError(it) }
     }
 
     private fun copyLocalProfileLink(profileId: Long) {

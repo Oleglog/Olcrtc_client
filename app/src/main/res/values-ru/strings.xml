@@ -10,6 +10,8 @@
     <string name="profiles_count_suffix">профилей</string>
     <string name="profile_locally_modified">изменён</string>
     <string name="profile_reset">Сброс</string>
+    <string name="profile_test_latency">Проверить</string>
+    <string name="profile_latency_result">Задержка: %1$d мс</string>
     <string name="subscription_add">Добавить подписку</string>
     <string name="subscription_update_now">Обновить сейчас</string>
     <string name="subscription_details">Детали</string>
@@ -62,6 +64,8 @@
     <string name="settings_always_on">Настройки Always-on VPN</string>
     <string name="settings_battery_optimization">Настройки оптимизации батареи</string>
     <string name="settings_check_update">Проверить обновление приложения</string>
+    <string name="settings_core_versions">Версии ядра</string>
+    <string name="settings_core_versions_message">Xray: %1$s\nolcRTC core: %2$s</string>
     <string name="settings_update_available">Доступно обновление: %1$s\nФайл: %2$s</string>
     <string name="settings_update_download_install">Скачать и установить</string>
     <string name="settings_update_install_permission">Разрешите установку APK для этого приложения, затем повторите установку обновления.</string>

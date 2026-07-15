@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"syscall"
@@ -207,6 +208,33 @@ func TrafficBytesUp() int64 {
 
 func TrafficBytesDown() int64 {
 	return 0
+}
+
+func XrayVersion() string {
+	return dependencyVersion("github.com/xtls/xray-core")
+}
+
+func OlcrtcVersion() string {
+	if value := dependencyVersion("github.com/openlibrecommunity/olcrtc"); value != "unknown" {
+		return value
+	}
+	return dependencyVersion("github.com/Oleglog/Olcrtc_manager")
+}
+
+func dependencyVersion(path string) string {
+	info, ok := debug.ReadBuildInfo()
+	if !ok {
+		return "unknown"
+	}
+	for _, dep := range info.Deps {
+		if dep.Path == path {
+			if dep.Replace != nil {
+				return dep.Replace.Version
+			}
+			return dep.Version
+		}
+	}
+	return "unknown"
 }
 
 func IsFatalError(message string) bool {

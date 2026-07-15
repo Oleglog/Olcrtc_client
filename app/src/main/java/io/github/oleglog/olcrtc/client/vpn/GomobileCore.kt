@@ -44,6 +44,11 @@ internal object GomobileCore : NativeCore {
         bytesDown = Mobilecore.trafficBytesDown(),
     )
 
+    fun coreVersions(): CoreVersions = CoreVersions(
+        xray = runCatching { Mobilecore.xrayVersion() }.getOrDefault("unknown"),
+        olcrtc = runCatching { Mobilecore.olcrtcVersion() }.getOrDefault("unknown"),
+    )
+
     fun isFatalError(error: Throwable): Boolean =
         Mobilecore.isFatalError(error.message.orEmpty())
 

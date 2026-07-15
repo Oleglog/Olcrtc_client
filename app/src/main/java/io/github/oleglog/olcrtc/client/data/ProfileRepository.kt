@@ -11,7 +11,10 @@ import io.github.oleglog.olcrtc.client.profile.standard.StandardUri
 import io.github.oleglog.olcrtc.client.routing.RoutingRule
 import org.json.JSONArray
 import org.json.JSONObject
+import java.net.InetSocketAddress
+import java.net.Socket
 import java.util.UUID
+import kotlin.system.measureTimeMillis
 
 internal data class ProfileSummary(
     val id: Long,
@@ -130,6 +133,34 @@ internal class ProfileRepository(
     fun exportSubscriptionProfileUri(profileId: String, includeAuthToken: Boolean = false): String {
         val profile = getSubscriptionProfile(profileId) ?: throw IllegalArgumentException("Subscription profile not found")
         return profile.exportUri(includeAuthToken)
+    }
+
+    fun testLocalProfileLatency(id: Long): Long = measureLatency(get(id) ?: throw IllegalArgumentException("Profile not found"))
+
+    fun testSubscriptionProfileLatency(profileId: String, now: Long = System.currentTimeMillis()): Long {
+        val profile = getSubscriptionProfile(profileId) ?: throw IllegalArgumentException("Subscription profile not found")
+        val latency = measureLatency(profile)
+        subscriptions.updateProfileLatency(profileId, latency, now)
+        return latency
+    }
+
+    private fun measureLatency(profile: ProfileConfig): Long = when (profile) {
+        is ProfileConfig.Standard -> profile.value.measureTcpLatency()
+        is ProfileConfig.Olcrtc -> throw IllegalArgumentException("Latency test requires an endpoint profile")
+    }
+
+    private fun StandardProfile.measureTcpLatency(timeoutMillis: Int = 5_000): Long {
+        require(address.isNotBlank()) { "address is required" }
+        require(port in 1..65535) { "port must be in 1..65535" }
+        var socket: Socket? = null
+        return try {
+            measureTimeMillis {
+                socket = Socket()
+                socket!!.connect(InetSocketAddress(address, port), timeoutMillis)
+            }
+        } finally {
+            socket?.close()
+        }
     }
 
     fun findDuplicate(profile: OlcrtcProfile): Long? =

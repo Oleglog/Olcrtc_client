@@ -17,6 +17,11 @@ internal data class TrafficCounters(
     val bytesDown: Long = 0,
 )
 
+internal data class CoreVersions(
+    val xray: String = "unknown",
+    val olcrtc: String = "unknown",
+)
+
 internal fun interface SocketProtector {
     fun protect(fd: Int): Boolean
 }

@@ -22,6 +22,19 @@ if [[ -z "$NDK_BUILD" || ! -f "$NDK_BUILD" ]]; then
   exit 1
 fi
 
+if [[ "${FORCE_NATIVE_REBUILD:-}" != "1" ]]; then
+  all_present=1
+  for abi in ${HEV_APP_ABI:-armeabi-v7a arm64-v8a x86_64}; do
+    if [[ ! -s "$OUTPUT/$abi/libhev-socks5-tunnel.so" ]]; then
+      all_present=0
+    fi
+  done
+  if [[ "$all_present" == "1" ]]; then
+    printf 'Using cached HEV tunnel libraries: %s\n' "$OUTPUT"
+    exit 0
+  fi
+fi
+
 if [[ ! -d "$SOURCE/.git" ]]; then
   git clone --recurse-submodules --branch "$TAG" --single-branch "$REPOSITORY" "$SOURCE"
 fi

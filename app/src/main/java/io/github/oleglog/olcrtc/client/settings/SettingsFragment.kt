@@ -32,6 +32,7 @@ import io.github.oleglog.olcrtc.client.support.IssueReportInfo
 import io.github.oleglog.olcrtc.client.updater.ApkUpdateInstaller
 import io.github.oleglog.olcrtc.client.updater.GitHubUpdateClient
 import io.github.oleglog.olcrtc.client.updater.GitHubRelease
+import io.github.oleglog.olcrtc.client.vpn.GomobileCore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -75,6 +76,7 @@ class SettingsFragment : Fragment() {
             openSystemSettings(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
         }
         binding.checkUpdate.setOnClickListener { checkUpdate() }
+        binding.showCoreVersions.setOnClickListener { showCoreVersions() }
         binding.viewDiagnostics.setOnClickListener { showDiagnostics() }
         binding.copyDiagnostics.setOnClickListener { copyDiagnostics() }
         binding.exportDiagnostics.setOnClickListener { exportDiagnostics() }
@@ -267,6 +269,15 @@ class SettingsFragment : Fragment() {
         }
     }
 
+    private fun showCoreVersions() {
+        val versions = GomobileCore.coreVersions()
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.settings_core_versions)
+            .setMessage(getString(R.string.settings_core_versions_message, versions.xray, versions.olcrtc))
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
+
     private fun checkUpdate() {
         viewLifecycleOwner.lifecycleScope.launch {
             val result = runCatching {
@@ -361,10 +372,13 @@ class SettingsFragment : Fragment() {
     }
 
     private fun reportIssue() {
+        val versions = GomobileCore.coreVersions()
         val url = IssueReportBuilder.buildUrl(
             IssueReportInfo(
                 appVersion = BuildConfig.VERSION_NAME,
                 protocol = null,
+                xrayVersion = versions.xray,
+                olcrtcCoreVersion = versions.olcrtc,
             ),
         )
         runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }

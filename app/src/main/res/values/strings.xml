@@ -9,6 +9,8 @@
     <string name="profiles_count_suffix">profiles</string>
     <string name="profile_locally_modified">modified</string>
     <string name="profile_reset">Reset</string>
+    <string name="profile_test_latency">Test</string>
+    <string name="profile_latency_result">Latency: %1$d ms</string>
     <string name="subscription_add">Add subscription</string>
     <string name="subscription_update_now">Update now</string>
     <string name="subscription_details">Details</string>
@@ -61,6 +63,8 @@
     <string name="settings_always_on">Always-on VPN settings</string>
     <string name="settings_battery_optimization">Battery optimization settings</string>
     <string name="settings_check_update">Check application update</string>
+    <string name="settings_core_versions">Core versions</string>
+    <string name="settings_core_versions_message">Xray: %1$s\nolcRTC core: %2$s</string>
     <string name="settings_update_available">Update available: %1$s\nAsset: %2$s</string>
     <string name="settings_update_download_install">Download and install</string>
     <string name="settings_update_install_permission">Allow APK installs for this app, then retry update installation.</string>

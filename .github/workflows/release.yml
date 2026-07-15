@@ -39,8 +39,10 @@ jobs:
         with:
           path: |
             ~/go/bin/gomobile
+            app/libs/mobilecore.aar
+            app/src/main/jniLibs
             native/hev-socks5-tunnel/upstream
-          key: release-native-${{ runner.os }}-${{ hashFiles('scripts/build_mobilecore.sh', 'scripts/build_hev.sh', 'native/mobilecore/go.mod') }}
+          key: release-native-${{ runner.os }}-${{ hashFiles('scripts/build_mobilecore.sh', 'scripts/build_hev.sh', 'native/mobilecore/go.mod', 'native/mobilecore/**/*.go', 'app/src/main/jni/**') }}
 
       - uses: android-actions/setup-android@v3
 

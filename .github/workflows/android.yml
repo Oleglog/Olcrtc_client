@@ -30,8 +30,10 @@ jobs:
         with:
           path: |
             ~/go/bin/gomobile
+            app/libs/mobilecore.aar
+            app/src/main/jniLibs
             native/hev-socks5-tunnel/upstream
-          key: android-native-${{ runner.os }}-${{ hashFiles('scripts/build_mobilecore.sh', 'scripts/build_hev.sh', 'native/mobilecore/go.mod') }}
+          key: android-native-${{ runner.os }}-${{ hashFiles('scripts/build_mobilecore.sh', 'scripts/build_hev.sh', 'native/mobilecore/go.mod', 'native/mobilecore/**/*.go', 'app/src/main/jni/**') }}
       - uses: android-actions/setup-android@v3
       - run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
       - run: python scripts/verify_licenses.py

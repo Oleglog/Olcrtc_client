@@ -7,6 +7,10 @@ readonly OUTPUT="${1:-$ROOT/app/libs/mobilecore.aar}"
 readonly GOMOBILE_VERSION="v0.0.0-20260410095206-2cfb76559b7b"
 
 mkdir -p "$(dirname "$OUTPUT")"
+if [[ -s "$OUTPUT" && "${FORCE_NATIVE_REBUILD:-}" != "1" ]]; then
+  printf 'Using cached mobilecore AAR: %s\n' "$OUTPUT"
+  exit 0
+fi
 if ! command -v gomobile >/dev/null 2>&1; then
   go install "golang.org/x/mobile/cmd/gomobile@$GOMOBILE_VERSION"
 fi
