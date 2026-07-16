@@ -46,7 +46,7 @@
     <string name="profiles_count_suffix">профилей</string>
     <string name="profile_locally_modified">изменён</string>
     <string name="profile_reset">Сбросить</string>
-    <string name="profile_test_latency">Проверить</string>
+    <string name="profile_test_latency">Пинг</string>
     <string name="profile_latency_result">Задержка: %1$d мс</string>
     <string name="profile_latency_connect_first">Сначала подключите этот профиль olcRTC</string>
     <string name="subscription_add">Добавить подписку по QR-коду</string>
@@ -151,12 +151,11 @@
     <string name="settings_saved">Настройки сохранены</string>
     <string name="olcrtc_uri_hint">Вставьте URI профиля olcrtc://</string>
     <string name="no_profile">Профиль не выбран</string>
+    <string name="profile_select_required">Сначала выберите подключение</string>
     <string name="connect">Подключить</string>
     <string name="add_connection">Добавить подключение</string>
-    <string name="connection_saved_profiles">Сохранённые подключения</string>
     <string name="connection_manual_profiles">Мои подключения</string>
     <string name="connection_subscription_profiles">Из подписок</string>
-    <string name="connection_selected_profile">Выбрано: %1$s</string>
     <string name="import_and_connect">Импортировать и подключить</string>
     <string name="paste_clipboard">Вставить</string>
     <string name="scan_qr">Сканировать QR-код</string>

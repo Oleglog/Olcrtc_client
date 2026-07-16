@@ -2,9 +2,12 @@ package mobilecore
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"runtime/debug"
 	"strings"
@@ -13,6 +16,8 @@ import (
 	"time"
 
 	olcrtc "github.com/openlibrecommunity/olcrtc/mobile"
+	xraynet "github.com/xtls/xray-core/common/net"
+	"github.com/xtls/xray-core/common/session"
 	"github.com/xtls/xray-core/core"
 	_ "github.com/xtls/xray-core/main/distro/all"
 	"github.com/xtls/xray-core/transport/internet"
@@ -147,6 +152,65 @@ func WaitXrayReady(socksPort int, timeoutMillis int) error {
 	}
 }
 
+func UrlTest(link string, timeoutMillis int) (int64, error) {
+	if timeoutMillis <= 0 {
+		return 0, errors.New("URL test timeout must be positive")
+	}
+	parsed, err := url.ParseRequestURI(link)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return 0, errors.New("URL test requires an HTTP(S) URL")
+	}
+
+	mu.Lock()
+	instance := xrayInstance
+	mu.Unlock()
+	if instance == nil {
+		return 0, errNotRunning
+	}
+
+	return runURLTest(link, timeoutMillis, func(ctx context.Context, destination xraynet.Destination) (net.Conn, error) {
+		return core.Dial(ctx, instance, destination)
+	})
+}
+
+type destinationDialer func(context.Context, xraynet.Destination) (net.Conn, error)
+
+func runURLTest(link string, timeoutMillis int, dial destinationDialer) (int64, error) {
+	timeout := time.Duration(timeoutMillis) * time.Millisecond
+	transport := &http.Transport{
+		DisableKeepAlives:   true,
+		ForceAttemptHTTP2:   true,
+		TLSHandshakeTimeout: timeout,
+		DialContext: func(ctx context.Context, network string, address string) (net.Conn, error) {
+			destination, err := xraynet.ParseDestination(fmt.Sprintf("%s:%s", network, address))
+			if err != nil {
+				return nil, err
+			}
+			ctx = session.ContextWithInbound(ctx, &session.Inbound{Tag: latencyTestInboundTag})
+			return dial(ctx, destination)
+		},
+	}
+	defer transport.CloseIdleConnections()
+	client := &http.Client{
+		Transport: transport,
+		Timeout:   timeout,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	request, err := http.NewRequest(http.MethodHead, link, nil)
+	if err != nil {
+		return 0, err
+	}
+	startedAt := time.Now()
+	response, err := client.Do(request)
+	if err != nil {
+		return 0, err
+	}
+	response.Body.Close()
+	return time.Since(startedAt).Milliseconds(), nil
+}
+
 func StartOlcrtc(
 	provider string,
 	transport string,
@@ -269,3 +333,5 @@ func protectSocket(_ string, _ string, conn syscall.RawConn) error {
 	}
 	return nil
 }
+
+const latencyTestInboundTag = "latency-test"

@@ -74,6 +74,7 @@ internal object NativeConfig {
 
     private fun routing(rules: List<RoutingRule>, policy: RoutingPolicy): String {
         val xrayRules = buildList {
+            add("{ \"type\": \"field\", \"inboundTag\": [\"$LATENCY_TEST_TAG\"], \"outboundTag\": \"proxy\" }")
             add("{ \"type\": \"field\", \"inboundTag\": [\"$DNS_TAG\"], \"outboundTag\": \"proxy\" }")
             rules.forEach { rule ->
                 val field = when (rule.matchType) {
@@ -185,6 +186,7 @@ internal object NativeConfig {
     }
 
     private const val DNS_TAG = "dns-proxy"
+    private const val LATENCY_TEST_TAG = "latency-test"
     private val LAN_RANGES = listOf(
         "10.0.0.0/8",
         "100.64.0.0/10",

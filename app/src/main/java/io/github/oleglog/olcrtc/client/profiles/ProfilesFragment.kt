@@ -73,9 +73,11 @@ class ProfilesFragment : Fragment() {
     }
 
     private fun loadSubscriptions() {
+        if (storage.isShutdown) return
         storage.execute {
             val result = runCatching { profiles.listSubscriptions() }
             activity?.runOnUiThread {
+                if (_binding == null) return@runOnUiThread
                 result.onSuccess(::showSubscriptions).onFailure(::showError)
             }
         }
@@ -93,9 +95,10 @@ class ProfilesFragment : Fragment() {
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT,
         ).apply { bottomMargin = 12.dp }
+        radius = 10.dp.toFloat()
         addView(LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(16.dp, 14.dp, 16.dp, 14.dp)
+            setPadding(14.dp, 12.dp, 8.dp, 12.dp)
             addView(TextView(requireContext()).apply {
                 text = subscription.name
                 setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium)
@@ -114,12 +117,13 @@ class ProfilesFragment : Fragment() {
                     com.google.android.material.R.attr.materialButtonOutlinedStyle,
                 ).apply {
                     setText(R.string.subscription_update_now)
+                    cornerRadius = 8.dp
                     setOnClickListener { updateSubscription(subscription.id) }
                 })
-                addView(iconButton(android.R.drawable.ic_menu_edit, R.string.edit) {
+                addView(iconButton(R.drawable.ic_edit_20, R.string.edit) {
                     editSubscription(subscription)
                 })
-                addView(iconButton(android.R.drawable.ic_menu_delete, R.string.delete) {
+                addView(iconButton(R.drawable.ic_delete_20, R.string.delete) {
                     confirmDeleteSubscription(subscription)
                 })
             })
@@ -135,8 +139,17 @@ class ProfilesFragment : Fragment() {
             icon = ContextCompat.getDrawable(requireContext(), iconRes)
             text = ""
             contentDescription = getString(descriptionRes)
-            minWidth = 48.dp
-            minimumWidth = 48.dp
+            layoutParams = LinearLayout.LayoutParams(40.dp, 40.dp).apply { marginStart = 2.dp }
+            minWidth = 0
+            minimumWidth = 0
+            minHeight = 0
+            minimumHeight = 0
+            iconSize = 20.dp
+            iconPadding = 0
+            insetTop = 0
+            insetBottom = 0
+            cornerRadius = 8.dp
+            setPadding(0, 0, 0, 0)
             setOnClickListener { action() }
         }
 
@@ -152,6 +165,7 @@ class ProfilesFragment : Fragment() {
     }
 
     private fun saveNewSubscription(raw: String) {
+        if (storage.isShutdown) return
         storage.execute {
             val result = runCatching {
                 when (val payload = ImportPayload.decode(raw)) {
@@ -172,6 +186,7 @@ class ProfilesFragment : Fragment() {
                 }
             }
             activity?.runOnUiThread {
+                if (_binding == null) return@runOnUiThread
                 result.onSuccess(::showSubscriptionRefreshResult).onFailure(::showError)
                 loadSubscriptions()
             }
@@ -188,6 +203,7 @@ class ProfilesFragment : Fragment() {
         }
 
     private fun updateSubscription(subscriptionId: Long) {
+        if (storage.isShutdown) return
         storage.execute {
             val result = runCatching {
                 refreshSubscription(subscriptionId).also {
@@ -197,6 +213,7 @@ class ProfilesFragment : Fragment() {
                 }
             }
             activity?.runOnUiThread {
+                if (_binding == null) return@runOnUiThread
                 result.onSuccess(::showSubscriptionRefreshResult).onFailure(::showError)
                 loadSubscriptions()
             }
@@ -216,9 +233,11 @@ class ProfilesFragment : Fragment() {
             ?: SubscriptionRefresher(profiles).refreshWithChanges(subscriptionId)
 
     private fun editSubscription(subscription: SubscriptionSummary) {
+        if (storage.isShutdown) return
         storage.execute {
             val result = runCatching { requireNotNull(profiles.getSubscriptionSource(subscription.id)) }
             activity?.runOnUiThread {
+                if (_binding == null) return@runOnUiThread
                 result.onSuccess { source ->
                     val form = LinearLayout(requireContext()).apply {
                         orientation = LinearLayout.VERTICAL
@@ -264,9 +283,11 @@ class ProfilesFragment : Fragment() {
         name: String,
         url: String,
     ) {
+        if (storage.isShutdown) return
         storage.execute {
             val result = runCatching { profiles.updateSubscriptionSource(subscriptionId, name, url) }
             activity?.runOnUiThread {
+                if (_binding == null) return@runOnUiThread
                 result.onSuccess {
                     dialog.dismiss()
                     loadSubscriptions()
@@ -286,9 +307,11 @@ class ProfilesFragment : Fragment() {
     }
 
     private fun deleteSubscription(subscriptionId: Long, retainProfiles: Boolean) {
+        if (storage.isShutdown) return
         storage.execute {
             val result = runCatching { profiles.deleteSubscription(subscriptionId, retainProfiles) }
             activity?.runOnUiThread {
+                if (_binding == null) return@runOnUiThread
                 result.onFailure(::showError)
                 loadSubscriptions()
             }

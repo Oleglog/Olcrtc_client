@@ -67,19 +67,21 @@ class ConnectionFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, state: Bundle?) {
+        binding.connect.isEnabled = false
+        binding.testSelected.isEnabled = false
         binding.connect.setOnClickListener {
             if (currentState == VpnState.CONNECTED || currentState in BUSY_STATES) activityHost.stopVpn() else connectSelected()
         }
         binding.addProfile.setOnClickListener { showAddConnectionMenu() }
         binding.testSelected.setOnClickListener { testSelectedProfile() }
         storage.execute { SubscriptionRefresher(profiles).refreshStale() }
-        loadProfiles()
     }
 
     override fun onStart() {
         super.onStart()
         activityHost.setVpnStateListener(::showVpnState)
         activityHost.setImportListener { validatePreview(it, R.string.source_deep_link) }
+        loadProfiles()
     }
 
     override fun onStop() {
@@ -100,6 +102,7 @@ class ConnectionFragment : Fragment() {
 
 
     private fun loadProfiles() {
+        if (storage.isShutdown) return
         storage.execute {
             val result = runCatching {
                 ConnectionScreenModel(
@@ -114,23 +117,30 @@ class ConnectionFragment : Fragment() {
                 result.onSuccess { model ->
                     binding.profileList.removeAllViews()
                     val subscriptionItems = model.subscriptions.flatMap(SubscriptionSection::profiles)
+                    if (currentState != VpnState.CONNECTED) {
+                        selectedProfileId = selectedProfileId?.takeIf { selected ->
+                            model.local.any { it.id == selected }
+                        }
+                        selectedSubscriptionProfileId = selectedSubscriptionProfileId?.takeIf { selected ->
+                            subscriptionItems.any { it.id == selected }
+                        }
+                        if (selectedProfileId == null && selectedSubscriptionProfileId == null) {
+                            selectedProfileId = model.local.firstOrNull()?.id
+                            if (selectedProfileId == null) {
+                                selectedSubscriptionProfileId = subscriptionItems.firstOrNull()?.id
+                            }
+                        }
+                    }
                     if (model.local.isEmpty() && subscriptionItems.isEmpty()) {
                         binding.profileList.addView(TextView(requireContext()).apply {
                             setText(R.string.profiles_placeholder)
                             setPadding(0, 12.dp, 0, 12.dp)
                         })
                     } else {
-                        if (selectedProfileId == null && selectedSubscriptionProfileId == null) {
-                            model.local.firstOrNull()?.let {
-                                selectProfile(it.id, it.name, it.type, it.endpoint)
-                            } ?: subscriptionItems.firstOrNull()?.let {
-                                selectSubscriptionProfile(it.id, it.name, it.type, it.endpoint)
-                            }
-                        }
                         if (model.local.isNotEmpty()) {
                             binding.profileList.addView(sectionTitle(R.string.connection_manual_profiles))
                             model.local.forEach { profile ->
-                                binding.profileList.addView(profileCard(profile.id, profile.name, profile.type, profile.endpoint))
+                                binding.profileList.addView(profileCard(profile.id, profile.name))
                             }
                         }
                         if (subscriptionItems.isNotEmpty()) {
@@ -139,12 +149,19 @@ class ConnectionFragment : Fragment() {
                                 binding.profileList.addView(subscriptionTitle(section.subscription))
                                 section.profiles.forEach { profile ->
                                     binding.profileList.addView(
-                                        subscriptionProfileCard(profile.id, profile.name, profile.type, profile.endpoint),
+                                        subscriptionProfileCard(profile.id, profile.name),
                                     )
                                 }
                             }
                         }
                     }
+                    binding.connect.isEnabled = currentState == VpnState.CONNECTED ||
+                        currentState in BUSY_STATES ||
+                        selectedProfileId != null ||
+                        selectedSubscriptionProfileId != null
+                    binding.testSelected.isEnabled = currentState == VpnState.CONNECTED ||
+                        selectedProfileId != null ||
+                        selectedSubscriptionProfileId != null
                 }.onFailure { binding.status.text = it.message }
             }
         }
@@ -162,7 +179,7 @@ class ConnectionFragment : Fragment() {
         setPadding(4.dp, 12.dp, 0, 0)
     }
 
-    private fun profileCard(id: Long, name: String, type: String, endpoint: String): View =
+    private fun profileCard(id: Long, name: String): View =
         MaterialCardView(requireContext()).apply {
             tag = "local:$id"
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
@@ -170,24 +187,21 @@ class ConnectionFragment : Fragment() {
             }
             isClickable = true
             isFocusable = true
-            strokeColor = cardStrokeState(id == selectedProfileId, id == connectedProfileId)
-            strokeWidth = cardStrokeWidth(id == selectedProfileId, id == connectedProfileId)
+            radius = 10.dp.toFloat()
             addView(LinearLayout(requireContext()).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL
-                setPadding(16.dp, 14.dp, 16.dp, 14.dp)
-                addView(LinearLayout(requireContext()).apply {
-                    orientation = LinearLayout.VERTICAL
-                    addView(TextView(requireContext()).apply {
-                        text = name
-                        textSize = 18f
-                    })
-                    addView(TextView(requireContext()).apply { text = "$type - $endpoint" })
+                setPadding(14.dp, 11.dp, 8.dp, 11.dp)
+                addView(TextView(requireContext()).apply {
+                    text = name
+                    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium)
+                    maxLines = 2
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                addView(iconButton(android.R.drawable.ic_menu_edit, R.string.edit) { editLocalProfile(id) })
-                addView(iconButton(android.R.drawable.ic_menu_delete, R.string.delete) { confirmDeleteProfile(id, name) })
+                addView(iconButton(R.drawable.ic_edit_20, R.string.edit) { editLocalProfile(id) })
+                addView(iconButton(R.drawable.ic_delete_20, R.string.delete) { confirmDeleteProfile(id, name) })
             })
-            setOnClickListener { selectProfile(id, name, type, endpoint) }
+            applyCardAppearance(this, id == selectedProfileId, id == connectedProfileId)
+            setOnClickListener { selectProfile(id) }
         }
 
     private fun iconButton(iconRes: Int, descriptionRes: Int, action: () -> Unit): MaterialButton =
@@ -199,13 +213,22 @@ class ConnectionFragment : Fragment() {
             icon = ContextCompat.getDrawable(requireContext(), iconRes)
             text = ""
             contentDescription = getString(descriptionRes)
-            minWidth = 48.dp
-            minimumWidth = 48.dp
+            layoutParams = LinearLayout.LayoutParams(40.dp, 40.dp).apply { marginStart = 2.dp }
+            minWidth = 0
+            minimumWidth = 0
+            minHeight = 0
+            minimumHeight = 0
+            iconSize = 20.dp
+            iconPadding = 0
+            insetTop = 0
+            insetBottom = 0
+            cornerRadius = 8.dp
+            setPadding(0, 0, 0, 0)
             setOnClickListener { action() }
         }
 
 
-    private fun subscriptionProfileCard(id: String, name: String, type: String, endpoint: String): View =
+    private fun subscriptionProfileCard(id: String, name: String): View =
         MaterialCardView(requireContext()).apply {
             tag = "sub:$id"
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
@@ -213,42 +236,62 @@ class ConnectionFragment : Fragment() {
             }
             isClickable = true
             isFocusable = true
-            strokeColor = cardStrokeState(id == selectedSubscriptionProfileId, id == connectedSubscriptionProfileId)
-            strokeWidth = cardStrokeWidth(id == selectedSubscriptionProfileId, id == connectedSubscriptionProfileId)
+            radius = 10.dp.toFloat()
             addView(LinearLayout(requireContext()).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = android.view.Gravity.CENTER_VERTICAL
-                setPadding(16.dp, 14.dp, 16.dp, 14.dp)
-                addView(LinearLayout(requireContext()).apply {
-                    orientation = LinearLayout.VERTICAL
-                    addView(TextView(requireContext()).apply {
-                        text = name
-                        textSize = 18f
-                    })
-                    addView(TextView(requireContext()).apply { text = "$type - $endpoint" })
+                setPadding(14.dp, 11.dp, 8.dp, 11.dp)
+                addView(TextView(requireContext()).apply {
+                    text = name
+                    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium)
+                    maxLines = 2
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                addView(iconButton(android.R.drawable.ic_menu_edit, R.string.edit) { editSubscriptionProfile(id) })
-                addView(iconButton(android.R.drawable.ic_menu_delete, R.string.delete) {
+                addView(iconButton(R.drawable.ic_edit_20, R.string.edit) { editSubscriptionProfile(id) })
+                addView(iconButton(R.drawable.ic_delete_20, R.string.delete) {
                     confirmDeleteSubscriptionProfile(id, name)
                 })
             })
-            setOnClickListener { selectSubscriptionProfile(id, name, type, endpoint) }
+            applyCardAppearance(this, id == selectedSubscriptionProfileId, id == connectedSubscriptionProfileId)
+            setOnClickListener { selectSubscriptionProfile(id) }
         }
 
-    private fun cardStrokeState(selected: Boolean, connected: Boolean): Int {
-        val attr = when {
-            connected -> android.R.attr.colorPrimary
-            selected -> com.google.android.material.R.attr.colorSecondary
-            else -> com.google.android.material.R.attr.colorOutline
+    private fun applyCardAppearance(card: MaterialCardView, selected: Boolean, connected: Boolean) {
+        val state = connectionCardState(
+            selected = selected,
+            connected = connected,
+            hasConnectedProfile = connectedProfileId != null || connectedSubscriptionProfileId != null,
+        )
+        val strokeAttr = when (state) {
+            ConnectionCardState.CONNECTED -> android.R.attr.colorPrimary
+            ConnectionCardState.SELECTED -> com.google.android.material.R.attr.colorSecondary
+            ConnectionCardState.INACTIVE -> com.google.android.material.R.attr.colorOutline
         }
-        val ta = requireContext().obtainStyledAttributes(intArrayOf(attr))
-        return ta.getColor(0, 0).also { ta.recycle() }
+        card.strokeColor = resolveColor(strokeAttr)
+        card.strokeWidth = when (state) {
+            ConnectionCardState.CONNECTED -> 4.dp
+            ConnectionCardState.SELECTED -> 2.dp
+            ConnectionCardState.INACTIVE -> 1.dp
+        }
+        card.cardElevation = if (state == ConnectionCardState.CONNECTED) 3.dp.toFloat() else 0f
+        card.alpha = if (
+            state == ConnectionCardState.INACTIVE &&
+            (connectedProfileId != null || connectedSubscriptionProfileId != null)
+        ) 0.55f else 1f
+        card.setCardBackgroundColor(resolveColor(
+            if (state == ConnectionCardState.CONNECTED) {
+                com.google.android.material.R.attr.colorPrimaryContainer
+            } else {
+                com.google.android.material.R.attr.colorSurface
+            },
+        ))
     }
 
-    private fun cardStrokeWidth(selected: Boolean, connected: Boolean): Int =
-        (if (connected) 3.dp else if (selected) 2.dp else 1.dp)
+    private fun resolveColor(attribute: Int): Int {
+        val values = requireContext().obtainStyledAttributes(intArrayOf(attribute))
+        return values.getColor(0, 0).also { values.recycle() }
+    }
 
-    private fun refreshAllCardStrokes() {
+    private fun refreshCardAppearance() {
         for (i in 0 until binding.profileList.childCount) {
             (binding.profileList.getChildAt(i) as? MaterialCardView)?.let { card ->
                 val (sel, conn) = when (val tag = card.tag?.toString()) {
@@ -262,41 +305,45 @@ class ConnectionFragment : Fragment() {
                         }
                     }
                 }
-                card.strokeColor = cardStrokeState(sel, conn)
-                card.strokeWidth = cardStrokeWidth(sel, conn)
+                applyCardAppearance(card, sel, conn)
             }
         }
     }
 
-    private fun selectSubscriptionProfile(id: String, name: String, type: String, endpoint: String) {
+    private fun selectSubscriptionProfile(id: String) {
+        if (currentState == VpnState.CONNECTED || currentState in BUSY_STATES) return
         selectedProfileId = null
         selectedSubscriptionProfileId = id
-        binding.selectedProfile.text = "$name\n$type - $endpoint"
-        binding.status.text = getString(R.string.connection_selected_profile, name)
+        binding.status.text = ""
         binding.connect.isEnabled = currentState in BUSY_STATES || currentState == VpnState.CONNECTED || selectedSubscriptionProfileId != null
-        refreshAllCardStrokes()
+        binding.testSelected.isEnabled = true
+        refreshCardAppearance()
     }
 
-    private fun selectProfile(id: Long, name: String, type: String, endpoint: String) {
+    private fun selectProfile(id: Long) {
+        if (currentState == VpnState.CONNECTED || currentState in BUSY_STATES) return
         selectedSubscriptionProfileId = null
         selectedProfileId = id
-        binding.selectedProfile.text = "$name\n$type - $endpoint"
-        binding.status.text = getString(R.string.connection_selected_profile, name)
+        binding.status.text = ""
         binding.connect.isEnabled = currentState in BUSY_STATES || currentState == VpnState.CONNECTED || selectedProfileId != null
-        refreshAllCardStrokes()
+        binding.testSelected.isEnabled = true
+        refreshCardAppearance()
     }
 
     private fun connectSelected() {
         selectedProfileId?.let { activityHost.requestVpnPermission(it); return }
         selectedSubscriptionProfileId?.let { activityHost.requestSubscriptionVpnPermission(it); return }
-        binding.status.setText(R.string.no_profile)
+        binding.status.setText(R.string.profile_select_required)
     }
 
     private fun testSelectedProfile() {
+        val state = currentState
         val localId = selectedProfileId
         val subscriptionId = selectedSubscriptionProfileId
+        val host = activityHost
         storage.execute {
             val result = runCatching {
+                if (state == VpnState.CONNECTED) return@runCatching host.testConnectionLatency()
                 val profile = when {
                     localId != null -> profiles.get(localId)
                     subscriptionId != null -> profiles.getSubscriptionProfile(subscriptionId)
@@ -309,17 +356,12 @@ class ConnectionFragment : Fragment() {
                         else -> error("unreachable")
                     }
                     is ProfileConfig.Olcrtc -> {
-                        val selectedIsConnected = currentState == VpnState.CONNECTED && when {
-                            localId != null -> localId == connectedProfileId
-                            subscriptionId != null -> subscriptionId == connectedSubscriptionProfileId
-                            else -> false
-                        }
-                        require(selectedIsConnected) { getString(R.string.profile_latency_connect_first) }
-                        activityHost.testConnectionLatency()
+                        throw IllegalArgumentException(getString(R.string.profile_latency_connect_first))
                     }
                 }
             }
             activity?.runOnUiThread {
+                val binding = _binding ?: return@runOnUiThread
                 result.onSuccess { binding.status.text = getString(R.string.profile_latency_result, it) }
                     .onFailure { binding.status.text = it.message ?: getString(R.string.invalid_profile) }
             }
@@ -357,6 +399,7 @@ class ConnectionFragment : Fragment() {
         setText(label)
         isAllCaps = false
         minHeight = 56.dp
+        cornerRadius = 10.dp
         setOnClickListener { action() }
     }
 
@@ -368,6 +411,8 @@ class ConnectionFragment : Fragment() {
                 val active = activityHost.activeProfileReference()
                 connectedProfileId = active?.removePrefix("local:")?.takeIf { it != active }?.toLongOrNull()
                 connectedSubscriptionProfileId = active?.removePrefix("subscription:")?.takeIf { it != active }
+                selectedProfileId = connectedProfileId
+                selectedSubscriptionProfileId = connectedSubscriptionProfileId
             }
             VpnState.DISCONNECTED, VpnState.ERROR, VpnState.NO_PROFILE -> {
                 connectedProfileId = null
@@ -375,12 +420,23 @@ class ConnectionFragment : Fragment() {
             }
             else -> {}
         }
-        binding.status.text = error ?: state.name
+        binding.status.text = error ?: vpnStateText(state)
         binding.connect.text = getString(
             if (state == VpnState.CONNECTED || state in BUSY_STATES) R.string.disconnect else R.string.connect
         )
         binding.connect.isEnabled = state == VpnState.CONNECTED || state in BUSY_STATES || selectedProfileId != null || selectedSubscriptionProfileId != null
-        refreshAllCardStrokes()
+        binding.testSelected.isEnabled = state == VpnState.CONNECTED || selectedProfileId != null || selectedSubscriptionProfileId != null
+        refreshCardAppearance()
+    }
+
+    private fun vpnStateText(state: VpnState): String = when (state) {
+        VpnState.NO_PROFILE -> ""
+        VpnState.DISCONNECTED -> getString(R.string.vpn_notification_disconnected)
+        VpnState.PREPARING, VpnState.CONNECTING -> getString(R.string.vpn_notification_connecting)
+        VpnState.CONNECTED -> getString(R.string.vpn_notification_connected)
+        VpnState.RECONNECTING -> getString(R.string.vpn_notification_reconnecting)
+        VpnState.STOPPING -> getString(R.string.vpn_notification_stopping)
+        VpnState.ERROR -> getString(R.string.vpn_notification_error)
     }
 
     private fun requestScanner() {
@@ -399,7 +455,10 @@ class ConnectionFragment : Fragment() {
     private fun validatePreview(raw: String, source: Int) {
         storage.execute {
             val result = runCatching { parsePreview(raw) }
-            activity?.runOnUiThread { showPreview(result, R.string.invalid_profile, source) }
+            activity?.runOnUiThread {
+                if (_binding == null) return@runOnUiThread
+                showPreview(result, R.string.invalid_profile, source)
+            }
         }
     }
 
@@ -413,7 +472,6 @@ class ConnectionFragment : Fragment() {
 
     private fun importBundle(raw: String): ImportPreview = when (val bundle = bundleImports.accept(raw)) {
         is BundleImportResult.Pending -> ImportPreview(
-            description = "",
             multipartReceived = bundle.received,
             multipartTotal = bundle.total,
         )
@@ -422,7 +480,6 @@ class ConnectionFragment : Fragment() {
             val refresh = (activity as? MainActivity)?.refreshSubscription(subscriptionId)
                 ?: SubscriptionRefresher(profiles).refreshWithChanges(subscriptionId)
             ImportPreview(
-                description = "${bundle.bundle.name}: ${refresh.total} profiles",
                 subscriptionImported = true,
                 subscriptionRefresh = refresh,
             )
@@ -431,11 +488,9 @@ class ConnectionFragment : Fragment() {
 
     private fun saveProfile(raw: String): ImportPreview = when (val profile = ProfileUri.parse(raw)) {
         is ImportedProfile.Olcrtc -> ImportPreview(
-            description = "olcRTC: ${profile.value.name}",
             localProfileId = profiles.findDuplicate(profile.value) ?: profiles.insert(profile.value),
         )
         is ImportedProfile.Standard -> ImportPreview(
-            description = "${profile.value.protocol.name}: ${profile.value.name}",
             localProfileId = profiles.findDuplicate(profile.value) ?: profiles.insert(profile.value),
         )
     }
@@ -453,8 +508,8 @@ class ConnectionFragment : Fragment() {
             }
             selectedProfileId = preview.localProfileId
             selectedSubscriptionProfileId = null
-            binding.selectedProfile.text = preview.description
             binding.connect.isEnabled = preview.localProfileId != null || currentState in BUSY_STATES || currentState == VpnState.CONNECTED
+            binding.testSelected.isEnabled = preview.localProfileId != null
             binding.status.text = "${getString(R.string.import_source, getString(source))}\n${getString(
                 if (preview.subscriptionImported) R.string.subscription_imported else R.string.profile_saved,
             )}"
@@ -478,9 +533,11 @@ class ConnectionFragment : Fragment() {
     }
 
     private fun editLocalProfile(profileId: Long) {
+        if (storage.isShutdown) return
         storage.execute {
             val result = runCatching { requireNotNull(profiles.get(profileId)) }
             activity?.runOnUiThread {
+                val binding = _binding ?: return@runOnUiThread
                 result.onSuccess { profile ->
                     ProfileEditorDialog.show(
                         fragment = this,
@@ -494,6 +551,7 @@ class ConnectionFragment : Fragment() {
     }
 
     private fun saveLocalProfile(profileId: Long, profile: ProfileConfig, dialog: AlertDialog) {
+        if (storage.isShutdown) return
         storage.execute {
             val result = runCatching {
                 when (profile) {
@@ -502,6 +560,7 @@ class ConnectionFragment : Fragment() {
                 }
             }
             activity?.runOnUiThread {
+                val binding = _binding ?: return@runOnUiThread
                 result.onSuccess {
                     dialog.dismiss()
                     loadProfiles()
@@ -511,9 +570,11 @@ class ConnectionFragment : Fragment() {
     }
 
     private fun editSubscriptionProfile(profileId: String) {
+        if (storage.isShutdown) return
         storage.execute {
             val result = runCatching { requireNotNull(profiles.getSubscriptionProfile(profileId)) }
             activity?.runOnUiThread {
+                val binding = _binding ?: return@runOnUiThread
                 result.onSuccess { profile ->
                     ProfileEditorDialog.show(
                         fragment = this,
@@ -527,6 +588,7 @@ class ConnectionFragment : Fragment() {
     }
 
     private fun saveSubscriptionProfile(profileId: String, profile: ProfileConfig, dialog: AlertDialog) {
+        if (storage.isShutdown) return
         storage.execute {
             val result = runCatching {
                 profiles.updateSubscriptionProfile(
@@ -538,6 +600,7 @@ class ConnectionFragment : Fragment() {
                 )
             }
             activity?.runOnUiThread {
+                val binding = _binding ?: return@runOnUiThread
                 result.onSuccess {
                     dialog.dismiss()
                     loadProfiles()
@@ -552,14 +615,16 @@ class ConnectionFragment : Fragment() {
             .setMessage(getString(R.string.profile_delete_message, name))
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.delete) { _, _ ->
+                if (storage.isShutdown) return@setPositiveButton
                 storage.execute {
                     val result = runCatching { profiles.deleteSubscriptionProfile(profileId) }
                     activity?.runOnUiThread {
+                        val binding = _binding ?: return@runOnUiThread
                         result.onSuccess {
                             if (selectedSubscriptionProfileId == profileId) {
                                 selectedSubscriptionProfileId = null
-                                binding.selectedProfile.setText(R.string.no_profile)
                                 binding.connect.isEnabled = currentState in BUSY_STATES || currentState == VpnState.CONNECTED
+                                binding.testSelected.isEnabled = false
                             }
                             loadProfiles()
                         }.onFailure { binding.status.text = it.message ?: getString(R.string.invalid_profile) }
@@ -575,9 +640,11 @@ class ConnectionFragment : Fragment() {
             .setMessage(getString(R.string.profile_delete_message, name))
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.delete) { _, _ ->
+                if (storage.isShutdown) return@setPositiveButton
                 storage.execute {
                     val result = runCatching { profiles.deleteLocal(profileId) }
                     activity?.runOnUiThread {
+                        val binding = _binding ?: return@runOnUiThread
                         result.onSuccess {
                             if (selectedProfileId == profileId) selectedProfileId = null
                             loadProfiles()
@@ -592,7 +659,6 @@ class ConnectionFragment : Fragment() {
     private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
 
     private data class ImportPreview(
-        val description: String,
         val localProfileId: Long? = null,
         val subscriptionImported: Boolean = false,
         val multipartReceived: Int? = null,
@@ -618,4 +684,20 @@ class ConnectionFragment : Fragment() {
             VpnState.STOPPING,
         )
     }
+}
+
+internal enum class ConnectionCardState {
+    CONNECTED,
+    SELECTED,
+    INACTIVE,
+}
+
+internal fun connectionCardState(
+    selected: Boolean,
+    connected: Boolean,
+    hasConnectedProfile: Boolean,
+): ConnectionCardState = when {
+    connected -> ConnectionCardState.CONNECTED
+    selected && !hasConnectedProfile -> ConnectionCardState.SELECTED
+    else -> ConnectionCardState.INACTIVE
 }

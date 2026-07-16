@@ -45,7 +45,7 @@
     <string name="profiles_count_suffix">profiles</string>
     <string name="profile_locally_modified">modified</string>
     <string name="profile_reset">Reset</string>
-    <string name="profile_test_latency">Test</string>
+    <string name="profile_test_latency">Ping</string>
     <string name="profile_latency_result">Latency: %1$d ms</string>
     <string name="profile_latency_connect_first">Connect this olcRTC profile before testing it</string>
     <string name="subscription_add">Add subscription</string>
@@ -150,12 +150,11 @@
     <string name="settings_saved">Settings saved</string>
     <string name="olcrtc_uri_hint">Paste an olcrtc:// profile URI</string>
     <string name="no_profile">No profile imported</string>
+    <string name="profile_select_required">Select a connection first</string>
     <string name="connect">Connect</string>
     <string name="add_connection">Add connection</string>
-    <string name="connection_saved_profiles">Saved connections</string>
     <string name="connection_manual_profiles">My connections</string>
     <string name="connection_subscription_profiles">From subscriptions</string>
-    <string name="connection_selected_profile">Selected: %1$s</string>
     <string name="import_and_connect">Import and connect</string>
     <string name="paste_clipboard">Paste</string>
     <string name="scan_qr">Scan QR</string>

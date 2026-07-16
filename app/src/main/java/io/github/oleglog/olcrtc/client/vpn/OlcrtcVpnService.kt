@@ -38,15 +38,12 @@ import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
-import java.net.InetSocketAddress
-import java.net.Proxy
 import java.net.SocketTimeoutException
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.TimeUnit
-import kotlin.system.measureTimeMillis
 
 class OlcrtcVpnService : VpnService() {
     private val callbacks = RemoteCallbackList<IVpnStateCallback>()
@@ -392,7 +389,10 @@ class OlcrtcVpnService : VpnService() {
 
     private fun subscriptionRefresher(): SubscriptionRefresher {
         val socksPort = activeSocksPort ?: return SubscriptionRefresher(profiles)
-        val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved("127.0.0.1", socksPort))
+        val proxy = java.net.Proxy(
+            java.net.Proxy.Type.SOCKS,
+            java.net.InetSocketAddress.createUnresolved("127.0.0.1", socksPort),
+        )
         return SubscriptionRefresher(
             profiles,
             userHttp = SubscriptionHttpClient(proxy = proxy),
@@ -402,11 +402,7 @@ class OlcrtcVpnService : VpnService() {
 
     private fun measureConnectionLatency(): Long {
         check(publishedState == VpnState.CONNECTED) { "VPN is not connected" }
-        val socksPort = requireNotNull(activeSocksPort) { "VPN SOCKS endpoint is not ready" }
-        val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved("127.0.0.1", socksPort))
-        return measureTimeMillis {
-            SubscriptionHttpClient(proxy = proxy).get(CONNECTION_TEST_URL)
-        }
+        return GomobileCore.urlTest(CONNECTION_TEST_URL, CONNECTION_TEST_TIMEOUT_MILLIS)
     }
 
     private fun handleNetworkAvailable(network: Network) {
@@ -935,6 +931,7 @@ class OlcrtcVpnService : VpnService() {
         const val DATAPATH_TIMEOUT_MILLIS = 10_000
         const val MAX_RECONNECT_ATTEMPTS = 3
         private const val CONNECTION_TEST_URL = "https://www.google.com/generate_204"
+        private const val CONNECTION_TEST_TIMEOUT_MILLIS = 5_000
         private val RECONNECTABLE_STATES = setOf(
             VpnState.PREPARING,
             VpnState.CONNECTING,

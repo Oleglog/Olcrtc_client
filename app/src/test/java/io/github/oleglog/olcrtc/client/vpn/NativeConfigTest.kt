@@ -101,6 +101,23 @@ class NativeConfigTest {
     }
 
     @Test
+    fun routesLatencyTestThroughProxyBeforeUserRules() {
+        val json = NativeConfig.xray(
+            socksPort = 1080,
+            routingRules = listOf(routingRule(
+                RoutingRule.MatchType.DOMAIN,
+                "www.google.com",
+                RoutingRule.Action.DIRECT,
+            )),
+        )
+
+        val latencyRule = json.indexOf("\"inboundTag\": [\"latency-test\"]")
+        val directRule = json.indexOf("full:www.google.com")
+        assertTrue(latencyRule >= 0)
+        assertTrue(latencyRule < directRule)
+    }
+
+    @Test
     fun buildsRoutingRulesForAllActions() {
         val rules = listOf(
             routingRule(RoutingRule.MatchType.DOMAIN, "exact.example", RoutingRule.Action.VPN),

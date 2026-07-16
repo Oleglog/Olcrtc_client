@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true">
@@ -8,7 +9,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="24dp">
+        android:padding="20dp">
 
         <TextView
             android:layout_width="wrap_content"
@@ -16,28 +17,21 @@
             android:text="@string/navigation_connection"
             android:textAppearance="?attr/textAppearanceHeadlineMedium" />
 
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/selected_profile_card"
+        <LinearLayout
+            android:id="@+id/profile_list"
             android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp">
-
-            <TextView
-                android:id="@+id/selected_profile"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:padding="16dp"
-                android:text="@string/no_profile"
-                android:textAppearance="?attr/textAppearanceTitleMedium" />
-        </com.google.android.material.card.MaterialCardView>
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:orientation="vertical" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/connect"
             android:layout_width="match_parent"
-            android:layout_height="72dp"
-            android:layout_marginTop="12dp"
+            android:layout_height="60dp"
+            android:layout_marginTop="20dp"
             android:text="@string/connect"
-            android:textAppearance="?attr/textAppearanceTitleLarge" />
+            android:textAppearance="?attr/textAppearanceTitleMedium"
+            app:cornerRadius="10dp" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -49,41 +43,29 @@
                 android:id="@+id/add_profile"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="52dp"
                 android:layout_weight="1"
-                android:text="@string/add_connection" />
+                android:text="@string/add_connection"
+                app:cornerRadius="10dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/test_selected"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="52dp"
                 android:layout_marginStart="8dp"
                 android:layout_weight="1"
-                android:text="@string/profile_test_latency" />
+                android:text="@string/profile_test_latency"
+                app:cornerRadius="10dp" />
         </LinearLayout>
 
         <TextView
             android:id="@+id/status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/no_profile"
-            android:textAppearance="?attr/textAppearanceBodyLarge" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="24dp"
-            android:text="@string/connection_saved_profiles"
-            android:textAppearance="?attr/textAppearanceTitleMedium" />
-
-        <LinearLayout
-            android:id="@+id/profile_list"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:orientation="vertical" />
+            android:layout_marginTop="10dp"
+            android:text=""
+            android:textAppearance="?attr/textAppearanceBodyMedium" />
 
     </LinearLayout>
 </ScrollView>
