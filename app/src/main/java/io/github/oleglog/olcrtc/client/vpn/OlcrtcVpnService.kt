@@ -13,6 +13,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.VpnService
+import android.os.Build
 import android.os.IBinder
 import android.os.RemoteCallbackList
 import android.os.RemoteException
@@ -156,14 +157,16 @@ class OlcrtcVpnService : VpnService() {
         GomobileCore.setProtector(::protect)
         GomobileCore.setLogWriter { diagnostics.append("info", "olcRTC core: $it") }
         createNotificationChannel()
-        activeNetwork = connectivity.allNetworks.firstOrNull(::isUnderlyingNetwork)
-        connectivity.registerNetworkCallback(
-            NetworkRequest.Builder()
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
-                .build(),
-            networkCallback,
-        )
+        activeNetwork = connectivity.activeNetwork?.takeIf(::isUnderlyingNetwork)
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            .build()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            connectivity.registerBestMatchingNetworkCallback(request, networkCallback)
+        } else {
+            connectivity.requestNetwork(request, networkCallback)
+        }
         ContextCompat.registerReceiver(
             this,
             userUnlockedReceiver,
@@ -553,6 +556,7 @@ class OlcrtcVpnService : VpnService() {
             .addRoute("0.0.0.0", 0)
             .addRoute("::", 0)
             .addDnsServer(dns.address)
+        activeNetwork?.let { builder.setUnderlyingNetworks(arrayOf(it)) }
         applyPerAppPolicy(builder, routingSettings.getPerAppPolicy())
         val descriptor = builder.establish()
             ?: error("failed to establish VPN interface")
