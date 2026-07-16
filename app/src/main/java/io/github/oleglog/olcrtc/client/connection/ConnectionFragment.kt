@@ -40,6 +40,7 @@ class ConnectionFragment : Fragment() {
     private val binding get() = requireNotNull(_binding)
     private val profiles by lazy { ProfileRepository.open(requireContext().applicationContext) }
     private val storage = Executors.newSingleThreadExecutor()
+    private val latency = Executors.newSingleThreadExecutor()
     private val bundleImports = BundleImportDispatcher()
     private var currentState = VpnState.NO_PROFILE
     private var selectedProfileId: Long? = null
@@ -74,7 +75,6 @@ class ConnectionFragment : Fragment() {
         }
         binding.addProfile.setOnClickListener { showAddConnectionMenu() }
         binding.testSelected.setOnClickListener { testSelectedProfile() }
-        storage.execute { SubscriptionRefresher(profiles).refreshStale() }
     }
 
     override fun onStart() {
@@ -97,6 +97,7 @@ class ConnectionFragment : Fragment() {
 
     override fun onDestroy() {
         storage.shutdownNow()
+        latency.shutdownNow()
         super.onDestroy()
     }
 
@@ -336,7 +337,9 @@ class ConnectionFragment : Fragment() {
         val localId = selectedProfileId
         val subscriptionId = selectedSubscriptionProfileId
         val host = activityHost
-        storage.execute {
+        binding.testSelected.isEnabled = false
+        binding.status.setText(R.string.profile_latency_checking)
+        latency.execute {
             val result = runCatching {
                 if (state == VpnState.CONNECTED) return@runCatching host.testConnectionLatency()
                 val profile = when {
@@ -357,6 +360,8 @@ class ConnectionFragment : Fragment() {
             }
             activity?.runOnUiThread {
                 val binding = _binding ?: return@runOnUiThread
+                binding.testSelected.isEnabled = currentState == VpnState.CONNECTED ||
+                    selectedProfileId != null || selectedSubscriptionProfileId != null
                 result.onSuccess { binding.status.text = getString(R.string.profile_latency_result, it) }
                     .onFailure { binding.status.text = it.message ?: getString(R.string.invalid_profile) }
             }

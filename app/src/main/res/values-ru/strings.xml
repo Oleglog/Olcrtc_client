@@ -47,6 +47,7 @@
     <string name="profile_locally_modified">изменён</string>
     <string name="profile_reset">Сбросить</string>
     <string name="profile_test_latency">Пинг</string>
+    <string name="profile_latency_checking">Проверка задержки…</string>
     <string name="profile_latency_result">Задержка: %1$d мс</string>
     <string name="profile_latency_connect_first">Сначала подключите этот профиль olcRTC</string>
     <string name="subscription_add">Добавить подписку по QR-коду</string>

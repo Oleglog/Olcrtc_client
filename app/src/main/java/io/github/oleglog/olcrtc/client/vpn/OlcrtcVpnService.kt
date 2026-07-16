@@ -199,6 +199,7 @@ class OlcrtcVpnService : VpnService() {
         when (intent?.action) {
             ACTION_START -> {
                 startForeground(NOTIFICATION_ID, notification())
+                acquireWakeLock()
                 val subscriptionProfileId = intent.getStringExtra(EXTRA_SUBSCRIPTION_PROFILE_ID)
                 val localProfileId = intent.getLongExtra(EXTRA_PROFILE_ID, 0)
                 val profile = when {
@@ -214,6 +215,7 @@ class OlcrtcVpnService : VpnService() {
                 } else {
                     commands.execute {
                         transitionToError("profileId is missing")
+                        releaseWakeLock()
                         stopForeground(STOP_FOREGROUND_REMOVE)
                         stopSelf()
                     }
@@ -408,7 +410,7 @@ class OlcrtcVpnService : VpnService() {
 
     private fun measureConnectionLatency(): Long {
         check(publishedState == VpnState.CONNECTED) { "VPN is not connected" }
-        return GomobileCore.urlTest(CONNECTION_TEST_URL, CONNECTION_TEST_TIMEOUT_MILLIS)
+        return GomobileCore.urlTest(CONNECTION_TEST_URL, CONNECTION_TEST_TIMEOUT_MILLIS).coerceAtLeast(1)
     }
 
     private fun handleNetworkAvailable(network: Network) {

@@ -46,6 +46,7 @@
     <string name="profile_locally_modified">modified</string>
     <string name="profile_reset">Reset</string>
     <string name="profile_test_latency">Ping</string>
+    <string name="profile_latency_checking">Checking latency…</string>
     <string name="profile_latency_result">Latency: %1$d ms</string>
     <string name="profile_latency_connect_first">Connect this olcRTC profile before testing it</string>
     <string name="subscription_add">Add subscription</string>
