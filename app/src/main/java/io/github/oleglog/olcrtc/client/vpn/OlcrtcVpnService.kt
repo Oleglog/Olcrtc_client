@@ -14,6 +14,7 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.VpnService
 import android.os.Build
+import android.os.Handler
 import android.os.IBinder
 import android.os.RemoteCallbackList
 import android.os.RemoteException
@@ -163,7 +164,7 @@ class OlcrtcVpnService : VpnService() {
             .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
             .build()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            connectivity.registerBestMatchingNetworkCallback(request, networkCallback)
+            connectivity.registerBestMatchingNetworkCallback(request, networkCallback, Handler(mainLooper))
         } else {
             connectivity.requestNetwork(request, networkCallback)
         }
