@@ -22,6 +22,8 @@ internal class NativeSession(
     ) {
         check(!closed && !coreStarted) { "native session already used" }
         try {
+            val descriptor = establishTun()
+            tun = descriptor
             coreStarted = true
             if (olcrtcConfig != null) {
                 stage("olcRTC startup") {
@@ -33,8 +35,6 @@ internal class NativeSession(
                 nativeCore.startXray(assetDirectory, xrayConfig)
                 nativeCore.waitXrayReady(socksPort, XRAY_READY_TIMEOUT_MILLIS)
             }
-            val descriptor = establishTun()
-            tun = descriptor
             stage("HEV startup") {
                 hevTunnel.start(hevConfig, descriptor.fd)
                 check(hevTunnel.isRunning()) {

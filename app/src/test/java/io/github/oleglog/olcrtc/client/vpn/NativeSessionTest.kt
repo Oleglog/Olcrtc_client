@@ -9,7 +9,7 @@ import org.junit.runners.JUnit4
 @RunWith(JUnit4::class)
 class NativeSessionTest {
     @Test
-    fun rollsBackXrayWhenTunCreationFails() {
+    fun doesNotStartCoreWhenTunCreationFails() {
         val events = mutableListOf<String>()
         val session = NativeSession(
             RecordingCore(events),
@@ -20,7 +20,7 @@ class NativeSessionTest {
 
         runCatching { session.start(1080, "/assets", "{}", byteArrayOf(1)) }
 
-        assertEquals(listOf("xray:start", "xray:ready", "tunnel:close", "core:stop"), events)
+        assertEquals(listOf("tunnel:close"), events)
     }
 
     @Test
@@ -29,14 +29,14 @@ class NativeSessionTest {
         val session = NativeSession(
             RecordingCore(events, failReadiness = true),
             RecordingTunnel(events),
-            establishTun = { error("unused") },
+            establishTun = { RecordingTun(events) },
             verifyDatapath = {},
         )
 
         val failure = runCatching { session.start(1080, "/assets", "{}", byteArrayOf(1)) }.exceptionOrNull()
 
         assertEquals("not ready", failure?.message)
-        assertEquals(listOf("xray:start", "xray:ready", "tunnel:close", "core:stop"), events)
+        assertEquals(listOf("xray:start", "xray:ready", "tunnel:close", "tun:close", "core:stop"), events)
     }
 
     @Test
@@ -46,7 +46,7 @@ class NativeSessionTest {
         val session = NativeSession(
             RecordingCore(events, failReadiness = true),
             RecordingTunnel(events),
-            establishTun = { error("unused") },
+            establishTun = { RecordingTun(events) },
             verifyDatapath = {},
             reportStage = { message, error ->
                 stages += if (error == null) message else "$message: ${error.message}"
@@ -67,13 +67,16 @@ class NativeSessionTest {
     }
 
     @Test
-    fun startsOlcrtcBeforeXray() {
+    fun establishesTunBeforeOlcrtcAndXray() {
         val events = mutableListOf<String>()
         val core = RecordingCore(events)
         val session = NativeSession(
             core,
             RecordingTunnel(events),
-            establishTun = { error("tun") },
+            establishTun = {
+                events += "tun:establish"
+                RecordingTun(events)
+            },
             verifyDatapath = {},
         )
         val config = NativeOlcrtcConfig(
@@ -95,12 +98,12 @@ class NativeSessionTest {
 
         assertEquals(
             listOf(
+                "tun:establish",
                 "olcrtc:start",
                 "olcrtc:ready",
                 "xray:start",
                 "xray:ready",
-                "tunnel:close",
-                "core:stop",
+                "tunnel:start",
             ),
             events,
         )
@@ -113,7 +116,7 @@ class NativeSessionTest {
         val session = NativeSession(
             RecordingCore(events, failOlcrtcStart = true),
             RecordingTunnel(events),
-            establishTun = { error("unused") },
+            establishTun = { RecordingTun(events) },
             verifyDatapath = {},
         )
 
@@ -122,7 +125,7 @@ class NativeSessionTest {
         }.exceptionOrNull()
 
         assertEquals("olcrtc start", failure?.message)
-        assertEquals(listOf("olcrtc:start", "tunnel:close", "core:stop"), events)
+        assertEquals(listOf("olcrtc:start", "tunnel:close", "tun:close", "core:stop"), events)
     }
 
     @Test
@@ -131,7 +134,7 @@ class NativeSessionTest {
         val session = NativeSession(
             RecordingCore(events, failOlcrtcReadiness = true),
             RecordingTunnel(events),
-            establishTun = { error("unused") },
+            establishTun = { RecordingTun(events) },
             verifyDatapath = {},
         )
 
@@ -141,7 +144,7 @@ class NativeSessionTest {
 
         assertEquals("olcrtc readiness", failure?.message)
         assertEquals(
-            listOf("olcrtc:start", "olcrtc:ready", "tunnel:close", "core:stop"),
+            listOf("olcrtc:start", "olcrtc:ready", "tunnel:close", "tun:close", "core:stop"),
             events,
         )
     }
