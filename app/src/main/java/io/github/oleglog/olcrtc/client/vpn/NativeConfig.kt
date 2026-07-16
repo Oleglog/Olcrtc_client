@@ -67,12 +67,6 @@ internal object NativeConfig {
           "outbounds": [
             $proxyOutbound,
             { "protocol": "dns", "tag": "$DNS_OUT_TAG", "settings": { "nonIPQuery": "reject" } },
-            {
-              "protocol": "freedom",
-              "tag": "$DNS_TLS_OUT_TAG",
-              "settings": { "redirect": "${escapeJson(dnsAddress(dns, DNS_TLS_PORT))}" },
-              "proxySettings": { "tag": "proxy" }
-            },
             { "protocol": "freedom", "tag": "direct" },
             { "protocol": "blackhole", "tag": "block" }
           ]${routing(routingRules, routingPolicy)}
@@ -84,7 +78,7 @@ internal object NativeConfig {
             add("{ \"type\": \"field\", \"inboundTag\": [\"$LATENCY_TEST_TAG\"], \"outboundTag\": \"proxy\" }")
             add("{ \"type\": \"field\", \"inboundTag\": [\"$DNS_TAG\"], \"outboundTag\": \"proxy\" }")
             add("{ \"type\": \"field\", \"ip\": [\"$VPN_DNS_ADDRESS\"], \"port\": \"53\", \"network\": \"tcp,udp\", \"outboundTag\": \"$DNS_OUT_TAG\" }")
-            add("{ \"type\": \"field\", \"ip\": [\"$VPN_DNS_ADDRESS\"], \"port\": \"$DNS_TLS_PORT\", \"network\": \"tcp\", \"outboundTag\": \"$DNS_TLS_OUT_TAG\" }")
+            add("{ \"type\": \"field\", \"port\": \"$PRIVATE_DNS_PORT\", \"network\": \"tcp\", \"outboundTag\": \"block\" }")
             rules.forEach { rule ->
                 val field = when (rule.matchType) {
                     RoutingRule.MatchType.DOMAIN -> "domain" to "full:${escapeJson(rule.value)}"
@@ -203,8 +197,7 @@ internal object NativeConfig {
 
     private const val DNS_TAG = "dns-proxy"
     private const val DNS_OUT_TAG = "dns-out"
-    private const val DNS_TLS_OUT_TAG = "dns-tls-out"
-    private const val DNS_TLS_PORT = 853
+    private const val PRIVATE_DNS_PORT = 853
     private const val LATENCY_TEST_TAG = "latency-test"
     const val VPN_DNS_ADDRESS = "10.0.0.1"
     private val LAN_RANGES = listOf(

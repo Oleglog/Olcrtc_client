@@ -95,17 +95,16 @@ class NativeConfigTest {
 
         assertTrue(json.contains("\"address\": \"tcp://[2001:4860:4860:0:0:0:0:8888]:5353\", \"tag\": \"dns-proxy\""))
         assertTrue(json.contains("\"protocol\": \"dns\", \"tag\": \"dns-out\""))
-        assertTrue(json.contains("\"tag\": \"dns-tls-out\""))
-        assertTrue(json.contains("\"redirect\": \"[2001:4860:4860:0:0:0:0:8888]:853\""))
-        assertTrue(json.contains("\"proxySettings\": { \"tag\": \"proxy\" }"))
+        assertFalse(json.contains("dns-tls-out"))
+        assertFalse(json.contains("\"redirect\""))
         val dnsRule = json.indexOf("\"inboundTag\": [\"dns-proxy\"]")
         val interceptedDnsRule = json.indexOf("\"ip\": [\"${NativeConfig.VPN_DNS_ADDRESS}\"]")
-        val interceptedDotRule = json.indexOf("\"port\": \"853\", \"network\": \"tcp\", \"outboundTag\": \"dns-tls-out\"")
+        val privateDnsRule = json.indexOf("\"port\": \"853\", \"network\": \"tcp\", \"outboundTag\": \"block\"")
         val userRuleIndex = json.indexOf("full:blocked.example")
         assertTrue(dnsRule >= 0)
         assertTrue(dnsRule < userRuleIndex)
         assertTrue(interceptedDnsRule in 0..<userRuleIndex)
-        assertTrue(interceptedDotRule in 0..<userRuleIndex)
+        assertTrue(privateDnsRule in 0..<userRuleIndex)
         assertTrue(json.contains("\"port\": \"53\", \"network\": \"tcp,udp\", \"outboundTag\": \"dns-out\""))
     }
 

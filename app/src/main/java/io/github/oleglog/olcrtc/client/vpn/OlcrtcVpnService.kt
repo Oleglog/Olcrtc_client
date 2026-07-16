@@ -584,7 +584,7 @@ class OlcrtcVpnService : VpnService() {
         }
     }
 
-    private fun establishTun(dns: DnsEndpoint): TunDescriptor {
+    private fun establishTun(): TunDescriptor {
         val builder = Builder()
             .setSession(getString(R.string.app_name))
             .setMtu(VPN_MTU)
@@ -673,7 +673,7 @@ class OlcrtcVpnService : VpnService() {
         return NativeSession(
             nativeCore = GomobileCore,
             hevTunnel = HevTunnel(),
-            establishTun = { establishTun(dns) },
+            establishTun = ::establishTun,
             verifyDatapath = { verifyDatapath(xraySocksPort, dns) },
             reportStage = { message, error ->
                 diagnostics.append(
