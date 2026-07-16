@@ -69,7 +69,9 @@ android {
             }
         }
         release {
-            signingConfig = signingConfigs.getByName("release")
+            if (keystorePropertiesFile.isFile) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
