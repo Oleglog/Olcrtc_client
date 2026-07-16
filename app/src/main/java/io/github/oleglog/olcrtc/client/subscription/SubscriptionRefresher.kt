@@ -25,9 +25,13 @@ internal class SubscriptionRefresher(
     fun refreshStale(now: Long = System.currentTimeMillis()): Int =
         repository.getStaleSubscriptionIds(now).count { refresh(it, now) }
 
-    fun refresh(subscriptionId: Long, now: Long = System.currentTimeMillis()): Boolean {
+    fun refresh(
+        subscriptionId: Long,
+        now: Long = System.currentTimeMillis(),
+        force: Boolean = false,
+    ): Boolean {
         val source = requireNotNull(repository.getSubscriptionSource(subscriptionId)) { "Subscription not found" }
-        return runCatching { refreshPrimary(subscriptionId, source, now) }
+        return runCatching { refreshPrimary(subscriptionId, source, now, force) }
             .recoverCatching { primaryError ->
                 if (source.mirrorUrl == null || source.mirrorKey == null) {
                     throw primaryError
@@ -42,7 +46,7 @@ internal class SubscriptionRefresher(
 
     fun refreshWithChanges(subscriptionId: Long, now: Long = System.currentTimeMillis()): Result {
         val before = repository.getSubscriptionProfiles(subscriptionId).mapTo(mutableSetOf(), ::identity)
-        if (!refresh(subscriptionId, now)) return Result(false, 0, 0, before.size)
+        if (!refresh(subscriptionId, now, force = true)) return Result(false, 0, 0, before.size)
         val after = repository.getSubscriptionProfiles(subscriptionId).mapTo(mutableSetOf(), ::identity)
         return Result(
             success = true,
@@ -52,11 +56,16 @@ internal class SubscriptionRefresher(
         )
     }
 
-    private fun refreshPrimary(subscriptionId: Long, source: SubscriptionSource, now: Long): Boolean {
+    private fun refreshPrimary(
+        subscriptionId: Long,
+        source: SubscriptionSource,
+        now: Long,
+        force: Boolean,
+    ): Boolean {
         val response = userHttp.get(
             source.url,
-            etag = source.etag,
-            lastModified = source.lastModified,
+            etag = source.etag.takeUnless { force },
+            lastModified = source.lastModified.takeUnless { force },
             allowUntrustedCertificate = true,
         )
         if (response.notModified) {

@@ -16,6 +16,7 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import io.github.oleglog.olcrtc.client.databinding.ActivityMainBinding
+import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import io.github.oleglog.olcrtc.client.vpn.IOlcrtcVpnService
 import io.github.oleglog.olcrtc.client.vpn.IVpnStateCallback
 import io.github.oleglog.olcrtc.client.vpn.OlcrtcVpnService
@@ -23,7 +24,7 @@ import io.github.oleglog.olcrtc.client.vpn.VpnState
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
-    private var vpn: IOlcrtcVpnService? = null
+    @Volatile private var vpn: IOlcrtcVpnService? = null
     private var bound = false
     private var pendingProfileId: Long? = null
     private var pendingSubscriptionProfileId: String? = null
@@ -119,6 +120,17 @@ class MainActivity : AppCompatActivity() {
 
     fun stopVpn() {
         vpn?.stop()
+    }
+
+    internal fun refreshSubscription(subscriptionId: Long): SubscriptionRefresher.Result? {
+        val values = vpn?.refreshSubscription(subscriptionId) ?: return null
+        require(values.size == 4) { "Invalid subscription refresh result" }
+        return SubscriptionRefresher.Result(
+            success = values[0] == 1,
+            added = values[1],
+            removed = values[2],
+            total = values[3],
+        )
     }
 
     fun requestVpnPermission(profileId: Long) {

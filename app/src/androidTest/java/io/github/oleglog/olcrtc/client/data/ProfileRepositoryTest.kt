@@ -341,10 +341,35 @@ class ProfileRepositoryTest {
         ))
 
         repository.insertSubscription(subscriptionBundle(listOf(profile)), now = 1)
-        repository.insertSubscription(subscriptionBundle(listOf(profile)), now = 2)
+        repository.insertSubscription(
+            subscriptionBundle(listOf(profile), url = "https://example.com/other-subscription"),
+            now = 2,
+        )
 
         assertEquals(2, database.subscriptions().countSubscriptions())
         assertEquals(2, database.subscriptions().countProfiles())
+    }
+
+    @Test
+    fun reusesSameSubscriptionUrlAndPreservesProfilesUntilRefresh() {
+        val profile = ImportedProfile.Standard(StandardProfile(
+            name = "VLESS",
+            protocol = StandardProfile.Protocol.VLESS,
+            address = "example.com",
+            port = 443,
+            uuid = "00000000-0000-0000-0000-000000000001",
+        ))
+        val firstId = repository.insertSubscription(subscriptionBundle(listOf(profile)), now = 1)
+
+        val secondId = repository.insertSubscription(
+            subscriptionBundle(emptyList()).copy(serverVersion = "1.9.56"),
+            now = 2,
+        )
+
+        assertEquals(firstId, secondId)
+        assertEquals(1, database.subscriptions().countSubscriptions())
+        assertEquals(listOf(profile), repository.getSubscriptionProfiles(firstId))
+        assertEquals("1.9.56", database.subscriptions().getSubscription(firstId)!!.serverVersion)
     }
 
     @Test
@@ -510,10 +535,22 @@ class ProfileRepositoryTest {
 
     @Test
     fun returnsOnlyEnabledSubscriptionsWhoseRefreshIntervalElapsed() {
-        val neverRefreshed = repository.insertSubscription(subscriptionBundle(emptyList()), now = 1)
-        val recent = repository.insertSubscription(subscriptionBundle(emptyList()), now = 2)
-        val elapsed = repository.insertSubscription(subscriptionBundle(emptyList()), now = 3)
-        val disabled = repository.insertSubscription(subscriptionBundle(emptyList()), now = 4)
+        val neverRefreshed = repository.insertSubscription(
+            subscriptionBundle(emptyList(), url = "https://example.com/never"),
+            now = 1,
+        )
+        val recent = repository.insertSubscription(
+            subscriptionBundle(emptyList(), url = "https://example.com/recent"),
+            now = 2,
+        )
+        val elapsed = repository.insertSubscription(
+            subscriptionBundle(emptyList(), url = "https://example.com/elapsed"),
+            now = 3,
+        )
+        val disabled = repository.insertSubscription(
+            subscriptionBundle(emptyList(), url = "https://example.com/disabled"),
+            now = 4,
+        )
         repository.markSubscriptionRefresh(recent, errorCode = null, now = 1_000, successful = true)
         repository.markSubscriptionRefresh(elapsed, errorCode = null, now = 0, successful = true)
         database.openHelper.writableDatabase.execSQL(
@@ -630,10 +667,11 @@ class ProfileRepositoryTest {
     private fun subscriptionBundle(
         profiles: List<ImportedProfile>,
         deduplication: Boolean = true,
+        url: String = "https://example.com/subscription",
     ) = SubscriptionBundle(
         name = "Test subscription",
         slug = "test",
-        url = "https://example.com/subscription",
+        url = url,
         serverVersion = "1.9.45",
         mirrors = listOf(SubscriptionBundle.Mirror("yandex", "https://example.com/mirror", true, "AES-256-GCM")),
         mirrorKey = "a".repeat(43),

@@ -47,7 +47,7 @@ class SubscriptionRefresherTest {
     @Test
     fun refreshesOnlyStaleSubscriptions() {
         val staleId = repository.insertSubscription(bundle(), now = 1)
-        val freshId = repository.insertSubscription(bundle(), now = 2)
+        val freshId = repository.insertSubscription(bundle("https://example.com/fresh-sub"), now = 2)
         repository.markSubscriptionRefresh(freshId, errorCode = null, now = 10, successful = true)
         val payload = "vless://00000000-0000-0000-0000-000000000001@example.com:443?encryption=none&type=tcp&security=none#VLESS"
         var requests = 0
@@ -109,10 +109,34 @@ class SubscriptionRefresherTest {
         assertEquals(null, subscription.lastErrorCode)
     }
 
-    private fun bundle() = SubscriptionBundle(
+    @Test
+    fun manualRefreshIgnoresCachedValidators() {
+        val subscriptionId = repository.insertSubscription(bundle(), now = 1)
+        repository.replaceSubscriptionProfiles(
+            subscriptionId,
+            repository.getSubscriptionProfiles(subscriptionId),
+            now = 2,
+            etag = "stale-etag",
+            lastModified = "stale-date",
+        )
+        val payload = "vless://00000000-0000-0000-0000-000000000001@example.com:443?encryption=none&type=tcp&security=none#VLESS"
+        val connection = FakeConnection(200, payload.encodeToByteArray())
+        val refresher = SubscriptionRefresher(
+            repository,
+            userHttp = SubscriptionHttpClient { connection },
+            strictHttp = SubscriptionHttpClient { FakeConnection(500) },
+        )
+
+        assertTrue(refresher.refreshWithChanges(subscriptionId, now = 3).success)
+
+        assertEquals(null, connection.requestHeaders["If-None-Match"])
+        assertEquals(null, connection.requestHeaders["If-Modified-Since"])
+    }
+
+    private fun bundle(url: String = "https://example.com/sub") = SubscriptionBundle(
         name = "Test",
         slug = "test",
-        url = "https://example.com/sub",
+        url = url,
         serverVersion = "1.9.45",
         mirrors = listOf(SubscriptionBundle.Mirror(
             type = "yandex_disk",
@@ -138,6 +162,12 @@ class SubscriptionRefresherTest {
         private val status: Int,
         private val body: ByteArray = byteArrayOf(),
     ) : HttpsURLConnection(URL("https://example.com")) {
+        val requestHeaders = mutableMapOf<String, String>()
+
+        override fun setRequestProperty(key: String, value: String) {
+            requestHeaders[key] = value
+        }
+
         override fun getResponseCode(): Int = status
         override fun getContentLengthLong(): Long = body.size.toLong()
         override fun getInputStream(): InputStream = ByteArrayInputStream(body)

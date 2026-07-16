@@ -438,7 +438,8 @@ class ConnectionFragment : Fragment() {
         )
         is BundleImportResult.Complete -> {
             val subscriptionId = profiles.insertSubscription(bundle.bundle)
-            val refresh = SubscriptionRefresher(profiles).refreshWithChanges(subscriptionId)
+            val refresh = (activity as? MainActivity)?.refreshSubscription(subscriptionId)
+                ?: SubscriptionRefresher(profiles).refreshWithChanges(subscriptionId)
             ImportPreview(
                 description = "${bundle.bundle.name}: ${refresh.total} profiles",
                 subscriptionImported = true,

@@ -7,6 +7,7 @@ interface IOlcrtcVpnService {
     void startSubscriptionProfile(String profileId);
     void stop();
     void reconnect();
+    int[] refreshSubscription(long subscriptionId);
     int getState();
     void registerCallback(IVpnStateCallback callback);
     void unregisterCallback(IVpnStateCallback callback);

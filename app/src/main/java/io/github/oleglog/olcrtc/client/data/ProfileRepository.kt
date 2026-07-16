@@ -223,7 +223,18 @@ internal class ProfileRepository(
     fun insertSubscriptionSource(name: String, url: String, kind: String = "GENERIC", now: Long = System.currentTimeMillis()): Long {
         require(name.isNotBlank()) { "Subscription name is required" }
         require(url.startsWith("https://", ignoreCase = true)) { "Subscription URL must use HTTPS" }
+        val normalizedUrl = url.trim()
         val normalizedKind = kind.trim().uppercase().takeIf { it == "OLCRTC" || it == "GENERIC" } ?: "GENERIC"
+        findSubscription(normalizedUrl)?.let { existing ->
+            subscriptions.updateSubscriptionMetadata(
+                existing.copy(
+                    kind = normalizedKind,
+                    encryptedUrl = secrets.encrypt(normalizedUrl),
+                    enabled = true,
+                ),
+            )
+            return existing.id
+        }
         return subscriptions.insertSubscriptionGroup(
             ProfileGroupEntity(
                 name = name.trim(),
@@ -236,7 +247,7 @@ internal class ProfileRepository(
                 groupId = 0,
                 name = name.trim(),
                 kind = normalizedKind,
-                encryptedUrl = secrets.encrypt(url.trim()),
+                encryptedUrl = secrets.encrypt(normalizedUrl),
                 serverVersion = null,
                 encryptedMirrorType = null,
                 encryptedMirrorUrl = null,
@@ -280,6 +291,25 @@ internal class ProfileRepository(
         now: Long = System.currentTimeMillis(),
     ): Long {
         val mirror = bundle.mirrors.firstOrNull()
+        val existing = findSubscription(bundle.url)
+        val kind = if (bundle.profiles.any { it is ImportedProfile.Olcrtc }) "OLCRTC" else existing?.kind ?: "GENERIC"
+        if (existing != null) {
+            subscriptions.updateSubscriptionMetadata(
+                existing.copy(
+                    kind = kind,
+                    encryptedUrl = secrets.encrypt(bundle.url.trim()),
+                    serverVersion = bundle.serverVersion,
+                    encryptedMirrorType = mirror?.type?.let(secrets::encrypt),
+                    encryptedMirrorUrl = mirror?.url?.let(secrets::encrypt),
+                    encryptedMirrorKey = bundle.mirrorKey?.let(secrets::encrypt),
+                    enabled = true,
+                ),
+            )
+            if (bundle.profiles.isNotEmpty()) {
+                replaceSubscriptionProfiles(existing.id, bundle.profiles, now, bundle.serverVersion)
+            }
+            return existing.id
+        }
         return subscriptions.insertSubscriptionGroup(
             ProfileGroupEntity(
                 name = bundle.name,
@@ -291,8 +321,8 @@ internal class ProfileRepository(
             SubscriptionEntity(
                 groupId = 0,
                 name = bundle.name,
-                kind = if (bundle.profiles.any { it is ImportedProfile.Olcrtc }) "OLCRTC" else "GENERIC",
-                encryptedUrl = secrets.encrypt(bundle.url),
+                kind = kind,
+                encryptedUrl = secrets.encrypt(bundle.url.trim()),
                 serverVersion = bundle.serverVersion,
                 encryptedMirrorType = mirror?.type?.let(secrets::encrypt),
                 encryptedMirrorUrl = mirror?.url?.let(secrets::encrypt),
@@ -307,6 +337,13 @@ internal class ProfileRepository(
             ),
             subscriptionEntities(bundle.profiles, now),
         )
+    }
+
+    private fun findSubscription(url: String): SubscriptionEntity? {
+        val normalizedUrl = url.trim()
+        return subscriptions.getSubscriptions().firstOrNull {
+            secrets.decrypt(it.encryptedUrl).trim() == normalizedUrl
+        }
     }
 
     fun replaceSubscriptionProfiles(

@@ -131,6 +131,12 @@ class OlcrtcVpnService : VpnService() {
             commands.execute(::reconnectVpn)
         }
 
+        override fun refreshSubscription(subscriptionId: Long): IntArray {
+            require(subscriptionId > 0) { "subscriptionId must be positive" }
+            val result = subscriptionRefresher().refreshWithChanges(subscriptionId)
+            return intArrayOf(if (result.success) 1 else 0, result.added, result.removed, result.total)
+        }
+
         override fun getState(): Int = publishedState.ordinal
 
         override fun registerCallback(callback: IVpnStateCallback) {
@@ -368,15 +374,19 @@ class OlcrtcVpnService : VpnService() {
     }
 
     private fun refreshStaleSubscriptions() {
-        val socksPort = activeSocksPort ?: return
         subscriptionRefresh.execute {
-            val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved("127.0.0.1", socksPort))
-            SubscriptionRefresher(
-                profiles,
-                userHttp = SubscriptionHttpClient(proxy = proxy),
-                strictHttp = SubscriptionHttpClient(proxy = proxy),
-            ).refreshStale()
+            subscriptionRefresher().refreshStale()
         }
+    }
+
+    private fun subscriptionRefresher(): SubscriptionRefresher {
+        val socksPort = activeSocksPort ?: return SubscriptionRefresher(profiles)
+        val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved("127.0.0.1", socksPort))
+        return SubscriptionRefresher(
+            profiles,
+            userHttp = SubscriptionHttpClient(proxy = proxy),
+            strictHttp = SubscriptionHttpClient(proxy = proxy),
+        )
     }
 
     private fun handleNetworkAvailable(network: Network) {

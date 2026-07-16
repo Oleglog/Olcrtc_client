@@ -18,6 +18,7 @@ import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import io.github.oleglog.olcrtc.client.MainActivity
 import io.github.oleglog.olcrtc.client.R
 import io.github.oleglog.olcrtc.client.data.ProfileRepository
 import io.github.oleglog.olcrtc.client.data.SubscriptionSummary
@@ -166,7 +167,7 @@ class ProfilesFragment : Fragment() {
                             url = payload.uri,
                             kind = "GENERIC",
                         )
-                        SubscriptionRefresher(profiles).refreshWithChanges(id)
+                        refreshSubscription(id)
                     }
                 }
             }
@@ -181,7 +182,7 @@ class ProfilesFragment : Fragment() {
         when (val bundle = bundleImports.accept(raw)) {
             is BundleImportResult.Complete -> {
                 val id = profiles.insertSubscription(bundle.bundle)
-                SubscriptionRefresher(profiles).refreshWithChanges(id)
+                refreshSubscription(id)
             }
             is BundleImportResult.Pending -> error("${bundle.received}/${bundle.total}")
         }
@@ -189,7 +190,7 @@ class ProfilesFragment : Fragment() {
     private fun updateSubscription(subscriptionId: Long) {
         storage.execute {
             val result = runCatching {
-                SubscriptionRefresher(profiles).refreshWithChanges(subscriptionId).also {
+                refreshSubscription(subscriptionId).also {
                     check(it.success) {
                         getString(R.string.subscription_update_failed)
                     }
@@ -209,6 +210,10 @@ class ProfilesFragment : Fragment() {
             .setPositiveButton(android.R.string.ok, null)
             .show()
     }
+
+    private fun refreshSubscription(subscriptionId: Long): SubscriptionRefresher.Result =
+        (activity as? MainActivity)?.refreshSubscription(subscriptionId)
+            ?: SubscriptionRefresher(profiles).refreshWithChanges(subscriptionId)
 
     private fun editSubscription(subscription: SubscriptionSummary) {
         storage.execute {

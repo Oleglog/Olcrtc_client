@@ -312,6 +312,9 @@ internal abstract class SubscriptionDao {
     @Query("UPDATE subscriptions SET name = :name, encryptedUrl = :encryptedUrl WHERE id = :id")
     abstract fun updateSubscriptionSource(id: Long, name: String, encryptedUrl: ByteArray): Int
 
+    @Transaction
+    open fun updateSubscriptionMetadata(subscription: SubscriptionEntity) = updateSubscription(subscription)
+
     @Query("SELECT * FROM subscription_profiles WHERE groupId = :groupId ORDER BY sortOrder")
     abstract fun getProfiles(groupId: Long): List<SubscriptionProfileEntity>
 
