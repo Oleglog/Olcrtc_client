@@ -7,6 +7,10 @@ internal object GomobileCore : NativeCore {
         Mobilecore.setProtector { fd -> protector.protect(fd.toInt()) }
     }
 
+    fun setLogWriter(writer: (String) -> Unit) {
+        Mobilecore.setLogWriter { message -> message?.takeIf(String::isNotBlank)?.let(writer) }
+    }
+
     override fun startOlcrtc(config: NativeOlcrtcConfig) {
         Mobilecore.startOlcrtc(
             config.provider,

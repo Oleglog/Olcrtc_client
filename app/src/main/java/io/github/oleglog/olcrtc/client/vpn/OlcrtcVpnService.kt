@@ -154,6 +154,7 @@ class OlcrtcVpnService : VpnService() {
         diagnostics.prune()
         connectivity = getSystemService(ConnectivityManager::class.java)
         GomobileCore.setProtector(::protect)
+        GomobileCore.setLogWriter { diagnostics.append("info", "olcRTC core: $it") }
         createNotificationChannel()
         activeNetwork = connectivity.allNetworks.firstOrNull(::isUnderlyingNetwork)
         connectivity.registerNetworkCallback(
