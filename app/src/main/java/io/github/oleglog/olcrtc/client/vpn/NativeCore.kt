@@ -33,5 +33,6 @@ internal interface TunDescriptor : Closeable {
 internal interface NativeTunnel : Closeable {
     fun start(config: ByteArray, tunFd: Int)
     fun stop(): Int
+    fun isRunning(): Boolean = true
     fun trafficCounters(): TrafficCounters = TrafficCounters()
 }

@@ -26,6 +26,11 @@
         android:theme="@style/Theme.OlcrtcClient"
         android:usesCleartextTraffic="false">
         <activity
+            android:name=".importer.QrScannerActivity"
+            android:exported="false"
+            android:screenOrientation="fullSensor" />
+
+        <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop">

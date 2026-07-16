@@ -14,6 +14,24 @@ class SubscriptionBundleTest {
     private val profile = "olcrtc://jitsi@room.example/room?k=${"a".repeat(64)}&t=datachannel&c=client"
 
     @Test
+    fun parsesCurrentManagerSubscriptionBundle() {
+        val wbstream = "olcrtc://wbstream@r/room?k=${"b".repeat(64)}&t=vp8channel&f=120&b=64&c=client&a=token#WB"
+        val bundle = SubscriptionBundleParser.parse(
+            """{"type":"olcrtc-sub","v":2,"n":"Manager","s":"manager","u":"https://example.com/sub/manager","m":[{"t":"yandex_disk","u":"https://example.com/mirror","e":true,"a":"AES-256-GCM"}],"mk":"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8","uc":true,"d":true,"p":["$profile","$wbstream"]}""",
+        )
+
+        assertEquals("Manager", bundle.name)
+        assertEquals("manager", bundle.slug)
+        assertEquals(2, bundle.profiles.size)
+        assertEquals(true, bundle.deduplication)
+        assertEquals(true, bundle.updateWhenConnectedOnly)
+        assertEquals("yandex_disk", bundle.mirrors.single().type)
+        assertEquals(true, bundle.mirrors.single().encrypted)
+        assertEquals("AES-256-GCM", bundle.mirrors.single().algorithm)
+        assertEquals("AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8", bundle.mirrorKey)
+    }
+
+    @Test
     fun parsesCompactBundleAndReportsRejectedProfiles() {
         val bundle = SubscriptionBundleParser.parse(
             """{"type":"olcrtc-sub","v":2,"sv":"1.9.45","n":"Test","s":"test","u":"https://example.com/sub/test","d":false,"uc":true,"p":["$profile","https://example.com/profile"]}""",

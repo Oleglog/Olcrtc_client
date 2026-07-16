@@ -11,6 +11,7 @@ import android.content.pm.PackageManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.net.VpnService
 import android.os.IBinder
 import android.os.RemoteCallbackList
@@ -35,6 +36,7 @@ import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Proxy
+import java.net.SocketTimeoutException
 import java.util.Locale
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
@@ -153,8 +155,14 @@ class OlcrtcVpnService : VpnService() {
         connectivity = getSystemService(ConnectivityManager::class.java)
         GomobileCore.setProtector(::protect)
         createNotificationChannel()
-        activeNetwork = connectivity.activeNetwork
-        connectivity.registerDefaultNetworkCallback(networkCallback)
+        activeNetwork = connectivity.allNetworks.firstOrNull(::isUnderlyingNetwork)
+        connectivity.registerNetworkCallback(
+            NetworkRequest.Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+                .build(),
+            networkCallback,
+        )
         ContextCompat.registerReceiver(
             this,
             userUnlockedReceiver,
@@ -367,16 +375,47 @@ class OlcrtcVpnService : VpnService() {
     }
 
     private fun handleNetworkAvailable(network: Network) {
-        val previous = activeNetwork
-        activeNetwork = network
-        if (previous == network) return
-        requestNetworkReconnect(if (previous == null) 0 else reconnectBackoff.nextDelayMillis())
+        val eligible = isUnderlyingNetwork(network)
+        when (
+            underlyingNetworkChange(
+                current = activeNetwork,
+                candidate = network,
+                available = true,
+                eligible = eligible,
+            )
+        ) {
+            UnderlyingNetworkChange.KEEP -> return
+            UnderlyingNetworkChange.LOST -> return
+            UnderlyingNetworkChange.REPLACE -> {
+                val previous = activeNetwork
+                activeNetwork = network
+                diagnostics.append("info", "Underlying network changed")
+                requestNetworkReconnect(
+                    if (previous == null) 0
+                    else reconnectBackoff.nextDelayMillis(),
+                )
+            }
+        }
     }
 
     private fun handleNetworkLost(network: Network) {
-        if (activeNetwork != network) return
+        if (
+            underlyingNetworkChange(
+                current = activeNetwork,
+                candidate = network,
+                available = false,
+                eligible = false,
+            ) != UnderlyingNetworkChange.LOST
+        ) return
         activeNetwork = null
+        diagnostics.append("info", "Underlying network lost")
         requestNetworkReconnect(null)
+    }
+
+    private fun isUnderlyingNetwork(network: Network): Boolean {
+        val capabilities = connectivity.getNetworkCapabilities(network) ?: return false
+        return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
     }
 
     private fun requestNetworkReconnect(delayMillis: Long?) {
@@ -500,7 +539,6 @@ class OlcrtcVpnService : VpnService() {
             capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> "wifi"
             capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> "mobile"
             capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> "ethernet"
-            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN) -> "vpn"
             else -> "other"
         }
     }
@@ -591,6 +629,13 @@ class OlcrtcVpnService : VpnService() {
             hevTunnel = HevTunnel(),
             establishTun = { establishTun(dns) },
             verifyDatapath = { verifyDatapath(dns) },
+            reportStage = { message, error ->
+                diagnostics.append(
+                    if (error == null) "info" else "error",
+                    message,
+                    error,
+                )
+            },
         ).also { session ->
             session.start(
                 socksPort = xraySocksPort,
@@ -619,7 +664,14 @@ class OlcrtcVpnService : VpnService() {
             socket.send(DatagramPacket(query, query.size))
             val response = ByteArray(512)
             val packet = DatagramPacket(response, response.size)
-            socket.receive(packet)
+            try {
+                socket.receive(packet)
+            } catch (error: SocketTimeoutException) {
+                throw IllegalStateException(
+                    "VPN datapath timed out",
+                    error,
+                )
+            }
             check(
                 packet.length >= 12 &&
                     response[0] == query[0] &&
@@ -826,4 +878,23 @@ class OlcrtcVpnService : VpnService() {
             VpnState.RECONNECTING,
         )
     }
+}
+
+internal enum class UnderlyingNetworkChange {
+    KEEP,
+    REPLACE,
+    LOST,
+}
+
+internal fun <T> underlyingNetworkChange(
+    current: T?,
+    candidate: T,
+    available: Boolean,
+    eligible: Boolean,
+): UnderlyingNetworkChange = when {
+    available && eligible && current != candidate ->
+        UnderlyingNetworkChange.REPLACE
+    !available && current == candidate ->
+        UnderlyingNetworkChange.LOST
+    else -> UnderlyingNetworkChange.KEEP
 }

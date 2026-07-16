@@ -40,6 +40,33 @@ class NativeSessionTest {
     }
 
     @Test
+    fun reportsFailedStartupStage() {
+        val events = mutableListOf<String>()
+        val stages = mutableListOf<String>()
+        val session = NativeSession(
+            RecordingCore(events, failReadiness = true),
+            RecordingTunnel(events),
+            establishTun = { error("unused") },
+            verifyDatapath = {},
+            reportStage = { message, error ->
+                stages += if (error == null) message else "$message: ${error.message}"
+            },
+        )
+
+        runCatching {
+            session.start(1080, "/assets", "{}", byteArrayOf(1))
+        }
+
+        assertEquals(
+            listOf(
+                "Xray startup started",
+                "Xray startup failed: not ready",
+            ),
+            stages,
+        )
+    }
+
+    @Test
     fun startsOlcrtcBeforeXray() {
         val events = mutableListOf<String>()
         val session = NativeSession(
@@ -133,6 +160,27 @@ class NativeSessionTest {
             events,
         )
         session.close()
+    }
+
+    @Test
+    fun rejectsTunnelThatExitsDuringStartup() {
+        val events = mutableListOf<String>()
+        val session = NativeSession(
+            RecordingCore(events),
+            RecordingTunnel(events, running = false),
+            establishTun = { RecordingTun(events) },
+            verifyDatapath = { events += "datapath:verify" },
+        )
+
+        val failure = runCatching {
+            session.start(1080, "/assets", "{}", byteArrayOf(1))
+        }.exceptionOrNull()
+
+        assertEquals("HEV tunnel exited during startup", failure?.message)
+        assertEquals(
+            listOf("xray:start", "xray:ready", "tunnel:start", "tunnel:close", "tun:close", "core:stop"),
+            events,
+        )
     }
 
     @Test
@@ -249,7 +297,10 @@ class NativeSessionTest {
         }
     }
 
-    private class RecordingTunnel(private val events: MutableList<String>) : NativeTunnel {
+    private class RecordingTunnel(
+        private val events: MutableList<String>,
+        private val running: Boolean = true,
+    ) : NativeTunnel {
         override fun start(config: ByteArray, tunFd: Int) {
             events += "tunnel:start"
         }
@@ -258,6 +309,8 @@ class NativeSessionTest {
             events += "tunnel:stop"
             return 0
         }
+
+        override fun isRunning(): Boolean = running
 
         override fun close() {
             events += "tunnel:close"

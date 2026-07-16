@@ -1,10 +1,9 @@
 package io.github.oleglog.olcrtc.client.connection
 
-import android.Manifest
 import android.app.Activity
 import android.content.ClipboardManager
 import android.content.ContentResolver
-import android.content.pm.PackageManager
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -16,12 +15,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.Preview
 import androidx.appcompat.app.AlertDialog
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.google.android.material.card.MaterialCardView
 import io.github.oleglog.olcrtc.client.MainActivity
@@ -30,8 +24,8 @@ import io.github.oleglog.olcrtc.client.data.ProfileRepository
 import io.github.oleglog.olcrtc.client.databinding.FragmentConnectionBinding
 import io.github.oleglog.olcrtc.client.importer.BundleImportDispatcher
 import io.github.oleglog.olcrtc.client.importer.BundleImportResult
-import io.github.oleglog.olcrtc.client.importer.QrFrameDecoder
 import io.github.oleglog.olcrtc.client.importer.QrImageDecoder
+import io.github.oleglog.olcrtc.client.importer.QrScannerActivity
 import io.github.oleglog.olcrtc.client.profile.ImportedProfile
 import io.github.oleglog.olcrtc.client.profile.ProfileUri
 import io.github.oleglog.olcrtc.client.profile.olcrtc.OlcrtcProfile
@@ -49,10 +43,7 @@ class ConnectionFragment : Fragment() {
     private val binding get() = requireNotNull(_binding)
     private val profiles by lazy { ProfileRepository.open(requireContext().applicationContext) }
     private val storage = Executors.newSingleThreadExecutor()
-    private val cameraAnalysis = Executors.newSingleThreadExecutor()
     private val bundleImports = BundleImportDispatcher()
-    private var cameraProvider: ProcessCameraProvider? = null
-    @Volatile private var scanning = false
     private var currentState = VpnState.NO_PROFILE
     private var selectedProfileId: Long? = null
     private var selectedSubscriptionProfileId: String? = null
@@ -65,8 +56,18 @@ class ConnectionFragment : Fragment() {
     private val filePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(::readImportFile)
     }
-    private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) startScanner() else _binding?.status?.setText(R.string.camera_permission_denied)
+    private val qrScanner = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data
+                ?.getStringExtra(QrScannerActivity.EXTRA_RESULT)
+                ?.let { validatePreview(it, R.string.source_camera) }
+        } else {
+            result.data
+                ?.getStringExtra(QrScannerActivity.EXTRA_ERROR)
+                ?.let { _binding?.status?.text = it }
+        }
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View {
@@ -79,7 +80,7 @@ class ConnectionFragment : Fragment() {
             if (currentState == VpnState.CONNECTED || currentState in BUSY_STATES) activityHost.stopVpn() else connectSelectedOrImport()
         }
         binding.pasteClipboard.setOnClickListener { pasteClipboard() }
-        binding.scanQr.setOnClickListener { if (scanning) stopScanner() else requestScanner() }
+        binding.scanQr.setOnClickListener { requestScanner() }
         binding.importImage.setOnClickListener {
             qrImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         }
@@ -101,7 +102,6 @@ class ConnectionFragment : Fragment() {
     }
 
     override fun onStop() {
-        stopScanner()
         activityHost.setImportListener(null)
         activityHost.setVpnStateListener(null)
         super.onStop()
@@ -114,7 +114,6 @@ class ConnectionFragment : Fragment() {
 
     override fun onDestroy() {
         storage.shutdownNow()
-        cameraAnalysis.shutdownNow()
         super.onDestroy()
     }
 
@@ -306,66 +305,9 @@ class ConnectionFragment : Fragment() {
     }
 
     private fun requestScanner() {
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-            startScanner()
-        } else {
-            cameraPermission.launch(Manifest.permission.CAMERA)
-        }
-    }
-
-    private fun startScanner() {
-        val providerFuture = ProcessCameraProvider.getInstance(requireContext())
-        providerFuture.addListener({
-            val currentBinding = _binding ?: return@addListener
-            runCatching {
-                val provider = providerFuture.get()
-                val cameraSelector = if (provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)) {
-                    CameraSelector.DEFAULT_BACK_CAMERA
-                } else {
-                    CameraSelector.DEFAULT_FRONT_CAMERA
-                }
-                val preview = Preview.Builder().build().also { it.surfaceProvider = currentBinding.cameraPreview.surfaceProvider }
-                val analysis = ImageAnalysis.Builder()
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .build()
-                analysis.setAnalyzer(cameraAnalysis) { image ->
-                    try {
-                        if (scanning) QrFrameDecoder.decode(image)?.let { raw ->
-                            scanning = false
-                            activity?.runOnUiThread {
-                                stopScanner()
-                                validatePreview(raw, R.string.source_camera)
-                            }
-                        }
-                    } catch (_: Throwable) {
-                        // ponytail: defensive — single bad frame should not kill scanner
-                    } finally {
-                        image.close()
-                    }
-                }
-                provider.unbindAll()
-                provider.bindToLifecycle(viewLifecycleOwner, cameraSelector, preview, analysis)
-                cameraProvider = provider
-                scanning = true
-                currentBinding.cameraPreview.visibility = View.VISIBLE
-                currentBinding.profileUri.visibility = View.GONE
-                currentBinding.scanQr.setText(R.string.stop_scan)
-            }.onFailure {
-                stopScanner()
-                binding.status.text = it.message ?: getString(R.string.camera_error)
-            }
-        }, ContextCompat.getMainExecutor(requireContext()))
-    }
-
-    private fun stopScanner() {
-        cameraProvider?.unbindAll()
-        cameraProvider = null
-        scanning = false
-        _binding?.let {
-            it.cameraPreview.visibility = View.GONE
-            it.profileUri.visibility = View.VISIBLE
-            it.scanQr.setText(R.string.scan_qr)
-        }
+        qrScanner.launch(
+            Intent(requireContext(), QrScannerActivity::class.java),
+        )
     }
 
     private fun pasteClipboard() {

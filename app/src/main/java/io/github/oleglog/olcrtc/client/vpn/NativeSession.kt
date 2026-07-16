@@ -7,6 +7,7 @@ internal class NativeSession(
     private val hevTunnel: NativeTunnel,
     private val establishTun: () -> TunDescriptor,
     private val verifyDatapath: () -> Unit,
+    private val reportStage: (String, Throwable?) -> Unit = { _, _ -> },
 ) : Closeable {
     private var coreStarted = false
     private var tun: TunDescriptor? = null
@@ -23,15 +24,29 @@ internal class NativeSession(
         try {
             coreStarted = true
             if (olcrtcConfig != null) {
-                nativeCore.startOlcrtc(olcrtcConfig)
-                nativeCore.waitOlcrtcReady(OLCRTC_READY_TIMEOUT_MILLIS)
+                stage("olcRTC startup") {
+                    nativeCore.startOlcrtc(olcrtcConfig)
+                    nativeCore.waitOlcrtcReady(OLCRTC_READY_TIMEOUT_MILLIS)
+                }
             }
-            nativeCore.startXray(assetDirectory, xrayConfig)
-            nativeCore.waitXrayReady(socksPort, XRAY_READY_TIMEOUT_MILLIS)
+            stage("Xray startup") {
+                nativeCore.startXray(assetDirectory, xrayConfig)
+                nativeCore.waitXrayReady(socksPort, XRAY_READY_TIMEOUT_MILLIS)
+            }
             val descriptor = establishTun()
             tun = descriptor
-            hevTunnel.start(hevConfig, descriptor.fd)
-            verifyDatapath()
+            stage("HEV startup") {
+                hevTunnel.start(hevConfig, descriptor.fd)
+                check(hevTunnel.isRunning()) {
+                    "HEV tunnel exited during startup"
+                }
+            }
+            stage("VPN datapath verification") {
+                verifyDatapath()
+                check(hevTunnel.isRunning()) {
+                    "HEV tunnel exited during datapath verification"
+                }
+            }
         } catch (error: Throwable) {
             stop(error)
             throw error
@@ -39,6 +54,20 @@ internal class NativeSession(
     }
 
     fun trafficCounters(): TrafficCounters = hevTunnel.trafficCounters()
+
+    private inline fun stage(
+        name: String,
+        action: () -> Unit,
+    ) {
+        reportStage("$name started", null)
+        try {
+            action()
+            reportStage("$name ready", null)
+        } catch (error: Throwable) {
+            reportStage("$name failed", error)
+            throw error
+        }
+    }
 
     override fun close() {
         stop(null)

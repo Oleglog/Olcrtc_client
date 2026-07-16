@@ -23,6 +23,9 @@ internal class HevTunnel : NativeTunnel {
         return current.get().also { run = null }
     }
 
+    @Synchronized
+    override fun isRunning(): Boolean = run?.isDone == false
+
     fun stats(): LongArray = nativeStats()
 
     override fun trafficCounters(): TrafficCounters {

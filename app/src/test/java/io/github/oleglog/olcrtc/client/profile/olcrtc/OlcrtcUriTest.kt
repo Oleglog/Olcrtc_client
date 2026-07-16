@@ -10,6 +10,23 @@ class OlcrtcUriTest {
     private val key = "a".repeat(64)
 
     @Test
+    fun parsesCurrentManagerQrUri() {
+        val profile = OlcrtcUri.parse(
+            "olcrtc://wbstream@r/room%2Fone?k=$key&t=vp8channel&f=120&b=64&c=android%20client&a=token%2Bvalue&d=1.1.1.1%3A53#Main+instance",
+        )
+
+        assertEquals("Main instance", profile.name)
+        assertEquals("room/one", profile.roomId)
+        assertEquals("android client", profile.clientId)
+        assertEquals("token+value", profile.authToken)
+        assertEquals("1.1.1.1:53", profile.dnsServer)
+        assertEquals(120, profile.vp8Fps)
+        assertEquals(64, profile.vp8BatchSize)
+        assertEquals(OlcrtcProfile.Provider.WBSTREAM, profile.provider)
+        assertEquals(OlcrtcProfile.Transport.VP8CHANNEL, profile.transport)
+    }
+
+    @Test
     fun parsesCompactUri() {
         val profile = OlcrtcUri.parse(
             "olcrtc://wbstream@r/room%201?k=$key&t=vp8channel&f=120&b=64&c=client%201&a=token&d=77.88.8.8%3A53&ka=15#Main%20profile",

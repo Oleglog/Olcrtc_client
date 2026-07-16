@@ -1,29 +1,27 @@
 package io.github.oleglog.olcrtc.client.profiles
 
-import android.Manifest
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.content.pm.PackageManager
+import android.app.Activity
+import android.content.Intent
 import android.os.Bundle
+import android.text.InputType
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.Button
+import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.Spinner
+import android.widget.ArrayAdapter
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
-import androidx.camera.core.CameraSelector
-import androidx.camera.core.ImageAnalysis
-import androidx.camera.core.Preview
-import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.view.PreviewView
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import io.github.oleglog.olcrtc.client.MainActivity
 import io.github.oleglog.olcrtc.client.R
+import io.github.oleglog.olcrtc.client.data.ProfileConfig
 import io.github.oleglog.olcrtc.client.data.ProfileRepository
 import io.github.oleglog.olcrtc.client.data.ProfileSummary
 import io.github.oleglog.olcrtc.client.data.SubscriptionProfileSummary
@@ -31,9 +29,9 @@ import io.github.oleglog.olcrtc.client.data.SubscriptionSummary
 import io.github.oleglog.olcrtc.client.databinding.FragmentProfilesBinding
 import io.github.oleglog.olcrtc.client.importer.BundleImportDispatcher
 import io.github.oleglog.olcrtc.client.importer.BundleImportResult
-import io.github.oleglog.olcrtc.client.importer.QrFrameDecoder
-import io.github.oleglog.olcrtc.client.profile.ImportedProfile
-import io.github.oleglog.olcrtc.client.profile.ProfileUri
+import io.github.oleglog.olcrtc.client.importer.QrScannerActivity
+import io.github.oleglog.olcrtc.client.profile.olcrtc.OlcrtcProfile
+import io.github.oleglog.olcrtc.client.profile.standard.StandardProfile
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import java.text.DateFormat
 import java.util.Date
@@ -43,6 +41,20 @@ class ProfilesFragment : Fragment() {
     private var _binding: FragmentProfilesBinding? = null
     private val profiles by lazy { ProfileRepository.open(requireContext().applicationContext) }
     private val storage = Executors.newSingleThreadExecutor()
+    private val bundleImports = BundleImportDispatcher()
+    private val qrScanner = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data
+                ?.getStringExtra(QrScannerActivity.EXTRA_RESULT)
+                ?.let(::saveNewSubscription)
+        } else {
+            result.data
+                ?.getStringExtra(QrScannerActivity.EXTRA_ERROR)
+                ?.let { showError(IllegalStateException(it)) }
+        }
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View {
         _binding = FragmentProfilesBinding.inflate(inflater, container, false)
@@ -56,14 +68,12 @@ class ProfilesFragment : Fragment() {
     }
 
     override fun onDestroyView() {
-        stopSubscriptionScanner()
         _binding = null
         super.onDestroyView()
     }
 
     override fun onDestroy() {
         storage.shutdownNow()
-        cameraAnalysis.shutdownNow()
         super.onDestroy()
     }
 
@@ -86,11 +96,7 @@ class ProfilesFragment : Fragment() {
         binding.profileList.removeAllViews()
         model.local.takeIf { it.isNotEmpty() }?.let { local ->
             binding.profileList.addView(sectionTitle(getString(R.string.profile_group_local)))
-            binding.profileList.addView(materialCard().apply {
-                addView(verticalContainer().apply {
-                    local.forEach { addView(localProfileRow(it)) }
-                })
-            })
+            local.forEach { binding.profileList.addView(localProfileCard(it)) }
         }
         model.subscriptions.forEach { subscription ->
             binding.profileList.addView(sectionTitle(subscriptionHeader(subscription)))
@@ -125,182 +131,70 @@ class ProfilesFragment : Fragment() {
         setPadding(16.dp, 12.dp, 16.dp, 12.dp)
     }
 
-    private fun localProfileRow(profile: ProfileSummary): View {
-        val row = horizontalRow()
-        row.addView(
-            TextView(requireContext()).apply {
-                text = "${profile.name}\n${profile.type} · ${profile.endpoint}"
+    private fun localProfileCard(profile: ProfileSummary): View = materialCard().apply {
+        addView(verticalContainer().apply {
+            addView(TextView(requireContext()).apply {
+                text = profile.name
+                setTextAppearance(android.R.style.TextAppearance_Material_Title)
+            })
+            addView(TextView(requireContext()).apply {
+                text = "${profile.type} · ${profile.endpoint}"
                 setTextAppearance(android.R.style.TextAppearance_Material_Body1)
-                setPadding(0, 12.dp, 16.dp, 12.dp)
-                setOnClickListener { activityHost.requestVpnPermission(profile.id) }
-            },
-            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
-        )
-        row.addView(Button(requireContext()).apply {
-            setText(R.string.profile_test_latency)
-            isEnabled = profile.type != "olcRTC"
-            setOnClickListener { testLocalLatency(profile.id) }
+                setPadding(0, 4.dp, 0, 8.dp)
+            })
+            addView(horizontalRow().apply {
+                addView(Button(requireContext()).apply {
+                    setText(R.string.connect)
+                    setOnClickListener {
+                        activityHost.requestVpnPermission(profile.id)
+                    }
+                }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                addView(Button(requireContext()).apply {
+                    setText(R.string.edit)
+                    setOnClickListener { editLocalProfile(profile) }
+                }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                addView(Button(requireContext()).apply {
+                    setText(R.string.delete)
+                    setOnClickListener { confirmDelete(profile) }
+                }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            })
         })
-        row.addView(Button(requireContext()).apply {
-            setText(R.string.edit)
-            setOnClickListener { editLocalProfile(profile) }
-        })
-        row.addView(Button(requireContext()).apply {
-            setText(R.string.copy)
-            setOnClickListener { copyLocalProfileLink(profile.id) }
-        })
-        row.addView(Button(requireContext()).apply {
-            setText(R.string.delete)
-            setOnClickListener { confirmDelete(profile) }
-        })
-        return row
     }
 
-    private fun subscriptionProfileRow(profile: SubscriptionProfileSummary): View {
-        val row = horizontalRow().apply { setPadding(16.dp, 4.dp, 0, 4.dp) }
-        row.addView(
-            TextView(requireContext()).apply {
+    private fun subscriptionProfileRow(profile: SubscriptionProfileSummary): View =
+        materialCard().apply {
+            addView(verticalContainer().apply {
                 val flags = listOfNotNull(
                     profile.type,
                     profile.lastLatencyMs?.let { "${it}ms" },
-                    if (profile.locallyModified) getString(R.string.profile_locally_modified) else null,
+                    if (profile.locallyModified) {
+                        getString(R.string.profile_locally_modified)
+                    } else {
+                        null
+                    },
                 ).joinToString(" · ")
-                text = "${profile.name}\n$flags · ${profile.endpoint}"
-                setTextAppearance(android.R.style.TextAppearance_Material_Body1)
-                setPadding(0, 10.dp, 16.dp, 10.dp)
-                setOnClickListener { activityHost.requestSubscriptionVpnPermission(profile.id) }
-            },
-            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
-        )
-        return row
-    }
+                addView(TextView(requireContext()).apply {
+                    text = profile.name
+                    setTextAppearance(android.R.style.TextAppearance_Material_Title)
+                })
+                addView(TextView(requireContext()).apply {
+                    text = "$flags · ${profile.endpoint}"
+                    setTextAppearance(android.R.style.TextAppearance_Material_Body1)
+                    setPadding(0, 4.dp, 0, 8.dp)
+                })
+                addView(Button(requireContext()).apply {
+                    setText(R.string.connect)
+                    setOnClickListener {
+                        activityHost.requestSubscriptionVpnPermission(profile.id)
+                    }
+                })
+            })
+        }
 
     private fun addSubscription() {
-        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-            showSubscriptionQrScanner()
-        } else {
-            cameraPermission.launch(Manifest.permission.CAMERA)
-        }
-    }
-
-    private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) showSubscriptionQrScanner() else showError(IllegalStateException(getString(R.string.camera_permission_denied)))
-    }
-
-    @Volatile private var scanning = false
-    private var cameraProvider: ProcessCameraProvider? = null
-    private var scannerDialog: AlertDialog? = null
-    private var lastScannedSubscriptionQr: String? = null
-    private val cameraAnalysis = Executors.newSingleThreadExecutor()
-    private val bundleImports = BundleImportDispatcher()
-
-    private fun showSubscriptionQrScanner() {
-        bundleImports.clear()
-        lastScannedSubscriptionQr = null
-        val previewView = PreviewView(requireContext()).apply {
-            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(240))
-        }
-        scannerDialog = AlertDialog.Builder(requireContext())
-            .setTitle(R.string.subscription_add)
-            .setView(previewView)
-            .setNegativeButton(R.string.cancel) { _, _ -> stopSubscriptionScanner() }
-            .setOnDismissListener { stopSubscriptionScanner() }
-            .show()
-        val providerFuture = ProcessCameraProvider.getInstance(requireContext())
-        providerFuture.addListener({
-            runCatching {
-                if (scannerDialog?.isShowing != true) return@runCatching
-                val provider = providerFuture.get()
-                val cameraSelector = if (provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)) {
-                    CameraSelector.DEFAULT_BACK_CAMERA
-                } else {
-                    CameraSelector.DEFAULT_FRONT_CAMERA
-                }
-                val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
-                val analysis = ImageAnalysis.Builder()
-                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
-                    .build()
-                analysis.setAnalyzer(cameraAnalysis) { image ->
-                    try {
-                        if (scanning) QrFrameDecoder.decode(image)?.let { raw ->
-                            scanning = false
-                            activity?.runOnUiThread {
-                                handleSubscriptionQr(raw)
-                            }
-                        }
-                    } catch (_: Throwable) {
-                        // ponytail: defensive — single bad frame should not kill scanner
-                    } finally {
-                        image.close()
-                    }
-                }
-                provider.unbindAll()
-                provider.bindToLifecycle(viewLifecycleOwner, cameraSelector, preview, analysis)
-                cameraProvider = provider
-                scanning = true
-            }.onFailure {
-                stopSubscriptionScanner()
-                showError(it)
-            }
-        }, ContextCompat.getMainExecutor(requireContext()))
-    }
-
-    private fun stopSubscriptionScanner() {
-        scanning = false
-        bundleImports.clear()
-        cameraProvider?.unbindAll()
-        cameraProvider = null
-        scannerDialog?.let { if (it.isShowing) it.dismiss() }
-        scannerDialog = null
-    }
-
-    private fun dpToPx(value: Int): Int = (value * resources.displayMetrics.density).toInt()
-
-    private fun handleSubscriptionQr(raw: String) {
-        val trimmed = raw.trim()
-        if (trimmed == lastScannedSubscriptionQr) {
-            scanning = true
-            return
-        }
-        lastScannedSubscriptionQr = trimmed
-        if (trimmed.startsWith("olcrtc+part:", true)) {
-            runCatching { bundleImports.accept(trimmed) }
-                .onSuccess { result ->
-                    when (result) {
-                        is BundleImportResult.Pending -> {
-                            scannerDialog?.setTitle(
-                                getString(R.string.subscription_qr_progress, result.received, result.total),
-                            )
-                            scanning = true
-                        }
-                        is BundleImportResult.Complete -> {
-                            stopSubscriptionScanner()
-                            saveSubscriptionBundle(result)
-                        }
-                    }
-                }
-                .onFailure {
-                    stopSubscriptionScanner()
-                    showError(it)
-                }
-            return
-        }
-        stopSubscriptionScanner()
-        saveNewSubscription(trimmed)
-    }
-
-    private fun saveSubscriptionBundle(result: BundleImportResult.Complete) {
-        storage.execute {
-            val saved = runCatching {
-                profiles.insertSubscription(result.bundle).also {
-                    SubscriptionRefresher(profiles).refresh(it)
-                }
-            }
-            activity?.runOnUiThread {
-                saved.onFailure(::showError)
-                loadProfiles()
-            }
-        }
+        qrScanner.launch(
+            Intent(requireContext(), QrScannerActivity::class.java),
+        )
     }
 
     private fun saveNewSubscription(raw: String) {
@@ -455,142 +349,298 @@ class ProfilesFragment : Fragment() {
 
     private fun editLocalProfile(profile: ProfileSummary) {
         storage.execute {
-            val result = runCatching { profiles.exportProfileUri(profile.id, includeAuthToken = true) }
+            val result = runCatching { requireNotNull(profiles.get(profile.id)) }
             activity?.runOnUiThread {
-                result.onSuccess { raw ->
-                    val input = EditText(requireContext()).apply {
-                        setSingleLine(false)
-                        minLines = 4
-                        setText(raw)
+                result.onSuccess { config ->
+                    when (config) {
+                        is ProfileConfig.Olcrtc -> showOlcrtcEditor(profile.id, config.value)
+                        is ProfileConfig.Standard -> showStandardEditor(profile.id, config.value)
                     }
-                    AlertDialog.Builder(requireContext())
-                        .setTitle(getString(R.string.profile_edit_title, profile.name))
-                        .setView(input)
-                        .setNegativeButton(R.string.cancel, null)
-                        .setPositiveButton(android.R.string.ok) { _, _ ->
-                            saveLocalProfileEdit(profile.id, input.text?.toString().orEmpty())
-                        }
-                        .show()
-                }.onFailure { showError(it) }
+                }.onFailure(::showError)
             }
         }
     }
 
-    private fun saveLocalProfileEdit(profileId: Long, raw: String) {
-        storage.execute {
-            val result = runCatching {
-                when (val imported = ProfileUri.parse(raw.trim())) {
-                    is ImportedProfile.Olcrtc -> profiles.update(profileId, imported.value)
-                    is ImportedProfile.Standard -> profiles.update(profileId, imported.value)
+    private fun showOlcrtcEditor(profileId: Long, profile: OlcrtcProfile) {
+        val form = verticalContainer()
+        val name = formField(form, R.string.profile_field_name, profile.name)
+        val provider = formSpinner(
+            form,
+            R.string.profile_field_provider,
+            OlcrtcProfile.Provider.entries,
+            profile.provider,
+        )
+        val transport = formSpinner(
+            form,
+            R.string.profile_field_transport,
+            OlcrtcProfile.Transport.entries,
+            profile.transport,
+        )
+        val roomId = formField(form, R.string.profile_field_room_id, profile.roomId)
+        val roomPassword = formField(
+            form,
+            R.string.profile_field_room_password,
+            profile.roomPassword.orEmpty(),
+            secret = true,
+        )
+        val clientId = formField(form, R.string.profile_field_client_id, profile.clientId)
+        val key = formField(form, R.string.profile_field_key, profile.keyHex)
+        val auth = formField(
+            form,
+            R.string.profile_field_auth_token,
+            profile.authToken.orEmpty(),
+            secret = true,
+        )
+        val dns = formField(form, R.string.profile_field_dns, profile.dnsServer.orEmpty())
+        val fps = formField(form, R.string.profile_field_vp8_fps, profile.vp8Fps.toString(), numeric = true)
+        val batch = formField(form, R.string.profile_field_vp8_batch, profile.vp8BatchSize.toString(), numeric = true)
+        val keepalive = formField(
+            form,
+            R.string.profile_field_keepalive,
+            profile.keepaliveIntervalSeconds.toString(),
+            numeric = true,
+        )
+        showSecureEditor(profileId, profile.name, form) {
+            ProfileConfig.Olcrtc(
+                OlcrtcProfile(
+                    name = name.value(),
+                    provider = provider.selectedItem as OlcrtcProfile.Provider,
+                    transport = transport.selectedItem as OlcrtcProfile.Transport,
+                    roomId = roomId.value(),
+                    roomPassword = roomPassword.optionalValue(),
+                    clientId = clientId.value(),
+                    keyHex = key.value(),
+                    authToken = auth.optionalValue(),
+                    dnsServer = dns.optionalValue(),
+                    vp8Fps = fps.intValue(),
+                    vp8BatchSize = batch.intValue(),
+                    keepaliveIntervalSeconds = keepalive.intValue(),
+                ),
+            )
+        }
+    }
+
+    private fun showStandardEditor(profileId: Long, profile: StandardProfile) {
+        val form = verticalContainer()
+        val name = formField(form, R.string.profile_field_name, profile.name)
+        val protocol = formSpinner(
+            form,
+            R.string.profile_field_protocol,
+            StandardProfile.Protocol.entries,
+            profile.protocol,
+        )
+        val address = formField(form, R.string.profile_field_address, profile.address)
+        val port = formField(form, R.string.profile_field_port, profile.port.toString(), numeric = true)
+        val uuid = formField(form, R.string.profile_field_uuid, profile.uuid.orEmpty())
+        val password = formField(
+            form,
+            R.string.profile_field_password,
+            profile.password.orEmpty(),
+            secret = true,
+        )
+        val alterId = formField(form, R.string.profile_field_alter_id, profile.alterId.toString(), numeric = true)
+        val cipher = formField(form, R.string.profile_field_cipher, profile.cipher)
+        val transport = formSpinner(
+            form,
+            R.string.profile_field_transport,
+            StandardProfile.Transport.entries,
+            profile.transport,
+        )
+        val security = formSpinner(
+            form,
+            R.string.profile_field_security,
+            StandardProfile.Security.entries,
+            profile.security,
+        )
+        val flow = formField(form, R.string.profile_field_flow, profile.flow.orEmpty())
+        val serverName = formField(form, R.string.profile_field_server_name, profile.serverName.orEmpty())
+        val alpn = formField(form, R.string.profile_field_alpn, profile.alpn.joinToString(","))
+        val fingerprint = formField(form, R.string.profile_field_fingerprint, profile.fingerprint.orEmpty())
+        val allowInsecure = CheckBox(requireContext()).apply {
+            setText(R.string.profile_field_allow_insecure)
+            isChecked = profile.allowInsecure
+        }.also(form::addView)
+        val realityKey = formField(form, R.string.profile_field_reality_key, profile.realityPublicKey.orEmpty())
+        val realityShortId = formField(form, R.string.profile_field_reality_short_id, profile.realityShortId.orEmpty())
+        val realitySpiderX = formField(form, R.string.profile_field_reality_spider_x, profile.realitySpiderX.orEmpty())
+        val wsHost = formField(form, R.string.profile_field_ws_host, profile.webSocketHost.orEmpty())
+        val wsPath = formField(form, R.string.profile_field_ws_path, profile.webSocketPath.orEmpty())
+        val grpcService = formField(form, R.string.profile_field_grpc_service, profile.grpcServiceName.orEmpty())
+        val xhttpMode = formField(form, R.string.profile_field_xhttp_mode, profile.xhttpMode.orEmpty())
+        val xhttpHost = formField(form, R.string.profile_field_xhttp_host, profile.xhttpHost.orEmpty())
+        val xhttpPath = formField(form, R.string.profile_field_xhttp_path, profile.xhttpPath.orEmpty())
+        val xhttpExtra = formField(form, R.string.profile_field_xhttp_extra, profile.xhttpExtraJson.orEmpty())
+        val dns = formField(form, R.string.profile_field_dns, profile.dnsServer.orEmpty())
+        val conditionalFields = listOf(
+            uuid, password, alterId, cipher, flow, realityKey, realityShortId,
+            realitySpiderX, wsHost, wsPath, grpcService, xhttpMode, xhttpHost,
+            xhttpPath, xhttpExtra,
+        )
+        fun updateVisibility() {
+            conditionalFields.forEach { it.layout.visibility = View.GONE }
+            when (protocol.selectedItem as StandardProfile.Protocol) {
+                StandardProfile.Protocol.VLESS -> uuid.show()
+                StandardProfile.Protocol.VMESS -> {
+                    uuid.show()
+                    alterId.show()
+                    cipher.show()
+                }
+                StandardProfile.Protocol.TROJAN -> password.show()
+            }
+            when (transport.selectedItem as StandardProfile.Transport) {
+                StandardProfile.Transport.TCP -> Unit
+                StandardProfile.Transport.WS -> {
+                    wsHost.show()
+                    wsPath.show()
+                }
+                StandardProfile.Transport.GRPC -> grpcService.show()
+                StandardProfile.Transport.XHTTP -> {
+                    xhttpMode.show()
+                    xhttpHost.show()
+                    xhttpPath.show()
+                    xhttpExtra.show()
                 }
             }
-            activity?.runOnUiThread {
-                result.onFailure { showError(it) }
-                loadProfiles()
+            if (security.selectedItem == StandardProfile.Security.REALITY) {
+                realityKey.show()
+                realityShortId.show()
+                realitySpiderX.show()
+                if (
+                    protocol.selectedItem == StandardProfile.Protocol.VLESS &&
+                    transport.selectedItem == StandardProfile.Transport.TCP
+                ) {
+                    flow.show()
+                }
             }
+        }
+        protocol.onSelectionChanged(::updateVisibility)
+        transport.onSelectionChanged(::updateVisibility)
+        security.onSelectionChanged(::updateVisibility)
+        updateVisibility()
+        showSecureEditor(profileId, profile.name, form) {
+            val selectedProtocol = protocol.selectedItem as StandardProfile.Protocol
+            val selectedTransport = transport.selectedItem as StandardProfile.Transport
+            val selectedSecurity = security.selectedItem as StandardProfile.Security
+            ProfileConfig.Standard(
+                StandardProfile(
+                    name = name.value(),
+                    protocol = selectedProtocol,
+                    address = address.value(),
+                    port = port.intValue(),
+                    uuid = if (selectedProtocol == StandardProfile.Protocol.TROJAN) null else uuid.optionalValue(),
+                    password = if (selectedProtocol == StandardProfile.Protocol.TROJAN) password.optionalValue() else null,
+                    alterId = if (selectedProtocol == StandardProfile.Protocol.VMESS) alterId.intValue() else 0,
+                    cipher = if (selectedProtocol == StandardProfile.Protocol.VMESS) cipher.value() else "auto",
+                    transport = selectedTransport,
+                    security = selectedSecurity,
+                    flow = if (
+                        selectedProtocol == StandardProfile.Protocol.VLESS &&
+                        selectedTransport == StandardProfile.Transport.TCP &&
+                        selectedSecurity == StandardProfile.Security.REALITY
+                    ) flow.optionalValue() else null,
+                    serverName = serverName.optionalValue(),
+                    alpn = alpn.value().split(',').map(String::trim).filter(String::isNotEmpty),
+                    fingerprint = fingerprint.optionalValue(),
+                    allowInsecure = allowInsecure.isChecked,
+                    realityPublicKey = if (selectedSecurity == StandardProfile.Security.REALITY) realityKey.optionalValue() else null,
+                    realityShortId = if (selectedSecurity == StandardProfile.Security.REALITY) realityShortId.optionalValue() else null,
+                    realitySpiderX = if (selectedSecurity == StandardProfile.Security.REALITY) realitySpiderX.optionalValue() else null,
+                    webSocketHost = if (selectedTransport == StandardProfile.Transport.WS) wsHost.optionalValue() else null,
+                    webSocketPath = if (selectedTransport == StandardProfile.Transport.WS) wsPath.optionalValue() else null,
+                    grpcServiceName = if (selectedTransport == StandardProfile.Transport.GRPC) grpcService.optionalValue() else null,
+                    xhttpMode = if (selectedTransport == StandardProfile.Transport.XHTTP) xhttpMode.optionalValue() else null,
+                    xhttpHost = if (selectedTransport == StandardProfile.Transport.XHTTP) xhttpHost.optionalValue() else null,
+                    xhttpPath = if (selectedTransport == StandardProfile.Transport.XHTTP) xhttpPath.optionalValue() else null,
+                    xhttpExtraJson = if (selectedTransport == StandardProfile.Transport.XHTTP) xhttpExtra.optionalValue() else null,
+                    dnsServer = dns.optionalValue(),
+                ),
+            )
         }
     }
 
-    private fun editSubscriptionProfile(profile: SubscriptionProfileSummary) {
-        storage.execute {
-            val result = runCatching { profiles.exportSubscriptionProfileUri(profile.id, includeAuthToken = true) }
-            activity?.runOnUiThread {
-                result.onSuccess { raw ->
-                    val input = EditText(requireContext()).apply {
-                        setSingleLine(false)
-                        minLines = 4
-                        setText(raw)
-                    }
-                    AlertDialog.Builder(requireContext())
-                        .setTitle(getString(R.string.profile_edit_title, profile.name))
-                        .setView(input)
-                        .setNegativeButton(R.string.cancel, null)
-                        .setPositiveButton(android.R.string.ok) { _, _ ->
-                            saveSubscriptionProfileEdit(profile.id, input.text?.toString().orEmpty())
+    private fun showSecureEditor(
+        profileId: Long,
+        title: String,
+        form: LinearLayout,
+        build: () -> ProfileConfig,
+    ) {
+        val scroll = ScrollView(requireContext()).apply { addView(form) }
+        val dialog = AlertDialog.Builder(requireContext())
+            .setTitle(getString(R.string.profile_edit_title, title))
+            .setView(scroll)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(android.R.string.ok, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val updated = runCatching(build)
+                updated.onFailure(::showError)
+                updated.onSuccess { config ->
+                    storage.execute {
+                        val result = runCatching {
+                            when (config) {
+                                is ProfileConfig.Olcrtc -> profiles.update(profileId, config.value)
+                                is ProfileConfig.Standard -> profiles.update(profileId, config.value)
+                            }
                         }
-                        .show()
-                }.onFailure { showError(it) }
+                        activity?.runOnUiThread {
+                            result.onSuccess {
+                                dialog.dismiss()
+                                loadProfiles()
+                            }.onFailure(::showError)
+                        }
+                    }
+                }
             }
         }
+        dialog.show()
     }
 
-    private fun saveSubscriptionProfileEdit(profileId: String, raw: String) {
-        storage.execute {
-            val result = runCatching { profiles.updateSubscriptionProfile(profileId, ProfileUri.parse(raw.trim())) }
-            activity?.runOnUiThread {
-                result.onFailure { showError(it) }
-                loadProfiles()
+    private fun formField(
+        form: LinearLayout,
+        label: Int,
+        value: String,
+        numeric: Boolean = false,
+        secret: Boolean = false,
+    ): FormField {
+        val input = com.google.android.material.textfield.TextInputEditText(requireContext()).apply {
+            setText(value)
+            inputType = when {
+                secret -> InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+                numeric -> InputType.TYPE_CLASS_NUMBER
+                else -> InputType.TYPE_CLASS_TEXT
             }
+        }
+        val layout = com.google.android.material.textfield.TextInputLayout(requireContext()).apply {
+            hint = getString(label)
+            addView(input)
+        }
+        form.addView(layout)
+        return FormField(layout, input)
+    }
+
+    private fun <T> formSpinner(form: LinearLayout, label: Int, values: List<T>, selected: T): Spinner {
+        form.addView(TextView(requireContext()).apply {
+            setText(label)
+            setPadding(0, 8.dp, 0, 0)
+        })
+        return Spinner(requireContext()).apply {
+            adapter = ArrayAdapter(requireContext(), android.R.layout.simple_spinner_dropdown_item, values)
+            setSelection(values.indexOf(selected))
+        }.also(form::addView)
+    }
+
+    private fun Spinner.onSelectionChanged(action: () -> Unit) {
+        onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) = action()
+            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
         }
     }
 
     private fun updateSubscription(subscriptionId: Long) {
         storage.execute {
             val result = runCatching { SubscriptionRefresher(profiles).refresh(subscriptionId) }
-            activity?.runOnUiThread {
-                result.onFailure { showError(it) }
-                loadProfiles()
-            }
-        }
-    }
-
-    private fun testLocalLatency(profileId: Long) {
-        storage.execute {
-            val result = runCatching { profiles.testLocalProfileLatency(profileId) }
-            activity?.runOnUiThread { showLatencyResult(result) }
-        }
-    }
-
-    private fun testSubscriptionLatency(profileId: String) {
-        storage.execute {
-            val result = runCatching { profiles.testSubscriptionProfileLatency(profileId) }
-            activity?.runOnUiThread {
-                showLatencyResult(result)
-                if (result.isSuccess) loadProfiles()
-            }
-        }
-    }
-
-    private fun showLatencyResult(result: Result<Long>) {
-        result.onSuccess { latency ->
-            AlertDialog.Builder(requireContext())
-                .setTitle(R.string.profile_test_latency)
-                .setMessage(getString(R.string.profile_latency_result, latency))
-                .setPositiveButton(android.R.string.ok, null)
-                .show()
-        }.onFailure { showError(it) }
-    }
-
-    private fun copyLocalProfileLink(profileId: Long) {
-        copyProfileLink { profiles.exportProfileUri(profileId, includeAuthToken = false) }
-    }
-
-    private fun copySubscriptionProfileLink(profileId: String) {
-        copyProfileLink { profiles.exportSubscriptionProfileUri(profileId, includeAuthToken = false) }
-    }
-
-    private fun copyProfileLink(factory: () -> String) {
-        AlertDialog.Builder(requireContext())
-            .setTitle(R.string.profile_export_secret_warning_title)
-            .setMessage(R.string.profile_export_secret_warning_message)
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.copy) { _, _ ->
-                storage.execute {
-                    val result = runCatching(factory)
-                    activity?.runOnUiThread {
-                        result.onSuccess { link ->
-                            val clipboard = requireContext().getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            clipboard.setPrimaryClip(ClipData.newPlainText(getString(R.string.app_name), link))
-                        }.onFailure { showError(it) }
-                    }
-                }
-            }
-            .show()
-    }
-
-    private fun resetSubscriptionProfile(profileId: String) {
-        storage.execute {
-            val result = runCatching { profiles.resetSubscriptionProfile(profileId) }
             activity?.runOnUiThread {
                 result.onFailure { showError(it) }
                 loadProfiles()
@@ -653,6 +703,19 @@ class ProfilesFragment : Fragment() {
         DateFormat.SHORT,
         DateFormat.SHORT,
     ).format(Date(value))
+
+    private data class FormField(
+        val layout: com.google.android.material.textfield.TextInputLayout,
+        val input: com.google.android.material.textfield.TextInputEditText,
+    ) {
+        fun value(): String = input.text?.toString()?.trim().orEmpty()
+        fun optionalValue(): String? = value().takeIf(String::isNotEmpty)
+        fun intValue(): Int = value().toIntOrNull()
+            ?: throw IllegalArgumentException("${layout.hint} is invalid")
+        fun show() {
+            layout.visibility = View.VISIBLE
+        }
+    }
 
     private data class ProfilesScreenModel(
         val local: List<ProfileSummary>,

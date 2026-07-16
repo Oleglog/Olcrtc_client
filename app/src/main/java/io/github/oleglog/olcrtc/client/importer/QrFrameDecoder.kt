@@ -19,47 +19,76 @@ internal object QrFrameDecoder {
             BarcodeFormat.AZTEC,
         ),
         DecodeHintType.TRY_HARDER to true,
-        DecodeHintType.ASSUME_CODE_39_CHECK_DIGIT to false,
         DecodeHintType.CHARACTER_SET to "UTF-8",
     )
 
-    fun decode(image: ImageProxy): String? = try {
-        decodeInternal(image)
-    } catch (_: Throwable) {
-        null
-    }
-
-    private fun decodeInternal(image: ImageProxy): String? {
-        if (image.format != ImageFormat.YUV_420_888) return null
+    fun decode(image: ImageProxy): String? {
+        require(image.format == ImageFormat.YUV_420_888) { "Unsupported camera image format" }
+        val crop = image.cropRect
         val plane = image.planes[0]
-        val width = image.width
-        val height = image.height
-        val luminance = ByteArray(width * height)
-        val buffer = plane.buffer
-        buffer.rewind()
-        if (plane.pixelStride == 1 && plane.rowStride == width) {
-            buffer.get(luminance)
-        } else {
-            val row = ByteArray(plane.rowStride)
-            for (y in 0 until height) {
-                buffer.position(y * plane.rowStride)
-                val length = minOf(plane.rowStride, buffer.remaining())
-                buffer.get(row, 0, length)
-                for (x in 0 until width) luminance[y * width + x] = row[x * plane.pixelStride]
+        val buffer = plane.buffer.duplicate()
+        val luminance = ByteArray(crop.width() * crop.height())
+        val base = buffer.position()
+        var output = 0
+        for (y in crop.top until crop.bottom) {
+            for (x in crop.left until crop.right) {
+                val index = base + y * plane.rowStride + x * plane.pixelStride
+                require(index < buffer.limit()) { "Invalid camera image plane" }
+                luminance[output++] = buffer.get(index)
             }
         }
-        val source = PlanarYUVLuminanceSource(luminance, width, height, 0, 0, width, height, false)
-        val reader = MultiFormatReader().apply { setHints(hints) }
-        var rotated: LuminanceSource = source
-        repeat(image.imageInfo.rotationDegrees / 90) { rotated = rotated.rotateCounterClockwise() }
-        return decode(reader, rotated)
+        val rotated = rotate(
+            luminance,
+            crop.width(),
+            crop.height(),
+            image.imageInfo.rotationDegrees,
+        )
+        val width = if (image.imageInfo.rotationDegrees % 180 == 0) crop.width() else crop.height()
+        val height = if (image.imageInfo.rotationDegrees % 180 == 0) crop.height() else crop.width()
+        val source = PlanarYUVLuminanceSource(
+            rotated,
+            width,
+            height,
+            0,
+            0,
+            width,
+            height,
+            false,
+        )
+        return decode(source) ?: decode(source.invert())
     }
 
-    private fun decode(reader: MultiFormatReader, source: LuminanceSource): String? = try {
-        reader.decodeWithState(BinaryBitmap(HybridBinarizer(source))).text
-    } catch (_: NotFoundException) {
-        null
-    } finally {
-        reader.reset()
+    internal fun rotate(
+        source: ByteArray,
+        width: Int,
+        height: Int,
+        rotationDegrees: Int,
+    ): ByteArray {
+        require(source.size == width * height) { "Invalid luminance dimensions" }
+        require(rotationDegrees in setOf(0, 90, 180, 270)) { "Unsupported camera rotation" }
+        if (rotationDegrees == 0) return source
+        val rotated = ByteArray(source.size)
+        for (y in 0 until height) {
+            for (x in 0 until width) {
+                val destination = when (rotationDegrees) {
+                    90 -> x * height + (height - 1 - y)
+                    180 -> (height - 1 - y) * width + (width - 1 - x)
+                    else -> (width - 1 - x) * height + y
+                }
+                rotated[destination] = source[y * width + x]
+            }
+        }
+        return rotated
+    }
+
+    private fun decode(source: LuminanceSource): String? {
+        val reader = MultiFormatReader().apply { setHints(hints) }
+        return try {
+            reader.decodeWithState(BinaryBitmap(HybridBinarizer(source))).text
+        } catch (_: NotFoundException) {
+            null
+        } finally {
+            reader.reset()
+        }
     }
 }

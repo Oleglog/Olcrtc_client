@@ -4,9 +4,26 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Test
+import java.io.ByteArrayOutputStream
 import java.security.MessageDigest
+import java.util.Base64
+import java.util.zip.GZIPOutputStream
 
 class MultipartSessionTest {
+    @Test
+    fun dispatcherParsesManagerGzipBundleFromMultipartQr() {
+        val profile = "olcrtc://wbstream@r/room?k=${"a".repeat(64)}&t=vp8channel&f=120&b=64&c=client&a=token#WB"
+        val raw = """{"type":"olcrtc-sub","v":2,"n":"Manager","s":"manager","u":"https://example.com/sub/manager","m":[],"mk":"","uc":true,"d":true,"p":["$profile"]}"""
+        val payload = "olcrtc+gz:${gzipBase64Url(raw)}"
+        val parts = parts(payload)
+        val dispatcher = BundleImportDispatcher()
+
+        assertEquals(BundleImportResult.Pending(1, 2), dispatcher.accept(parts[0]))
+        val complete = dispatcher.accept(parts[1]) as BundleImportResult.Complete
+        assertEquals("Manager", complete.bundle.name)
+        assertEquals(1, complete.bundle.profiles.size)
+    }
+
     @Test
     fun assemblesPartsInAnyOrderAndIgnoresIdenticalDuplicate() {
         val payload = "olcrtc+gz:abcdef"
@@ -68,6 +85,14 @@ class MultipartSessionTest {
         now = 10 * 60 * 1000L
 
         assertThrows(IllegalArgumentException::class.java) { session.add(parts[1]) }
+    }
+
+    private fun gzipBase64Url(value: String): String {
+        val compressed = ByteArrayOutputStream().use { output ->
+            GZIPOutputStream(output).use { it.write(value.encodeToByteArray()) }
+            output.toByteArray()
+        }
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(compressed)
     }
 
     private fun parts(payload: String): List<String> {
