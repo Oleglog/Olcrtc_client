@@ -85,50 +85,5 @@
             android:layout_marginTop="8dp"
             android:orientation="vertical" />
 
-        <EditText
-            android:id="@+id/profile_uri"
-            android:layout_width="match_parent"
-            android:layout_height="120dp"
-            android:layout_marginTop="16dp"
-            android:gravity="top|start"
-            android:hint="@string/olcrtc_uri_hint"
-            android:inputType="textMultiLine|textNoSuggestions"
-            android:visibility="gone" />
-
-        <Button
-            android:id="@+id/paste_clipboard"
-            android:layout_width="1dp"
-            android:layout_height="1dp"
-            android:visibility="gone" />
-
-        <Button
-            android:id="@+id/scan_qr"
-            android:layout_width="1dp"
-            android:layout_height="1dp"
-            android:visibility="gone" />
-
-        <Button
-            android:id="@+id/import_image"
-            android:layout_width="1dp"
-            android:layout_height="1dp"
-            android:visibility="gone" />
-
-        <Button
-            android:id="@+id/import_file"
-            android:layout_width="1dp"
-            android:layout_height="1dp"
-            android:visibility="gone" />
-
-        <Button
-            android:id="@+id/manual_olcrtc"
-            android:layout_width="1dp"
-            android:layout_height="1dp"
-            android:visibility="gone" />
-
-        <Button
-            android:id="@+id/manual_standard"
-            android:layout_width="1dp"
-            android:layout_height="1dp"
-            android:visibility="gone" />
     </LinearLayout>
 </ScrollView>

@@ -20,7 +20,7 @@ internal class AppRoutingRepository(
 ) {
     fun refreshInstalled(includeSystem: Boolean): List<AppRoutingItem> {
         val stored = entries.getAll().associateBy(AppRoutingEntryEntity::packageName)
-        val installed = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+        val installed = packageManager.getInstalledApplications(0)
             .asSequence()
             .filter { includeSystem || !it.isSystemApp }
             .map { app ->

@@ -40,6 +40,18 @@ internal object ImportPayload {
         if (raw.startsWith(GZIP_PREFIX, ignoreCase = true)) decodeGzip(raw.substring(GZIP_PREFIX.length)) else raw,
     )
 
+    fun managerProfileUriOrNull(raw: String): String? {
+        if (!raw.trimStart().startsWith('{')) return null
+        val root = Json.parse(raw).objectValue("manager QR")
+        if (root.keys != setOf("uri")) return null
+        val uri = root.getValue("uri").stringValue("uri").trim()
+        require(uri.length <= 16 * 1024) { "Profile URI is too long" }
+        require(uri.substringBefore(':').lowercase() in setOf("olcrtc", "vless", "vmess", "trojan")) {
+            "Unsupported profile scheme"
+        }
+        return uri
+    }
+
     internal fun decodeGzip(encoded: String): String {
         require(encoded.isNotEmpty()) { "GZIP payload is empty" }
         require(encoded.length <= ((MAX_COMPRESSED_BYTES + 2) / 3) * 4) { "Compressed payload is too large" }

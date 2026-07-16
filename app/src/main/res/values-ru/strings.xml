@@ -2,10 +2,11 @@
 <resources>
     <string name="app_name">olcRTC Client</string>
     <string name="navigation_connection">Подключение</string>
-    <string name="navigation_profiles">Профили</string>
+    <string name="navigation_profiles">Подписки</string>
     <string name="navigation_statistics">Статистика</string>
     <string name="navigation_settings">Настройки</string>
-    <string name="profiles_placeholder">Импортированных профилей нет</string>
+    <string name="profiles_placeholder">Сохранённых подключений нет</string>
+    <string name="subscriptions_placeholder">Подписки ещё не импортированы</string>
     <string name="profile_group_local">Сохранённые подключения</string>
     <string name="profile_field_name">Название</string>
     <string name="profile_field_provider">Провайдер</string>
@@ -47,8 +48,13 @@
     <string name="profile_reset">Сбросить</string>
     <string name="profile_test_latency">Проверить</string>
     <string name="profile_latency_result">Задержка: %1$d мс</string>
+    <string name="profile_latency_connect_first">Сначала подключите этот профиль olcRTC</string>
     <string name="subscription_add">Добавить подписку по QR-коду</string>
     <string name="subscription_update_now">Обновить</string>
+    <string name="subscription_update_failed">Не удалось обновить подписку</string>
+    <string name="subscription_edit">Изменить подписку</string>
+    <string name="subscription_name">Название</string>
+    <string name="subscription_url">Адрес подписки</string>
     <string name="subscription_details">Сведения</string>
     <string name="subscription_edit_hint">name=Моя подписка\nurl=https://example.com/sub\nkind=GENERIC</string>
     <string name="subscription_delete_title">Удалить подписку?</string>
@@ -102,6 +108,7 @@
     <string name="settings_refresh_app_list">Обновить список приложений</string>
     <string name="settings_select_apps">Выбрать приложения</string>
     <string name="settings_select_apps_description">Выберите приложения, к которым применяется установленный режим маршрутизации.</string>
+    <string name="settings_app_search">Поиск приложений</string>
     <string name="settings_app_routing_summary">Установлено приложений: %1$d · выбрано: %2$d</string>
     <string name="settings_add_routing_rule">Добавить правило маршрутизации</string>
     <string name="settings_update_geo_assets">Обновить базы GeoIP и GeoSite</string>
@@ -144,6 +151,8 @@
     <string name="connect">Подключить</string>
     <string name="add_connection">Добавить подключение</string>
     <string name="connection_saved_profiles">Сохранённые подключения</string>
+    <string name="connection_manual_profiles">Мои подключения</string>
+    <string name="connection_subscription_profiles">Из подписок</string>
     <string name="connection_selected_profile">Выбрано: %1$s</string>
     <string name="import_and_connect">Импортировать и подключить</string>
     <string name="paste_clipboard">Вставить</string>
@@ -160,6 +169,8 @@
     <string name="manual_olcrtc_hint">name=olcRTC\nprovider=wbstream\ntransport=vp8channel\nroom=room\nclient=client\nkey=64-hex\nauth=необязательно\ndns=77.88.8.8:53</string>
     <string name="manual_standard_hint">Вставьте ссылку vless://, vmess:// или trojan://</string>
     <string name="import_preview">Проверьте данные, затем нажмите «Импортировать и подключить»</string>
+    <string name="profile_saved">Подключение сохранено</string>
+    <string name="subscription_imported">Подписка импортирована</string>
     <string name="import_source">Источник: %1$s</string>
     <string name="source_deep_link">внешняя ссылка</string>
     <string name="source_clipboard">буфер обмена</string>

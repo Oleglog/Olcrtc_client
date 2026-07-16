@@ -2,41 +2,38 @@ package io.github.oleglog.olcrtc.client.connection
 
 import android.app.Activity
 import android.content.ClipboardManager
-import android.content.ContentResolver
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Button
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import io.github.oleglog.olcrtc.client.MainActivity
 import io.github.oleglog.olcrtc.client.R
+import io.github.oleglog.olcrtc.client.data.ProfileConfig
 import io.github.oleglog.olcrtc.client.data.ProfileRepository
+import io.github.oleglog.olcrtc.client.data.SubscriptionProfileSummary
+import io.github.oleglog.olcrtc.client.data.SubscriptionSummary
 import io.github.oleglog.olcrtc.client.databinding.FragmentConnectionBinding
 import io.github.oleglog.olcrtc.client.importer.BundleImportDispatcher
 import io.github.oleglog.olcrtc.client.importer.BundleImportResult
-import io.github.oleglog.olcrtc.client.importer.QrImageDecoder
+import io.github.oleglog.olcrtc.client.importer.ImportPayload
 import io.github.oleglog.olcrtc.client.importer.QrScannerActivity
 import io.github.oleglog.olcrtc.client.profile.ImportedProfile
 import io.github.oleglog.olcrtc.client.profile.ProfileUri
-import io.github.oleglog.olcrtc.client.profile.olcrtc.OlcrtcProfile
-import io.github.oleglog.olcrtc.client.profile.olcrtc.OlcrtcUri
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import io.github.oleglog.olcrtc.client.vpn.VpnState
-import java.io.ByteArrayOutputStream
-import java.io.IOException
-import java.nio.ByteBuffer
-import java.nio.charset.CodingErrorAction
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.concurrent.Executors
+import kotlin.system.measureTimeMillis
 
 class ConnectionFragment : Fragment() {
     private var _binding: FragmentConnectionBinding? = null
@@ -50,12 +47,6 @@ class ConnectionFragment : Fragment() {
     private var connectedProfileId: Long? = null
     private var connectedSubscriptionProfileId: String? = null
 
-    private val qrImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        uri?.let(::decodeQrImage)
-    }
-    private val filePicker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        uri?.let(::readImportFile)
-    }
     private val qrScanner = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
@@ -77,18 +68,8 @@ class ConnectionFragment : Fragment() {
 
     override fun onViewCreated(view: View, state: Bundle?) {
         binding.connect.setOnClickListener {
-            if (currentState == VpnState.CONNECTED || currentState in BUSY_STATES) activityHost.stopVpn() else connectSelectedOrImport()
+            if (currentState == VpnState.CONNECTED || currentState in BUSY_STATES) activityHost.stopVpn() else connectSelected()
         }
-        binding.pasteClipboard.setOnClickListener { pasteClipboard() }
-        binding.scanQr.setOnClickListener { requestScanner() }
-        binding.importImage.setOnClickListener {
-            qrImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-        }
-        binding.importFile.setOnClickListener {
-            filePicker.launch(arrayOf("text/plain", "application/octet-stream"))
-        }
-        binding.manualOlcrtc.setOnClickListener { showManualOlcrtcDialog() }
-        binding.manualStandard.setOnClickListener { showManualStandardDialog() }
         binding.addProfile.setOnClickListener { showAddConnectionMenu() }
         binding.testSelected.setOnClickListener { testSelectedProfile() }
         storage.execute { SubscriptionRefresher(profiles).refreshStale() }
@@ -120,24 +101,65 @@ class ConnectionFragment : Fragment() {
 
     private fun loadProfiles() {
         storage.execute {
-            val result = runCatching { profiles.listLocal() to profiles.listSubscriptions().flatMap { profiles.listSubscriptionProfiles(it.id) } }
+            val result = runCatching {
+                ConnectionScreenModel(
+                    local = profiles.listLocal(),
+                    subscriptions = profiles.listSubscriptions().map { subscription ->
+                        SubscriptionSection(subscription, profiles.listSubscriptionProfiles(subscription.id))
+                    },
+                )
+            }
             activity?.runOnUiThread {
                 if (_binding == null) return@runOnUiThread
-                result.onSuccess { (localItems, subscriptionItems) ->
+                result.onSuccess { model ->
                     binding.profileList.removeAllViews()
-                    if (localItems.isEmpty() && subscriptionItems.isEmpty()) {
+                    val subscriptionItems = model.subscriptions.flatMap(SubscriptionSection::profiles)
+                    if (model.local.isEmpty() && subscriptionItems.isEmpty()) {
                         binding.profileList.addView(TextView(requireContext()).apply {
                             setText(R.string.profiles_placeholder)
                             setPadding(0, 12.dp, 0, 12.dp)
                         })
                     } else {
-                        if (selectedProfileId == null && selectedSubscriptionProfileId == null && localItems.isNotEmpty()) selectProfile(localItems.first().id, localItems.first().name, localItems.first().type, localItems.first().endpoint)
-                        localItems.forEach { profile -> binding.profileList.addView(profileCard(profile.id, profile.name, profile.type, profile.endpoint)) }
-                        subscriptionItems.forEach { profile -> binding.profileList.addView(subscriptionProfileCard(profile.id, profile.name, profile.type, profile.endpoint)) }
+                        if (selectedProfileId == null && selectedSubscriptionProfileId == null) {
+                            model.local.firstOrNull()?.let {
+                                selectProfile(it.id, it.name, it.type, it.endpoint)
+                            } ?: subscriptionItems.firstOrNull()?.let {
+                                selectSubscriptionProfile(it.id, it.name, it.type, it.endpoint)
+                            }
+                        }
+                        if (model.local.isNotEmpty()) {
+                            binding.profileList.addView(sectionTitle(R.string.connection_manual_profiles))
+                            model.local.forEach { profile ->
+                                binding.profileList.addView(profileCard(profile.id, profile.name, profile.type, profile.endpoint))
+                            }
+                        }
+                        if (subscriptionItems.isNotEmpty()) {
+                            binding.profileList.addView(sectionTitle(R.string.connection_subscription_profiles))
+                            model.subscriptions.filter { it.profiles.isNotEmpty() }.forEach { section ->
+                                binding.profileList.addView(subscriptionTitle(section.subscription))
+                                section.profiles.forEach { profile ->
+                                    binding.profileList.addView(
+                                        subscriptionProfileCard(profile.id, profile.name, profile.type, profile.endpoint),
+                                    )
+                                }
+                            }
+                        }
                     }
                 }.onFailure { binding.status.text = it.message }
             }
         }
+    }
+
+    private fun sectionTitle(textRes: Int): TextView = TextView(requireContext()).apply {
+        setText(textRes)
+        setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium)
+        setPadding(0, 18.dp, 0, 4.dp)
+    }
+
+    private fun subscriptionTitle(subscription: SubscriptionSummary): TextView = TextView(requireContext()).apply {
+        text = subscription.name
+        setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelLarge)
+        setPadding(4.dp, 12.dp, 0, 0)
     }
 
     private fun profileCard(id: Long, name: String, type: String, endpoint: String): View =
@@ -151,15 +173,35 @@ class ConnectionFragment : Fragment() {
             strokeColor = cardStrokeState(id == selectedProfileId, id == connectedProfileId)
             strokeWidth = cardStrokeWidth(id == selectedProfileId, id == connectedProfileId)
             addView(LinearLayout(requireContext()).apply {
-                orientation = LinearLayout.VERTICAL
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
                 setPadding(16.dp, 14.dp, 16.dp, 14.dp)
-                addView(TextView(requireContext()).apply {
-                    text = name
-                    textSize = 18f
-                })
-                addView(TextView(requireContext()).apply { text = "$type - $endpoint" })
+                addView(LinearLayout(requireContext()).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(TextView(requireContext()).apply {
+                        text = name
+                        textSize = 18f
+                    })
+                    addView(TextView(requireContext()).apply { text = "$type - $endpoint" })
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                addView(iconButton(android.R.drawable.ic_menu_edit, R.string.edit) { editLocalProfile(id) })
+                addView(iconButton(android.R.drawable.ic_menu_delete, R.string.delete) { confirmDeleteProfile(id, name) })
             })
             setOnClickListener { selectProfile(id, name, type, endpoint) }
+        }
+
+    private fun iconButton(iconRes: Int, descriptionRes: Int, action: () -> Unit): MaterialButton =
+        MaterialButton(
+            requireContext(),
+            null,
+            com.google.android.material.R.attr.materialButtonOutlinedStyle,
+        ).apply {
+            icon = ContextCompat.getDrawable(requireContext(), iconRes)
+            text = ""
+            contentDescription = getString(descriptionRes)
+            minWidth = 48.dp
+            minimumWidth = 48.dp
+            setOnClickListener { action() }
         }
 
 
@@ -236,10 +278,10 @@ class ConnectionFragment : Fragment() {
         refreshAllCardStrokes()
     }
 
-    private fun connectSelectedOrImport() {
+    private fun connectSelected() {
         selectedProfileId?.let { activityHost.requestVpnPermission(it); return }
         selectedSubscriptionProfileId?.let { activityHost.requestSubscriptionVpnPermission(it); return }
-        importAndConnect()
+        binding.status.setText(R.string.no_profile)
     }
 
     private fun testSelectedProfile() {
@@ -247,10 +289,26 @@ class ConnectionFragment : Fragment() {
         val subscriptionId = selectedSubscriptionProfileId
         storage.execute {
             val result = runCatching {
-                when {
-                    localId != null -> profiles.testLocalProfileLatency(localId)
-                    subscriptionId != null -> profiles.testSubscriptionProfileLatency(subscriptionId)
-                    else -> throw IllegalArgumentException(getString(R.string.no_profile))
+                val profile = when {
+                    localId != null -> profiles.get(localId)
+                    subscriptionId != null -> profiles.getSubscriptionProfile(subscriptionId)
+                    else -> null
+                } ?: throw IllegalArgumentException(getString(R.string.no_profile))
+                when (profile) {
+                    is ProfileConfig.Standard -> when {
+                        localId != null -> profiles.testLocalProfileLatency(localId)
+                        subscriptionId != null -> profiles.testSubscriptionProfileLatency(subscriptionId)
+                        else -> error("unreachable")
+                    }
+                    is ProfileConfig.Olcrtc -> {
+                        val selectedIsConnected = currentState == VpnState.CONNECTED && when {
+                            localId != null -> localId == connectedProfileId
+                            subscriptionId != null -> subscriptionId == connectedSubscriptionProfileId
+                            else -> false
+                        }
+                        require(selectedIsConnected) { getString(R.string.profile_latency_connect_first) }
+                        measureVpnLatency()
+                    }
                 }
             }
             activity?.runOnUiThread {
@@ -262,27 +320,38 @@ class ConnectionFragment : Fragment() {
 
     private fun showAddConnectionMenu() {
         val actions = arrayOf(
-            getString(R.string.paste_clipboard),
             getString(R.string.scan_qr),
-            getString(R.string.import_qr_image),
-            getString(R.string.import_file),
-            getString(R.string.manual_olcrtc),
-            getString(R.string.manual_standard),
+            getString(R.string.paste_clipboard),
         )
         AlertDialog.Builder(requireContext())
             .setTitle(R.string.add_connection)
             .setItems(actions) { _, which ->
                 when (which) {
-                    0 -> pasteClipboard()
-                    1 -> requestScanner()
-                    2 -> qrImagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                    3 -> filePicker.launch(arrayOf("text/plain", "application/octet-stream"))
-                    4 -> showManualOlcrtcDialog()
-                    5 -> showManualStandardDialog()
+                    0 -> requestScanner()
+                    1 -> pasteClipboard()
                 }
             }
             .show()
-    }    private fun showVpnState(state: VpnState, error: String?) {
+    }
+
+    private fun measureVpnLatency(): Long {
+        var connection: HttpURLConnection? = null
+        return try {
+            measureTimeMillis {
+                connection = (URL(VPN_LATENCY_URL).openConnection() as HttpURLConnection).apply {
+                    connectTimeout = LATENCY_TIMEOUT_MILLIS
+                    readTimeout = LATENCY_TIMEOUT_MILLIS
+                    instanceFollowRedirects = false
+                    requestMethod = "GET"
+                }
+                require(connection!!.responseCode in 200..399) { "HTTP ${connection!!.responseCode}" }
+            }
+        } finally {
+            connection?.disconnect()
+        }
+    }
+
+    private fun showVpnState(state: VpnState, error: String?) {
         if (_binding == null) return
         currentState = state
         when (state) {
@@ -300,7 +369,7 @@ class ConnectionFragment : Fragment() {
         binding.connect.text = getString(
             if (state == VpnState.CONNECTED || state in BUSY_STATES) R.string.disconnect else R.string.connect
         )
-        binding.connect.isEnabled = state == VpnState.CONNECTED || state in BUSY_STATES || selectedProfileId != null || selectedSubscriptionProfileId != null || !binding.profileUri.text.isNullOrBlank()
+        binding.connect.isEnabled = state == VpnState.CONNECTED || state in BUSY_STATES || selectedProfileId != null || selectedSubscriptionProfileId != null
         refreshAllCardStrokes()
     }
 
@@ -317,24 +386,6 @@ class ConnectionFragment : Fragment() {
         else validatePreview(text, R.string.source_clipboard)
     }
 
-    private fun decodeQrImage(uri: Uri) {
-        val resolver = requireContext().applicationContext.contentResolver
-        storage.execute {
-            val result = runCatching { parsePreview(QrImageDecoder.decode(resolver, uri)) }
-            activity?.runOnUiThread { showPreview(result, R.string.qr_image_error, R.string.source_qr_image) }
-        }
-    }
-
-    private fun readImportFile(uri: Uri) {
-        val resolver = requireContext().applicationContext.contentResolver
-        val fileError = getString(R.string.import_file_error)
-        val tooLargeError = getString(R.string.import_file_too_large)
-        storage.execute {
-            val result = runCatching { parsePreview(readText(resolver, uri, fileError, tooLargeError)) }
-            activity?.runOnUiThread { showPreview(result, R.string.import_file_error, R.string.source_file) }
-        }
-    }
-
     private fun validatePreview(raw: String, source: Int) {
         storage.execute {
             val result = runCatching { parsePreview(raw) }
@@ -344,152 +395,138 @@ class ConnectionFragment : Fragment() {
 
     private fun parsePreview(raw: String): ImportPreview {
         val value = raw.trim()
-        return if (value.startsWith("{") || value.startsWith("olcrtc+gz:", true) || value.startsWith("olcrtc+part:", true)) {
+        val managerProfile = if (value.startsWith("{")) ImportPayload.managerProfileUriOrNull(value) else null
+        return if (managerProfile != null) {
+            saveProfile(managerProfile)
+        } else if (value.startsWith("{") || value.startsWith("olcrtc+gz:", true) || value.startsWith("olcrtc+part:", true)) {
             when (val bundle = bundleImports.accept(value)) {
-                is BundleImportResult.Pending -> ImportPreview("Multipart QR ${bundle.received}/${bundle.total}", null)
+                is BundleImportResult.Pending -> ImportPreview(
+                    description = "",
+                    multipartReceived = bundle.received,
+                    multipartTotal = bundle.total,
+                )
                 is BundleImportResult.Complete -> {
                     profiles.insertSubscription(bundle.bundle)
-                    ImportPreview("${bundle.bundle.name}: ${bundle.bundle.profiles.size} profiles", null)
+                    ImportPreview(
+                        description = "${bundle.bundle.name}: ${bundle.bundle.profiles.size} profiles",
+                        subscriptionImported = true,
+                    )
                 }
             }
         } else {
-            val description = when (val profile = ProfileUri.parse(value)) {
-                is ImportedProfile.Olcrtc -> "olcRTC: ${profile.value.name}"
-                is ImportedProfile.Standard -> "${profile.value.protocol.name}: ${profile.value.name}"
-            }
-            ImportPreview(description, value)
+            saveProfile(value)
         }
+    }
+
+    private fun saveProfile(raw: String): ImportPreview = when (val profile = ProfileUri.parse(raw)) {
+        is ImportedProfile.Olcrtc -> ImportPreview(
+            description = "olcRTC: ${profile.value.name}",
+            localProfileId = profiles.findDuplicate(profile.value) ?: profiles.insert(profile.value),
+        )
+        is ImportedProfile.Standard -> ImportPreview(
+            description = "${profile.value.protocol.name}: ${profile.value.name}",
+            localProfileId = profiles.findDuplicate(profile.value) ?: profiles.insert(profile.value),
+        )
     }
 
     private fun showPreview(result: Result<ImportPreview>, fallbackError: Int, source: Int) {
         if (_binding == null) return
         result.onSuccess { preview ->
-            preview.profileUri?.let(binding.profileUri::setText)
-            val description = if (preview.profileUri == null) preview.description
-            else "${preview.description}\n${getString(R.string.import_preview)}"
-            selectedProfileId = null
+            if (preview.multipartReceived != null && preview.multipartTotal != null) {
+                binding.status.text = "${getString(R.string.import_source, getString(source))}\n${getString(
+                    R.string.subscription_qr_progress,
+                    preview.multipartReceived,
+                    preview.multipartTotal,
+                )}"
+                return@onSuccess
+            }
+            selectedProfileId = preview.localProfileId
             selectedSubscriptionProfileId = null
             binding.selectedProfile.text = preview.description
-            binding.connect.isEnabled = preview.profileUri != null || currentState in BUSY_STATES || currentState == VpnState.CONNECTED
-            binding.status.text = "${getString(R.string.import_source, getString(source))}\n$description"
+            binding.connect.isEnabled = preview.localProfileId != null || currentState in BUSY_STATES || currentState == VpnState.CONNECTED
+            binding.status.text = "${getString(R.string.import_source, getString(source))}\n${getString(
+                if (preview.subscriptionImported) R.string.subscription_imported else R.string.profile_saved,
+            )}"
+            loadProfiles()
         }.onFailure { binding.status.text = it.message ?: getString(fallbackError) }
     }
 
-    private fun showManualOlcrtcDialog() {
-        val input = EditText(requireContext()).apply {
-            hint = getString(R.string.manual_olcrtc_hint)
-            setSingleLine(false)
-            minLines = 8
+    private fun editLocalProfile(profileId: Long) {
+        storage.execute {
+            val result = runCatching { requireNotNull(profiles.get(profileId)) }
+            activity?.runOnUiThread {
+                result.onSuccess { profile ->
+                    ProfileEditorDialog.show(
+                        fragment = this,
+                        profile = profile,
+                        onSave = { updated, dialog -> saveLocalProfile(profileId, updated, dialog) },
+                        onError = { binding.status.text = it.message ?: getString(R.string.invalid_profile) },
+                    )
+                }.onFailure { binding.status.text = it.message ?: getString(R.string.invalid_profile) }
+            }
         }
-        AlertDialog.Builder(requireContext())
-            .setTitle(R.string.manual_profile_title)
-            .setView(input)
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                runCatching { buildManualOlcrtcUri(input.text?.toString().orEmpty()) }
-                    .onSuccess { raw ->
-                        binding.profileUri.setText(raw)
-                        validatePreview(raw, R.string.manual_olcrtc)
-                    }
-                    .onFailure { binding.status.text = it.message }
-            }
-            .show()
     }
 
-    private fun showManualStandardDialog() {
-        val input = EditText(requireContext()).apply {
-            hint = getString(R.string.manual_standard_hint)
-            setSingleLine(false)
-            minLines = 3
-        }
-        AlertDialog.Builder(requireContext())
-            .setTitle(R.string.manual_profile_title)
-            .setView(input)
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                val raw = input.text?.toString().orEmpty().trim()
-                binding.profileUri.setText(raw)
-                validatePreview(raw, R.string.manual_standard)
-            }
-            .show()
-    }
-
-    private fun buildManualOlcrtcUri(raw: String): String {
-        val values = raw.lineSequence()
-            .map(String::trim)
-            .filter { it.isNotEmpty() && !it.startsWith('#') }
-            .associate { line ->
-                val parts = line.split('=', limit = 2)
-                require(parts.size == 2) { "Invalid line: $line" }
-                parts[0].trim().lowercase() to parts[1].trim()
-            }
-        val profile = OlcrtcProfile(
-            name = values["name"].orEmpty().ifBlank { "olcRTC" },
-            provider = OlcrtcProfile.Provider.parse(values.required("provider")),
-            transport = OlcrtcProfile.Transport.parse(values.required("transport")),
-            roomId = values.required("room"),
-            roomPassword = values["password"]?.takeIf(String::isNotBlank),
-            clientId = values.required("client"),
-            keyHex = values.required("key"),
-            authToken = values["auth"]?.takeIf(String::isNotBlank),
-            dnsServer = values["dns"]?.takeIf(String::isNotBlank),
-        )
-        return OlcrtcUri.serialize(profile, includeAuthToken = true)
-    }
-
-    private fun Map<String, String>.required(name: String): String =
-        get(name)?.takeIf(String::isNotBlank) ?: throw IllegalArgumentException("$name is required")
-
-    private fun readText(
-        resolver: ContentResolver,
-        uri: Uri,
-        fileError: String,
-        tooLargeError: String,
-    ): String {
-        val bytes = resolver.openInputStream(uri)?.use { input ->
-            val output = ByteArrayOutputStream()
-            val buffer = ByteArray(8192)
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                require(output.size() + count <= MAX_IMPORT_FILE_BYTES) { tooLargeError }
-                output.write(buffer, 0, count)
-            }
-            output.toByteArray()
-        } ?: throw IOException(fileError)
-        return Charsets.UTF_8.newDecoder()
-            .onMalformedInput(CodingErrorAction.REPORT)
-            .onUnmappableCharacter(CodingErrorAction.REPORT)
-            .decode(ByteBuffer.wrap(bytes))
-            .toString()
-    }
-
-    private fun importAndConnect() {
-        val raw = binding.profileUri.text?.toString().orEmpty().trim()
+    private fun saveLocalProfile(profileId: Long, profile: ProfileConfig, dialog: AlertDialog) {
         storage.execute {
             val result = runCatching {
-                when (val profile = ProfileUri.parse(raw)) {
-                    is ImportedProfile.Olcrtc -> profiles.findDuplicate(profile.value) ?: profiles.insert(profile.value)
-                    is ImportedProfile.Standard -> profiles.findDuplicate(profile.value) ?: profiles.insert(profile.value)
+                when (profile) {
+                    is ProfileConfig.Olcrtc -> profiles.update(profileId, profile.value)
+                    is ProfileConfig.Standard -> profiles.update(profileId, profile.value)
                 }
             }
             activity?.runOnUiThread {
-                result.onSuccess { id ->
+                result.onSuccess {
+                    dialog.dismiss()
                     loadProfiles()
-                    activityHost.requestVpnPermission(id)
-                }
-                    .onFailure { binding.status.text = it.message ?: getString(R.string.invalid_profile) }
+                }.onFailure { binding.status.text = it.message ?: getString(R.string.invalid_profile) }
             }
         }
+    }
+
+    private fun confirmDeleteProfile(profileId: Long, name: String) {
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.profile_delete_title)
+            .setMessage(getString(R.string.profile_delete_message, name))
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                storage.execute {
+                    val result = runCatching { profiles.deleteLocal(profileId) }
+                    activity?.runOnUiThread {
+                        result.onSuccess {
+                            if (selectedProfileId == profileId) selectedProfileId = null
+                            loadProfiles()
+                        }.onFailure { binding.status.text = it.message ?: getString(R.string.invalid_profile) }
+                    }
+                }
+            }
+            .show()
     }
 
     private val activityHost get() = requireActivity() as MainActivity
     private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
 
-    private data class ImportPreview(val description: String, val profileUri: String?)
+    private data class ImportPreview(
+        val description: String,
+        val localProfileId: Long? = null,
+        val subscriptionImported: Boolean = false,
+        val multipartReceived: Int? = null,
+        val multipartTotal: Int? = null,
+    )
+
+    private data class ConnectionScreenModel(
+        val local: List<io.github.oleglog.olcrtc.client.data.ProfileSummary>,
+        val subscriptions: List<SubscriptionSection>,
+    )
+
+    private data class SubscriptionSection(
+        val subscription: SubscriptionSummary,
+        val profiles: List<SubscriptionProfileSummary>,
+    )
 
     companion object {
-        private const val MAX_IMPORT_FILE_BYTES = 4 * 1024 * 1024
+        private const val VPN_LATENCY_URL = "https://www.google.com/generate_204"
+        private const val LATENCY_TIMEOUT_MILLIS = 5_000
         private val BUSY_STATES = setOf(
             VpnState.PREPARING,
             VpnState.CONNECTING,

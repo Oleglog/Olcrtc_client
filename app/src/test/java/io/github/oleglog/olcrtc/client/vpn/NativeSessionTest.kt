@@ -69,8 +69,9 @@ class NativeSessionTest {
     @Test
     fun startsOlcrtcBeforeXray() {
         val events = mutableListOf<String>()
+        val core = RecordingCore(events)
         val session = NativeSession(
-            RecordingCore(events),
+            core,
             RecordingTunnel(events),
             establishTun = { error("tun") },
             verifyDatapath = {},
@@ -102,6 +103,7 @@ class NativeSessionTest {
             ),
             events,
         )
+        assertEquals(NativeOlcrtcConfig.WBSTREAM_READY_TIMEOUT_MILLIS, core.olcrtcReadyTimeoutMillis)
     }
 
     @Test
@@ -262,6 +264,8 @@ class NativeSessionTest {
         private val failOlcrtcStart: Boolean = false,
         private val failOlcrtcReadiness: Boolean = false,
     ) : NativeCore {
+        var olcrtcReadyTimeoutMillis = 0
+
         override fun setProtector(protector: SocketProtector) = Unit
 
         override fun startOlcrtc(config: NativeOlcrtcConfig) {
@@ -270,6 +274,7 @@ class NativeSessionTest {
         }
 
         override fun waitOlcrtcReady(timeoutMillis: Int) {
+            olcrtcReadyTimeoutMillis = timeoutMillis
             events += "olcrtc:ready"
             if (failOlcrtcReadiness) error("olcrtc readiness")
         }

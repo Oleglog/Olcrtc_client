@@ -32,6 +32,14 @@ class SubscriptionBundleTest {
     }
 
     @Test
+    fun unwrapsManagerInstanceQrResponse() {
+        val uri = "olcrtc://wbstream@r/room?k=${"b".repeat(64)}&t=vp8channel&c=client&a=token"
+
+        assertEquals(uri, ImportPayload.managerProfileUriOrNull("""{"uri":"$uri"}"""))
+        assertNull(ImportPayload.managerProfileUriOrNull("""{"type":"olcrtc-sub","v":2}"""))
+    }
+
+    @Test
     fun parsesCompactBundleAndReportsRejectedProfiles() {
         val bundle = SubscriptionBundleParser.parse(
             """{"type":"olcrtc-sub","v":2,"sv":"1.9.45","n":"Test","s":"test","u":"https://example.com/sub/test","d":false,"uc":true,"p":["$profile","https://example.com/profile"]}""",

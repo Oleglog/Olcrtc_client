@@ -1,10 +1,11 @@
 <resources>
     <string name="app_name">olcRTC Client</string>
     <string name="navigation_connection">Connection</string>
-    <string name="navigation_profiles">Profiles</string>
+    <string name="navigation_profiles">Subscriptions</string>
     <string name="navigation_statistics">Statistics</string>
     <string name="navigation_settings">Settings</string>
-    <string name="profiles_placeholder">No imported profiles</string>
+    <string name="profiles_placeholder">No saved connections</string>
+    <string name="subscriptions_placeholder">No subscriptions imported</string>
     <string name="profile_group_local">Saved connections</string>
     <string name="profile_field_name">Name</string>
     <string name="profile_field_provider">Provider</string>
@@ -46,8 +47,13 @@
     <string name="profile_reset">Reset</string>
     <string name="profile_test_latency">Test</string>
     <string name="profile_latency_result">Latency: %1$d ms</string>
+    <string name="profile_latency_connect_first">Connect this olcRTC profile before testing it</string>
     <string name="subscription_add">Add subscription</string>
     <string name="subscription_update_now">Update now</string>
+    <string name="subscription_update_failed">Subscription update failed</string>
+    <string name="subscription_edit">Edit subscription</string>
+    <string name="subscription_name">Name</string>
+    <string name="subscription_url">Subscription URL</string>
     <string name="subscription_details">Details</string>
     <string name="subscription_edit_hint">name=My subscription\nurl=https://example.com/sub\nkind=GENERIC</string>
     <string name="subscription_delete_title">Delete subscription?</string>
@@ -101,6 +107,7 @@
     <string name="settings_refresh_app_list">Refresh installed apps</string>
     <string name="settings_select_apps">Select applications</string>
     <string name="settings_select_apps_description">Choose which apps are affected by the selected per-app routing mode.</string>
+    <string name="settings_app_search">Search applications</string>
     <string name="settings_app_routing_summary">Installed apps: %1$d · selected: %2$d</string>
     <string name="settings_add_routing_rule">Add routing rule</string>
     <string name="settings_update_geo_assets">Update GeoIP/GeoSite assets</string>
@@ -143,6 +150,8 @@
     <string name="connect">Connect</string>
     <string name="add_connection">Add connection</string>
     <string name="connection_saved_profiles">Saved connections</string>
+    <string name="connection_manual_profiles">My connections</string>
+    <string name="connection_subscription_profiles">From subscriptions</string>
     <string name="connection_selected_profile">Selected: %1$s</string>
     <string name="import_and_connect">Import and connect</string>
     <string name="paste_clipboard">Paste</string>
@@ -159,6 +168,8 @@
     <string name="manual_olcrtc_hint">name=olcRTC\nprovider=wbstream\ntransport=vp8channel\nroom=room\nclient=client\nkey=64-hex\nauth=optional\ndns=77.88.8.8:53</string>
     <string name="manual_standard_hint">Paste vless://, vmess:// or trojan:// link</string>
     <string name="import_preview">Review the imported content, then tap Import and connect</string>
+    <string name="profile_saved">Connection saved</string>
+    <string name="subscription_imported">Subscription imported</string>
     <string name="import_source">Source: %1$s</string>
     <string name="source_deep_link">deep link</string>
     <string name="source_clipboard">clipboard</string>

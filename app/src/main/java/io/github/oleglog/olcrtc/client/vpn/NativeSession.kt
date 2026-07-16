@@ -26,7 +26,7 @@ internal class NativeSession(
             if (olcrtcConfig != null) {
                 stage("olcRTC startup") {
                     nativeCore.startOlcrtc(olcrtcConfig)
-                    nativeCore.waitOlcrtcReady(OLCRTC_READY_TIMEOUT_MILLIS)
+                    nativeCore.waitOlcrtcReady(olcrtcConfig.readyTimeoutMillis)
                 }
             }
             stage("Xray startup") {
@@ -102,7 +102,6 @@ internal class NativeSession(
     }
 
     private companion object {
-        const val OLCRTC_READY_TIMEOUT_MILLIS = 15_000
         const val XRAY_READY_TIMEOUT_MILLIS = 5_000
     }
 }

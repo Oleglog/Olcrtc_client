@@ -19,6 +19,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import androidx.core.content.FileProvider
+import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import io.github.oleglog.olcrtc.client.BuildConfig
@@ -214,26 +215,42 @@ class SettingsFragment : Fragment() {
             result.onSuccess { (apps, selectedPackages) ->
                 val checked = apps.map { it.packageName in selectedPackages }.toBooleanArray()
                 val list = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
-                val iconSize = 36.dp
-                apps.forEachIndexed { index, app ->
-                    list.addView(CheckBox(requireContext()).apply {
+                val rows = apps.mapIndexed { index, app ->
+                    CheckBox(requireContext()).apply {
                         text = "${app.label}\n${app.packageName}"
                         isChecked = checked[index]
                         setPadding(12.dp, 8.dp, 12.dp, 8.dp)
-                        runCatching { requireContext().packageManager.getApplicationIcon(app.packageName) }
-                            .onSuccess { icon ->
-                                icon.setBounds(0, 0, iconSize, iconSize)
-                                setCompoundDrawables(icon, null, null, null)
-                                compoundDrawablePadding = 12.dp
-                            }
                         setOnCheckedChangeListener { _, isChecked -> checked[index] = isChecked }
-                    })
+                    }.also(list::addView)
                 }
                 val scroll = ScrollView(requireContext()).apply { addView(list) }
+                val search = EditText(requireContext()).apply {
+                    setHint(R.string.settings_app_search)
+                    setSingleLine(true)
+                    doAfterTextChanged { text ->
+                        val query = text?.toString()?.trim().orEmpty()
+                        rows.forEachIndexed { index, row ->
+                            val app = apps[index]
+                            row.visibility = if (
+                                query.isEmpty() ||
+                                app.label.contains(query, ignoreCase = true) ||
+                                app.packageName.contains(query, ignoreCase = true)
+                            ) View.VISIBLE else View.GONE
+                        }
+                    }
+                }
+                val content = LinearLayout(requireContext()).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(16.dp, 0, 16.dp, 0)
+                    addView(search)
+                    addView(scroll, LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        480.dp,
+                    ))
+                }
                 AlertDialog.Builder(requireContext())
                     .setTitle(R.string.settings_select_apps)
-                    .setMessage(R.string.settings_select_apps_description)
-                    .setView(scroll)
+                    .setView(content)
                     .setNegativeButton(R.string.cancel, null)
                     .setPositiveButton(android.R.string.ok) { _, _ ->
                         val selected = apps.filterIndexed { index, _ -> checked[index] }
