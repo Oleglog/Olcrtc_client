@@ -1,6 +1,7 @@
 package io.github.oleglog.olcrtc.client.vpn
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -169,6 +170,26 @@ class NativeSessionTest {
     }
 
     @Test
+    fun reportsRuntimeTunnelExit() {
+        val events = mutableListOf<String>()
+        val tunnel = RecordingTunnel(events)
+        val session = NativeSession(
+            RecordingCore(events),
+            tunnel,
+            establishTun = { RecordingTun(events) },
+            verifyDatapath = {},
+        )
+
+        assertFalse(session.isRunning())
+        session.start(1080, "/assets", "{}", byteArrayOf(1))
+        assertTrue(session.isRunning())
+        tunnel.running = false
+        assertFalse(session.isRunning())
+        session.close()
+        assertFalse(session.isRunning())
+    }
+
+    @Test
     fun rejectsTunnelThatExitsDuringStartup() {
         val events = mutableListOf<String>()
         val session = NativeSession(
@@ -308,7 +329,7 @@ class NativeSessionTest {
 
     private class RecordingTunnel(
         private val events: MutableList<String>,
-        private val running: Boolean = true,
+        var running: Boolean = true,
     ) : NativeTunnel {
         override fun start(config: ByteArray, tunFd: Int) {
             events += "tunnel:start"

@@ -33,10 +33,7 @@ import io.github.oleglog.olcrtc.client.profile.ImportedProfile
 import io.github.oleglog.olcrtc.client.profile.ProfileUri
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import io.github.oleglog.olcrtc.client.vpn.VpnState
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.concurrent.Executors
-import kotlin.system.measureTimeMillis
 
 class ConnectionFragment : Fragment() {
     private var _binding: FragmentConnectionBinding? = null
@@ -318,7 +315,7 @@ class ConnectionFragment : Fragment() {
                             else -> false
                         }
                         require(selectedIsConnected) { getString(R.string.profile_latency_connect_first) }
-                        measureVpnLatency()
+                        activityHost.testConnectionLatency()
                     }
                 }
             }
@@ -363,30 +360,14 @@ class ConnectionFragment : Fragment() {
         setOnClickListener { action() }
     }
 
-    private fun measureVpnLatency(): Long {
-        var connection: HttpURLConnection? = null
-        return try {
-            measureTimeMillis {
-                connection = (URL(VPN_LATENCY_URL).openConnection() as HttpURLConnection).apply {
-                    connectTimeout = LATENCY_TIMEOUT_MILLIS
-                    readTimeout = LATENCY_TIMEOUT_MILLIS
-                    instanceFollowRedirects = false
-                    requestMethod = "GET"
-                }
-                require(connection!!.responseCode in 200..399) { "HTTP ${connection!!.responseCode}" }
-            }
-        } finally {
-            connection?.disconnect()
-        }
-    }
-
     private fun showVpnState(state: VpnState, error: String?) {
         if (_binding == null) return
         currentState = state
         when (state) {
             VpnState.CONNECTED -> {
-                connectedProfileId = selectedProfileId
-                connectedSubscriptionProfileId = selectedSubscriptionProfileId
+                val active = activityHost.activeProfileReference()
+                connectedProfileId = active?.removePrefix("local:")?.takeIf { it != active }?.toLongOrNull()
+                connectedSubscriptionProfileId = active?.removePrefix("subscription:")?.takeIf { it != active }
             }
             VpnState.DISCONNECTED, VpnState.ERROR, VpnState.NO_PROFILE -> {
                 connectedProfileId = null
@@ -630,8 +611,6 @@ class ConnectionFragment : Fragment() {
     )
 
     companion object {
-        private const val VPN_LATENCY_URL = "https://www.google.com/generate_204"
-        private const val LATENCY_TIMEOUT_MILLIS = 5_000
         private val BUSY_STATES = setOf(
             VpnState.PREPARING,
             VpnState.CONNECTING,

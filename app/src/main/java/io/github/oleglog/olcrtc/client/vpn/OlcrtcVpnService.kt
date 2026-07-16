@@ -1,5 +1,6 @@
 package io.github.oleglog.olcrtc.client.vpn
 
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -16,6 +17,7 @@ import android.net.VpnService
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.RemoteCallbackList
 import android.os.RemoteException
 import android.os.UserManager
@@ -44,6 +46,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.TimeUnit
+import kotlin.system.measureTimeMillis
 
 class OlcrtcVpnService : VpnService() {
     private val callbacks = RemoteCallbackList<IVpnStateCallback>()
@@ -59,8 +62,9 @@ class OlcrtcVpnService : VpnService() {
     private lateinit var connectionSessions: ConnectionSessionRepository
     private lateinit var diagnostics: DiagnosticsLogStore
     private lateinit var connectivity: ConnectivityManager
-    private var activeProfile: ProfileReference? = null
+    @Volatile private var activeProfile: ProfileReference? = null
     private var activeProfileInfo: ProfileInfo? = null
+    private var wakeLock: PowerManager.WakeLock? = null
     private var activeSessionId: Long? = null
     private var lastTrafficCounters = TrafficCounters()
     private var lastTrafficSampleAt = 0L
@@ -136,6 +140,10 @@ class OlcrtcVpnService : VpnService() {
             val result = subscriptionRefresher().refreshWithChanges(subscriptionId)
             return intArrayOf(if (result.success) 1 else 0, result.added, result.removed, result.total)
         }
+
+        override fun testConnectionLatency(): Long = measureConnectionLatency()
+
+        override fun getActiveProfileReference(): String? = activeProfile?.sessionId
 
         override fun getState(): Int = publishedState.ordinal
 
@@ -238,6 +246,7 @@ class OlcrtcVpnService : VpnService() {
         runCatching { connectivity.unregisterNetworkCallback(networkCallback) }
         runCatching { unregisterReceiver(userUnlockedReceiver) }
         activeNetwork = null
+        releaseWakeLock()
         stopNotificationTicker()
         finishConnectionSession("service destroyed")
         activeSocksPort = null
@@ -316,6 +325,7 @@ class OlcrtcVpnService : VpnService() {
         } catch (error: Throwable) {
             activeProfile = null
             activeProfileInfo = null
+            releaseWakeLock()
             persistVpnIntent(false, reference)
             transitionToError(error.message ?: error.javaClass.simpleName)
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -324,6 +334,7 @@ class OlcrtcVpnService : VpnService() {
 
         activeProfile = reference
         activeProfileInfo = ProfileInfo.from(profile)
+        acquireWakeLock()
         if (activeNetwork == null) {
             startForeground(NOTIFICATION_ID, notification())
             transition(VpnState.PREPARING)
@@ -387,6 +398,15 @@ class OlcrtcVpnService : VpnService() {
             userHttp = SubscriptionHttpClient(proxy = proxy),
             strictHttp = SubscriptionHttpClient(),
         )
+    }
+
+    private fun measureConnectionLatency(): Long {
+        check(publishedState == VpnState.CONNECTED) { "VPN is not connected" }
+        val socksPort = requireNotNull(activeSocksPort) { "VPN SOCKS endpoint is not ready" }
+        val proxy = Proxy(Proxy.Type.SOCKS, InetSocketAddress.createUnresolved("127.0.0.1", socksPort))
+        return measureTimeMillis {
+            SubscriptionHttpClient(proxy = proxy).get(CONNECTION_TEST_URL)
+        }
     }
 
     private fun handleNetworkAvailable(network: Network) {
@@ -477,6 +497,7 @@ class OlcrtcVpnService : VpnService() {
             finishConnectionSession(error.message ?: error.javaClass.simpleName)
             persistVpnIntent(false, activeProfile ?: persistedProfileReference())
             transition(VpnState.ERROR, error.message ?: error.javaClass.simpleName)
+            releaseWakeLock()
             stopForeground(STOP_FOREGROUND_REMOVE)
             return
         }
@@ -520,6 +541,7 @@ class OlcrtcVpnService : VpnService() {
             else -> Unit
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
+        releaseWakeLock()
         stopSelf()
     }
 
@@ -754,6 +776,11 @@ class OlcrtcVpnService : VpnService() {
 
     private fun sampleTrafficAndNotify() {
         if (publishedState != VpnState.CONNECTED) return
+        if (nativeSession?.isRunning() != true) {
+            diagnostics.append("error", "Native VPN tunnel stopped while connected")
+            requestNetworkReconnect(0)
+            return
+        }
         val now = System.currentTimeMillis()
         val counters = runCatching { nativeSession?.trafficCounters() ?: lastTrafficCounters }.getOrDefault(lastTrafficCounters)
         val elapsedMillis = (now - lastTrafficSampleAt).coerceAtLeast(1)
@@ -840,6 +867,22 @@ class OlcrtcVpnService : VpnService() {
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
+    @SuppressLint("WakelockTimeout")
+    private fun acquireWakeLock() {
+        if (wakeLock?.isHeld == true) return
+        wakeLock = getSystemService(PowerManager::class.java)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "$packageName:vpn")
+            .apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+    }
+
+    private fun releaseWakeLock() {
+        wakeLock?.let { if (it.isHeld) it.release() }
+        wakeLock = null
+    }
+
     private data class ProfileInfo(
         val name: String,
         val protocol: String,
@@ -891,6 +934,7 @@ class OlcrtcVpnService : VpnService() {
         const val VPN_IPV6_PREFIX = 128
         const val DATAPATH_TIMEOUT_MILLIS = 10_000
         const val MAX_RECONNECT_ATTEMPTS = 3
+        private const val CONNECTION_TEST_URL = "https://www.google.com/generate_204"
         private val RECONNECTABLE_STATES = setOf(
             VpnState.PREPARING,
             VpnState.CONNECTING,

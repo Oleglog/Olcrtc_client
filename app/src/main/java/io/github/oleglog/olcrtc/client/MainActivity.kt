@@ -8,7 +8,6 @@ import android.content.ServiceConnection
 import android.net.VpnService
 import android.os.Bundle
 import android.os.IBinder
-import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -42,10 +41,10 @@ class MainActivity : AppCompatActivity() {
 
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName, service: IBinder) {
-            vpn = IOlcrtcVpnService.Stub.asInterface(service).also { remote ->
-                remote.registerCallback(callback)
-                stateListener?.invoke(VpnState.entries.getOrNull(remote.state) ?: VpnState.ERROR, null)
-            }
+            val remote = IOlcrtcVpnService.Stub.asInterface(service)
+            vpn = remote
+            remote.registerCallback(callback)
+            stateListener?.invoke(VpnState.entries.getOrNull(remote.state) ?: VpnState.ERROR, null)
         }
 
         override fun onServiceDisconnected(name: ComponentName) {
@@ -66,7 +65,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         pendingProfileId = savedInstanceState?.getLong(KEY_PENDING_PROFILE_ID)?.takeIf { it > 0 }
@@ -121,6 +119,10 @@ class MainActivity : AppCompatActivity() {
     fun stopVpn() {
         vpn?.stop()
     }
+
+    fun activeProfileReference(): String? = runCatching { vpn?.activeProfileReference }.getOrNull()
+
+    fun testConnectionLatency(): Long = requireNotNull(vpn) { "VPN service is not connected" }.testConnectionLatency()
 
     internal fun refreshSubscription(subscriptionId: Long): SubscriptionRefresher.Result? {
         val values = vpn?.refreshSubscription(subscriptionId) ?: return null

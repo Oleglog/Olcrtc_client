@@ -55,6 +55,8 @@ internal class NativeSession(
 
     fun trafficCounters(): TrafficCounters = hevTunnel.trafficCounters()
 
+    fun isRunning(): Boolean = !closed && coreStarted && tun != null && hevTunnel.isRunning()
+
     private inline fun stage(
         name: String,
         action: () -> Unit,
