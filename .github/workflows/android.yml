@@ -26,7 +26,8 @@ jobs:
           cache: true
           cache-dependency-path: native/mobilecore/go.mod
       - name: Cache mobilecore AAR
-        uses: actions/cache@v4
+        id: mobilecore-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/go/bin/gomobile
@@ -48,6 +49,15 @@ jobs:
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
+          MOBILECORE_TARGET: android
+      - name: Save mobilecore AAR cache
+        if: steps.mobilecore-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/go/bin/gomobile
+            app/libs/mobilecore.aar
+          key: ${{ steps.mobilecore-cache.outputs.cache-primary-key }}
       - run: scripts/build_hev.sh
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358

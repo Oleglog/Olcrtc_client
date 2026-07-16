@@ -40,7 +40,7 @@ jobs:
           path: |
             ~/go/bin/gomobile
             app/libs/mobilecore.aar
-          key: mobilecore-${{ runner.os }}-android-arm-arm64-${{ hashFiles('scripts/build_mobilecore.sh', 'native/mobilecore/go.mod', 'native/mobilecore/go.sum', 'native/mobilecore/**/*.go') }}
+          key: mobilecore-${{ runner.os }}-android-all-${{ hashFiles('scripts/build_mobilecore.sh', 'native/mobilecore/go.mod', 'native/mobilecore/go.sum', 'native/mobilecore/**/*.go') }}
 
       - name: Cache gomobile and HEV sources
         uses: actions/cache@v4
@@ -79,7 +79,7 @@ jobs:
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
-          MOBILECORE_TARGET: android/arm,android/arm64
+          MOBILECORE_TARGET: android
 
       - name: Build HEV tunnel
         run: scripts/build_hev.sh
