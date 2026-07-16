@@ -21,10 +21,11 @@ object OlcrtcUri {
     fun parse(raw: String): OlcrtcProfile {
         val uri = URI(raw)
         require(uri.scheme.equals("olcrtc", ignoreCase = true)) { "Unsupported URI scheme" }
-        val provider = uri.userInfo?.let(OlcrtcProfile.Provider::parse)
+        val authority = uri.rawAuthority?.split('@')?.takeIf { it.size == 2 }
+        val provider = (uri.userInfo ?: authority?.firstOrNull()?.let(::decode))
+            ?.let(OlcrtcProfile.Provider::parse)
             ?: throw IllegalArgumentException("Provider is required")
-        val roomHost = uri.host ?: uri.rawAuthority
-            ?.substringAfter('@', missingDelimiterValue = "")
+        val roomHost = uri.host ?: authority?.lastOrNull()
             ?.takeIf { it.isNotBlank() && ':' !in it }
         require(!roomHost.isNullOrBlank()) { "olcRTC URI host is required" }
 
