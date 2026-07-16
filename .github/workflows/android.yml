@@ -25,6 +25,13 @@ jobs:
           go-version: "1.25.7"
           cache: true
           cache-dependency-path: native/mobilecore/go.mod
+      - name: Cache mobilecore AAR
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/go/bin/gomobile
+            app/libs/mobilecore.aar
+          key: mobilecore-${{ runner.os }}-android-all-${{ hashFiles('scripts/build_mobilecore.sh', 'native/mobilecore/go.mod', 'native/mobilecore/go.sum', 'native/mobilecore/**/*.go') }}
       - name: Cache gomobile and HEV sources
         uses: actions/cache@v4
         with:
