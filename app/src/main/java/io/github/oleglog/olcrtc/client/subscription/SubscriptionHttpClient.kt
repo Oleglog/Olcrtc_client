@@ -49,10 +49,13 @@ internal class SubscriptionHttpClient(
         repeat(MAX_REDIRECTS + 1) { redirects ->
             val connection = open(current.toURL()).apply {
                 instanceFollowRedirects = false
+                useCaches = false
                 requestMethod = "GET"
                 connectTimeout = TIMEOUT_MS
                 readTimeout = TIMEOUT_MS
                 setRequestProperty("Accept", "text/plain, application/octet-stream, application/json")
+                setRequestProperty("Cache-Control", "no-cache, no-store")
+                setRequestProperty("Pragma", "no-cache")
                 etag?.let { setRequestProperty("If-None-Match", it) }
                 lastModified?.let { setRequestProperty("If-Modified-Since", it) }
                 socketFactory?.let { sslSocketFactory = it }

@@ -2,6 +2,7 @@ package io.github.oleglog.olcrtc.client.subscription
 
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
@@ -33,6 +34,10 @@ class SubscriptionHttpClientTest {
         assertEquals("new-date", result.lastModified)
         assertEquals("old-etag", redirect.requestProperties["If-None-Match"]?.single())
         assertEquals("old-date", success.requestProperties["If-Modified-Since"]?.single())
+        assertEquals("no-cache, no-store", redirect.requestProperties["Cache-Control"]?.single())
+        assertEquals("no-cache", success.requestProperties["Pragma"]?.single())
+        assertFalse(redirect.useCaches)
+        assertFalse(success.useCaches)
         assertTrue(redirect.disconnected)
         assertTrue(success.disconnected)
     }

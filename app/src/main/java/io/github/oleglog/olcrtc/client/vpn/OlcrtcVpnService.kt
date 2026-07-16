@@ -578,10 +578,14 @@ class OlcrtcVpnService : VpnService() {
     }
 
     private fun applyPerAppPolicy(builder: Builder, policy: PerAppPolicy) {
-        if (policy.mode == PerAppPolicy.Mode.ALL) return
+        val packages = policy.packagesWithVpnAppExcluded(packageName)
+        if (policy.mode == PerAppPolicy.Mode.ALL) {
+            builder.addDisallowedApplication(packageName)
+            return
+        }
 
         var applied = 0
-        policy.packages.sorted().forEach { packageName ->
+        packages.sorted().forEach { packageName ->
             try {
                 when (policy.mode) {
                     PerAppPolicy.Mode.EXCLUDE_SELECTED -> builder.addDisallowedApplication(packageName)
