@@ -39,6 +39,10 @@ internal object GomobileCore : NativeCore {
         Mobilecore.waitXrayReady(socksPort.toLong(), timeoutMillis.toLong())
     }
 
+    override fun isXrayRunning(): Boolean = Mobilecore.isXrayRunning()
+
+    override fun isOlcrtcRunning(): Boolean = Mobilecore.isOlcrtcRunning()
+
     fun urlTest(url: String, timeoutMillis: Int): Long = Mobilecore.urlTest(url, timeoutMillis.toLong())
 
     fun validateXrayConfig(assetDirectory: String, configJson: String) {

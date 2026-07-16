@@ -35,9 +35,11 @@ import io.github.oleglog.olcrtc.client.routing.RoutingSettings
 import io.github.oleglog.olcrtc.client.statistics.ConnectionSessionRepository
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionHttpClient
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.InetAddress
+import java.io.DataInputStream
+import java.io.DataOutputStream
+import java.net.InetSocketAddress
+import java.net.Proxy
+import java.net.Socket
 import java.net.SocketTimeoutException
 import java.util.Locale
 import java.util.concurrent.Executors
@@ -68,10 +70,13 @@ class OlcrtcVpnService : VpnService() {
     private var trafficSpeedText = ""
     private var notificationTicker: ScheduledFuture<*>? = null
     @Volatile private var activeSocksPort: Int? = null
+    @Volatile private var activeDnsEndpoint: DnsEndpoint? = null
     private var nativeSession: NativeSession? = null
     private var reconnectFuture: ScheduledFuture<*>? = null
     private var networkReconnectRequested = false
     private var reconnectAttemptCount = 0
+    private var healthProbeInFlight = false
+    private var lastHealthProbeAt = 0L
     @Volatile private var activeNetwork: Network? = null
 
     private val userUnlockedReceiver = object : BroadcastReceiver() {
@@ -247,6 +252,7 @@ class OlcrtcVpnService : VpnService() {
         stopNotificationTicker()
         finishConnectionSession("service destroyed")
         activeSocksPort = null
+        activeDnsEndpoint = null
         runCatching { nativeSession?.close() }
         nativeSession = null
         commands.shutdownNow()
@@ -584,7 +590,7 @@ class OlcrtcVpnService : VpnService() {
             .addAddress(VPN_IPV6_ADDRESS, VPN_IPV6_PREFIX)
             .addRoute("0.0.0.0", 0)
             .addRoute("::", 0)
-            .addDnsServer(dns.address)
+            .addDnsServer(NativeConfig.VPN_DNS_ADDRESS)
         activeNetwork?.let { builder.setUnderlyingNetworks(arrayOf(it)) }
         applyPerAppPolicy(builder, routingSettings.getPerAppPolicy())
         val descriptor = builder.establish()
@@ -666,7 +672,7 @@ class OlcrtcVpnService : VpnService() {
             nativeCore = GomobileCore,
             hevTunnel = HevTunnel(),
             establishTun = { establishTun(dns) },
-            verifyDatapath = { verifyDatapath(dns) },
+            verifyDatapath = { verifyDatapath(xraySocksPort, dns) },
             reportStage = { message, error ->
                 diagnostics.append(
                     if (error == null) "info" else "error",
@@ -683,10 +689,22 @@ class OlcrtcVpnService : VpnService() {
                 olcrtcConfig = olcrtcConfig,
             )
             activeSocksPort = xraySocksPort
+            activeDnsEndpoint = dns
         }
     }
 
-    private fun verifyDatapath(dns: DnsEndpoint) {
+    private fun verifyDatapath(socksPort: Int, dns: DnsEndpoint) {
+        try {
+            queryDnsThroughTunnel(socksPort, dns, DATAPATH_TIMEOUT_MILLIS)
+        } catch (error: SocketTimeoutException) {
+            throw IllegalStateException(
+                "VPN datapath timed out",
+                error,
+            )
+        }
+    }
+
+    private fun queryDnsThroughTunnel(socksPort: Int, dns: DnsEndpoint, timeoutMillis: Int) {
         val queryId = ThreadLocalRandom.current().nextInt(0x10000)
         val query = byteArrayOf(
             (queryId ushr 8).toByte(), queryId.toByte(),
@@ -696,23 +714,18 @@ class OlcrtcVpnService : VpnService() {
             3, 'c'.code.toByte(), 'o'.code.toByte(), 'm'.code.toByte(),
             0, 0, 1, 0, 1,
         )
-        DatagramSocket().use { socket ->
-            socket.soTimeout = DATAPATH_TIMEOUT_MILLIS
-            socket.connect(InetAddress.getByName(dns.address), dns.port)
-            socket.send(DatagramPacket(query, query.size))
-            val response = ByteArray(512)
-            val packet = DatagramPacket(response, response.size)
-            try {
-                socket.receive(packet)
-            } catch (error: SocketTimeoutException) {
-                throw IllegalStateException(
-                    "VPN datapath timed out",
-                    error,
-                )
-            }
+        tunnelSocket(socksPort, dns, timeoutMillis).use { socket ->
+            val output = DataOutputStream(socket.getOutputStream())
+            output.writeShort(query.size)
+            output.write(query)
+            output.flush()
+            val input = DataInputStream(socket.getInputStream())
+            val response = ByteArray(input.readUnsignedShort().also { length ->
+                require(length in 12..MAX_DNS_RESPONSE_BYTES) { "invalid VPN datapath response length" }
+            })
+            input.readFully(response)
             check(
-                packet.length >= 12 &&
-                    response[0] == query[0] &&
+                response[0] == query[0] &&
                     response[1] == query[1] &&
                     response[2].toInt() and 0x80 != 0
             ) {
@@ -723,6 +736,7 @@ class OlcrtcVpnService : VpnService() {
 
     private fun closeNativeSession() {
         activeSocksPort = null
+        activeDnsEndpoint = null
         val session = nativeSession
         nativeSession = null
         session?.close()
@@ -761,6 +775,7 @@ class OlcrtcVpnService : VpnService() {
         if (notificationTicker != null) return
         lastTrafficCounters = runCatching { nativeSession?.trafficCounters() ?: TrafficCounters() }.getOrDefault(TrafficCounters())
         lastTrafficSampleAt = System.currentTimeMillis()
+        lastHealthProbeAt = lastTrafficSampleAt
         notificationTicker = commands.scheduleAtFixedRate({ sampleTrafficAndNotify() }, 1, 1, TimeUnit.SECONDS)
     }
 
@@ -778,6 +793,7 @@ class OlcrtcVpnService : VpnService() {
             return
         }
         val now = System.currentTimeMillis()
+        scheduleTunnelHealthProbe(now)
         val counters = runCatching { nativeSession?.trafficCounters() ?: lastTrafficCounters }.getOrDefault(lastTrafficCounters)
         val elapsedMillis = (now - lastTrafficSampleAt).coerceAtLeast(1)
         val upPerSecond = ((counters.bytesUp - lastTrafficCounters.bytesUp).coerceAtLeast(0) * 1000) / elapsedMillis
@@ -790,6 +806,53 @@ class OlcrtcVpnService : VpnService() {
             formatBytesPerSecond(downPerSecond),
         )
         updateNotification()
+    }
+
+    private fun scheduleTunnelHealthProbe(now: Long) {
+        if (healthProbeInFlight || now - lastHealthProbeAt < TUNNEL_HEALTH_INTERVAL_MILLIS) return
+        val session = nativeSession ?: return
+        val socksPort = activeSocksPort ?: return
+        val dns = activeDnsEndpoint ?: return
+        healthProbeInFlight = true
+        lastHealthProbeAt = now
+        subscriptionRefresh.execute {
+            val failure = runCatching { probeTunnel(socksPort, dns) }.exceptionOrNull()
+            runCatching {
+                commands.execute {
+                    healthProbeInFlight = false
+                    if (
+                        failure != null && publishedState == VpnState.CONNECTED &&
+                        nativeSession === session && activeSocksPort == socksPort
+                    ) {
+                        diagnostics.append("error", "VPN tunnel health probe failed", failure)
+                        requestNetworkReconnect(0)
+                    }
+                }
+            }
+        }
+    }
+
+    private fun probeTunnel(socksPort: Int, dns: DnsEndpoint) {
+        queryDnsThroughTunnel(socksPort, dns, TUNNEL_HEALTH_TIMEOUT_MILLIS)
+    }
+
+    private fun tunnelSocket(socksPort: Int, dns: DnsEndpoint, timeoutMillis: Int): Socket {
+        val proxy = Proxy(
+            Proxy.Type.SOCKS,
+            InetSocketAddress.createUnresolved("127.0.0.1", socksPort),
+        )
+        val socket = Socket(proxy)
+        try {
+            socket.soTimeout = timeoutMillis
+            socket.connect(
+                InetSocketAddress.createUnresolved(dns.address, dns.port),
+                timeoutMillis,
+            )
+            return socket
+        } catch (error: Throwable) {
+            runCatching { socket.close() }
+            throw error
+        }
     }
 
     private fun updateNotification() {
@@ -929,9 +992,12 @@ class OlcrtcVpnService : VpnService() {
         const val VPN_IPV6_ADDRESS = "fd00::2"
         const val VPN_IPV6_PREFIX = 128
         const val DATAPATH_TIMEOUT_MILLIS = 10_000
+        const val MAX_DNS_RESPONSE_BYTES = 65_535
         const val MAX_RECONNECT_ATTEMPTS = 3
         private const val CONNECTION_TEST_URL = "https://www.google.com/generate_204"
         private const val CONNECTION_TEST_TIMEOUT_MILLIS = 5_000
+        private const val TUNNEL_HEALTH_INTERVAL_MILLIS = 15_000L
+        private const val TUNNEL_HEALTH_TIMEOUT_MILLIS = 30_000
         private val RECONNECTABLE_STATES = setOf(
             VpnState.PREPARING,
             VpnState.CONNECTING,

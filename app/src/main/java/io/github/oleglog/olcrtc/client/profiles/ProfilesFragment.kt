@@ -8,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -110,16 +111,23 @@ class ProfilesFragment : Fragment() {
             })
             addView(LinearLayout(requireContext()).apply {
                 orientation = LinearLayout.HORIZONTAL
-                gravity = android.view.Gravity.END
-                addView(MaterialButton(
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                val progress = ProgressBar(requireContext()).apply {
+                    visibility = View.GONE
+                    isIndeterminate = true
+                }
+                val update = MaterialButton(
                     requireContext(),
                     null,
                     com.google.android.material.R.attr.materialButtonOutlinedStyle,
                 ).apply {
                     setText(R.string.subscription_update_now)
                     cornerRadius = 8.dp
-                    setOnClickListener { updateSubscription(subscription.id) }
-                })
+                    setOnClickListener { updateSubscription(subscription.id, this, progress) }
+                }
+                addView(update)
+                addView(progress, LinearLayout.LayoutParams(24.dp, 24.dp).apply { marginStart = 8.dp })
+                addView(View(requireContext()), LinearLayout.LayoutParams(0, 0, 1f))
                 addView(iconButton(R.drawable.ic_edit_20, R.string.edit) {
                     editSubscription(subscription)
                 })
@@ -146,6 +154,7 @@ class ProfilesFragment : Fragment() {
             minimumHeight = 0
             iconSize = 20.dp
             iconPadding = 0
+            iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
             insetTop = 0
             insetBottom = 0
             cornerRadius = 8.dp
@@ -202,8 +211,10 @@ class ProfilesFragment : Fragment() {
             is BundleImportResult.Pending -> error("${bundle.received}/${bundle.total}")
         }
 
-    private fun updateSubscription(subscriptionId: Long) {
+    private fun updateSubscription(subscriptionId: Long, button: MaterialButton, progress: ProgressBar) {
         if (storage.isShutdown) return
+        button.isEnabled = false
+        progress.visibility = View.VISIBLE
         storage.execute {
             val result = runCatching {
                 refreshSubscription(subscriptionId).also {
@@ -214,6 +225,8 @@ class ProfilesFragment : Fragment() {
             }
             activity?.runOnUiThread {
                 if (_binding == null) return@runOnUiThread
+                button.isEnabled = true
+                progress.visibility = View.GONE
                 result.onSuccess(::showSubscriptionRefreshResult).onFailure(::showError)
                 loadSubscriptions()
             }

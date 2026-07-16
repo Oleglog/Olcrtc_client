@@ -190,6 +190,42 @@ class NativeSessionTest {
     }
 
     @Test
+    fun reportsRuntimeXrayExitWhileTunnelStillRuns() {
+        val events = mutableListOf<String>()
+        val core = RecordingCore(events)
+        val session = NativeSession(
+            core,
+            RecordingTunnel(events),
+            establishTun = { RecordingTun(events) },
+            verifyDatapath = {},
+        )
+
+        session.start(1080, "/assets", "{}", byteArrayOf(1))
+        assertTrue(session.isRunning())
+        core.xrayRunning = false
+        assertFalse(session.isRunning())
+        session.close()
+    }
+
+    @Test
+    fun reportsRuntimeOlcrtcExitWhileTunnelStillRuns() {
+        val events = mutableListOf<String>()
+        val core = RecordingCore(events)
+        val session = NativeSession(
+            core,
+            RecordingTunnel(events),
+            establishTun = { RecordingTun(events) },
+            verifyDatapath = {},
+        )
+
+        session.start(1080, "/assets", "{}", byteArrayOf(1), olcrtcConfig())
+        assertTrue(session.isRunning())
+        core.olcrtcRunning = false
+        assertFalse(session.isRunning())
+        session.close()
+    }
+
+    @Test
     fun rejectsTunnelThatExitsDuringStartup() {
         val events = mutableListOf<String>()
         val session = NativeSession(
@@ -290,12 +326,15 @@ class NativeSessionTest {
         private val failOlcrtcReadiness: Boolean = false,
     ) : NativeCore {
         var olcrtcReadyTimeoutMillis = 0
+        var xrayRunning = false
+        var olcrtcRunning = false
 
         override fun setProtector(protector: SocketProtector) = Unit
 
         override fun startOlcrtc(config: NativeOlcrtcConfig) {
             events += "olcrtc:start"
             if (failOlcrtcStart) error("olcrtc start")
+            olcrtcRunning = true
         }
 
         override fun waitOlcrtcReady(timeoutMillis: Int) {
@@ -307,6 +346,7 @@ class NativeSessionTest {
         override fun startXray(assetDirectory: String, configJson: String) {
             assertEquals("/assets", assetDirectory)
             events += "xray:start"
+            xrayRunning = true
         }
 
         override fun waitXrayReady(socksPort: Int, timeoutMillis: Int) {
@@ -314,8 +354,14 @@ class NativeSessionTest {
             if (failReadiness) error("not ready")
         }
 
+        override fun isXrayRunning(): Boolean = xrayRunning
+
+        override fun isOlcrtcRunning(): Boolean = olcrtcRunning
+
         override fun stopAll() {
             events += "core:stop"
+            xrayRunning = false
+            olcrtcRunning = false
         }
     }
 

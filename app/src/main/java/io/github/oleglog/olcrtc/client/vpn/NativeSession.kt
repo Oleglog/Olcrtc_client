@@ -10,6 +10,7 @@ internal class NativeSession(
     private val reportStage: (String, Throwable?) -> Unit = { _, _ -> },
 ) : Closeable {
     private var coreStarted = false
+    private var olcrtcStarted = false
     private var tun: TunDescriptor? = null
     private var closed = false
 
@@ -28,6 +29,7 @@ internal class NativeSession(
             if (olcrtcConfig != null) {
                 stage("olcRTC startup") {
                     nativeCore.startOlcrtc(olcrtcConfig)
+                    olcrtcStarted = true
                     nativeCore.waitOlcrtcReady(olcrtcConfig.readyTimeoutMillis)
                 }
             }
@@ -55,7 +57,9 @@ internal class NativeSession(
 
     fun trafficCounters(): TrafficCounters = hevTunnel.trafficCounters()
 
-    fun isRunning(): Boolean = !closed && coreStarted && tun != null && hevTunnel.isRunning()
+    fun isRunning(): Boolean =
+        !closed && coreStarted && tun != null && hevTunnel.isRunning() &&
+            nativeCore.isXrayRunning() && (!olcrtcStarted || nativeCore.isOlcrtcRunning())
 
     private inline fun stage(
         name: String,
@@ -98,6 +102,7 @@ internal class NativeSession(
                 if (failure == null) failure = error else failure.addSuppressed(error)
             } finally {
                 coreStarted = false
+                olcrtcStarted = false
             }
         }
         if (original == null && failure != null) throw failure

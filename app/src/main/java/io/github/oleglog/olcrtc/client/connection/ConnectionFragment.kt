@@ -220,6 +220,7 @@ class ConnectionFragment : Fragment() {
             minimumHeight = 0
             iconSize = 20.dp
             iconPadding = 0
+            iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
             insetTop = 0
             insetBottom = 0
             cornerRadius = 8.dp
@@ -262,7 +263,7 @@ class ConnectionFragment : Fragment() {
             hasConnectedProfile = connectedProfileId != null || connectedSubscriptionProfileId != null,
         )
         val strokeAttr = when (state) {
-            ConnectionCardState.CONNECTED -> android.R.attr.colorPrimary
+            ConnectionCardState.CONNECTED -> com.google.android.material.R.attr.colorOnSurface
             ConnectionCardState.SELECTED -> com.google.android.material.R.attr.colorSecondary
             ConnectionCardState.INACTIVE -> com.google.android.material.R.attr.colorOutline
         }
@@ -277,13 +278,7 @@ class ConnectionFragment : Fragment() {
             state == ConnectionCardState.INACTIVE &&
             (connectedProfileId != null || connectedSubscriptionProfileId != null)
         ) 0.55f else 1f
-        card.setCardBackgroundColor(resolveColor(
-            if (state == ConnectionCardState.CONNECTED) {
-                com.google.android.material.R.attr.colorPrimaryContainer
-            } else {
-                com.google.android.material.R.attr.colorSurface
-            },
-        ))
+        card.setCardBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurface))
     }
 
     private fun resolveColor(attribute: Int): Int {

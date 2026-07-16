@@ -56,7 +56,7 @@ internal object NativeConfig {
         {
           "log": { "loglevel": "warning" },
           "dns": {
-            "servers": [{ "address": "${escapeJson(dns.address)}", "port": ${dns.port}, "tag": "$DNS_TAG" }]
+            "servers": [{ "address": "${escapeJson(dnsTcpUrl(dns))}", "tag": "$DNS_TAG" }]
           },
           "inbounds": [{
             "listen": "127.0.0.1",
@@ -66,6 +66,7 @@ internal object NativeConfig {
           }],
           "outbounds": [
             $proxyOutbound,
+            { "protocol": "dns", "tag": "$DNS_OUT_TAG", "settings": { "nonIPQuery": "reject" } },
             { "protocol": "freedom", "tag": "direct" },
             { "protocol": "blackhole", "tag": "block" }
           ]${routing(routingRules, routingPolicy)}
@@ -76,6 +77,7 @@ internal object NativeConfig {
         val xrayRules = buildList {
             add("{ \"type\": \"field\", \"inboundTag\": [\"$LATENCY_TEST_TAG\"], \"outboundTag\": \"proxy\" }")
             add("{ \"type\": \"field\", \"inboundTag\": [\"$DNS_TAG\"], \"outboundTag\": \"proxy\" }")
+            add("{ \"type\": \"field\", \"ip\": [\"$VPN_DNS_ADDRESS\"], \"port\": \"53\", \"network\": \"tcp,udp\", \"outboundTag\": \"$DNS_OUT_TAG\" }")
             rules.forEach { rule ->
                 val field = when (rule.matchType) {
                     RoutingRule.MatchType.DOMAIN -> "domain" to "full:${escapeJson(rule.value)}"
@@ -172,6 +174,11 @@ internal object NativeConfig {
 
     private fun StandardProfile.json(value: String): String = escapeJson(value)
 
+    private fun dnsTcpUrl(dns: DnsEndpoint): String {
+        val host = if (':' in dns.address) "[${dns.address}]" else dns.address
+        return "tcp://$host:${dns.port}"
+    }
+
     private fun escapeJson(value: String): String = buildString {
         value.forEach { character ->
             when (character) {
@@ -186,7 +193,9 @@ internal object NativeConfig {
     }
 
     private const val DNS_TAG = "dns-proxy"
+    private const val DNS_OUT_TAG = "dns-out"
     private const val LATENCY_TEST_TAG = "latency-test"
+    const val VPN_DNS_ADDRESS = "10.0.0.1"
     private val LAN_RANGES = listOf(
         "10.0.0.0/8",
         "100.64.0.0/10",

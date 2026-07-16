@@ -43,8 +43,9 @@
                 android:id="@+id/add_profile"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
-                android:layout_height="52dp"
+                android:layout_height="64dp"
                 android:layout_weight="1"
+                android:maxLines="2"
                 android:text="@string/add_connection"
                 app:cornerRadius="10dp" />
 
@@ -52,7 +53,7 @@
                 android:id="@+id/test_selected"
                 style="?attr/materialButtonOutlinedStyle"
                 android:layout_width="0dp"
-                android:layout_height="52dp"
+                android:layout_height="64dp"
                 android:layout_marginStart="8dp"
                 android:layout_weight="1"
                 android:text="@string/profile_test_latency"

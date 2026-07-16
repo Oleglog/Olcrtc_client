@@ -8,6 +8,8 @@ internal interface NativeCore {
     fun waitOlcrtcReady(timeoutMillis: Int)
     fun startXray(assetDirectory: String, configJson: String)
     fun waitXrayReady(socksPort: Int, timeoutMillis: Int)
+    fun isXrayRunning(): Boolean
+    fun isOlcrtcRunning(): Boolean
     fun trafficCounters(): TrafficCounters = TrafficCounters()
     fun stopAll()
 }

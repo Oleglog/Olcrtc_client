@@ -93,11 +93,15 @@ class NativeConfigTest {
             routingRules = listOf(userRule),
         )
 
-        assertTrue(json.contains("\"address\": \"2001:4860:4860:0:0:0:0:8888\", \"port\": 5353, \"tag\": \"dns-proxy\""))
+        assertTrue(json.contains("\"address\": \"tcp://[2001:4860:4860:0:0:0:0:8888]:5353\", \"tag\": \"dns-proxy\""))
+        assertTrue(json.contains("\"protocol\": \"dns\", \"tag\": \"dns-out\""))
         val dnsRule = json.indexOf("\"inboundTag\": [\"dns-proxy\"]")
+        val interceptedDnsRule = json.indexOf("\"ip\": [\"${NativeConfig.VPN_DNS_ADDRESS}\"]")
         val userRuleIndex = json.indexOf("full:blocked.example")
         assertTrue(dnsRule >= 0)
         assertTrue(dnsRule < userRuleIndex)
+        assertTrue(interceptedDnsRule in 0..<userRuleIndex)
+        assertTrue(json.contains("\"port\": \"53\", \"network\": \"tcp,udp\", \"outboundTag\": \"dns-out\""))
     }
 
     @Test
