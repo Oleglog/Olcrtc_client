@@ -8,6 +8,7 @@ import io.github.oleglog.olcrtc.client.data.SecretCipher
 import io.github.oleglog.olcrtc.client.importer.SubscriptionBundle
 import io.github.oleglog.olcrtc.client.profile.ImportedProfile
 import io.github.oleglog.olcrtc.client.profile.olcrtc.OlcrtcProfile
+import io.github.oleglog.olcrtc.client.profile.standard.StandardProfile
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -99,9 +100,13 @@ class SubscriptionRefresherTest {
             strictHttp = SubscriptionHttpClient { strictResponses.removeFirst() },
         )
 
-        assertTrue(refresher.refresh(subscriptionId, now = 3))
+        val result = refresher.refreshWithChanges(subscriptionId, now = 3)
 
         val subscription = database.subscriptions().getSubscription(subscriptionId)!!
+        assertTrue(result.success)
+        assertEquals(1, result.added)
+        assertEquals(1, result.removed)
+        assertEquals(1, result.total)
         assertEquals(1, repository.getSubscriptionProfiles(subscriptionId).size)
         assertTrue(repository.getSubscriptionProfiles(subscriptionId).single() is ImportedProfile.Standard)
         assertEquals(3L, subscription.lastSuccessAt)
@@ -133,7 +138,45 @@ class SubscriptionRefresherTest {
         assertEquals(null, connection.requestHeaders["If-Modified-Since"])
     }
 
-    private fun bundle(url: String = "https://example.com/sub") = SubscriptionBundle(
+    @Test
+    fun manualRefreshRestoresDeletedProfileAndReportsAddition() {
+        val profile = ImportedProfile.Standard(StandardProfile(
+            name = "VLESS",
+            protocol = StandardProfile.Protocol.VLESS,
+            address = "example.com",
+            port = 443,
+            uuid = "00000000-0000-0000-0000-000000000001",
+        ))
+        val subscriptionId = repository.insertSubscription(bundle(profiles = listOf(profile)), now = 1)
+        val groupId = database.subscriptions().getSubscriptionGroup(subscriptionId)!!.groupId
+        repository.deleteSubscriptionProfile(database.subscriptions().getProfiles(groupId).single().id, now = 2)
+        val payload = "vless://00000000-0000-0000-0000-000000000001@example.com:443?encryption=none&type=tcp&security=none#VLESS"
+        val refresher = SubscriptionRefresher(
+            repository,
+            userHttp = SubscriptionHttpClient { FakeConnection(200, payload.encodeToByteArray()) },
+            strictHttp = SubscriptionHttpClient { FakeConnection(500) },
+        )
+
+        val result = refresher.refreshWithChanges(subscriptionId, now = 3)
+
+        assertTrue(result.success)
+        assertEquals(1, result.added)
+        assertEquals(0, result.removed)
+        assertEquals(1, result.total)
+        assertEquals(1, repository.getSubscriptionProfiles(subscriptionId).size)
+    }
+
+    private fun bundle(
+        url: String = "https://example.com/sub",
+        profiles: List<ImportedProfile> = listOf(ImportedProfile.Olcrtc(OlcrtcProfile(
+            name = "olcRTC",
+            provider = OlcrtcProfile.Provider.WBSTREAM,
+            transport = OlcrtcProfile.Transport.VP8CHANNEL,
+            roomId = "room",
+            clientId = "client",
+            keyHex = "a".repeat(64),
+        ))),
+    ) = SubscriptionBundle(
         name = "Test",
         slug = "test",
         url = url,
@@ -147,14 +190,7 @@ class SubscriptionRefresherTest {
         mirrorKey = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32) { it.toByte() }),
         deduplication = true,
         updateWhenConnectedOnly = false,
-        profiles = listOf(ImportedProfile.Olcrtc(OlcrtcProfile(
-            name = "olcRTC",
-            provider = OlcrtcProfile.Provider.WBSTREAM,
-            transport = OlcrtcProfile.Transport.VP8CHANNEL,
-            roomId = "room",
-            clientId = "client",
-            keyHex = "a".repeat(64),
-        ))),
+        profiles = profiles,
         rejectedProfiles = emptyList(),
     )
 

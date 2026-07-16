@@ -385,7 +385,7 @@ class OlcrtcVpnService : VpnService() {
         return SubscriptionRefresher(
             profiles,
             userHttp = SubscriptionHttpClient(proxy = proxy),
-            strictHttp = SubscriptionHttpClient(proxy = proxy),
+            strictHttp = SubscriptionHttpClient(),
         )
     }
 

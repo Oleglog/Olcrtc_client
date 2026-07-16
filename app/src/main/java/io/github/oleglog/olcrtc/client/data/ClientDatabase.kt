@@ -415,7 +415,7 @@ internal abstract class SubscriptionDao {
                         incoming.encryptedConfigJson
                     },
                     isLocallyModified = current.isLocallyModified,
-                    isDeleted = current.isDeleted,
+                    isDeleted = false,
                     favorite = current.favorite,
                     lastLatencyMs = current.lastLatencyMs,
                     lastCheckedAt = current.lastCheckedAt,
