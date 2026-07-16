@@ -101,9 +101,8 @@ class SubscriptionBundleTest {
     @Test
     fun dispatchesCompressedWbstreamQrAsProfile() {
         val raw = "olcrtc://wbstream@r/room?k=${"b".repeat(64)}&t=vp8channel&c=client&a=${"token".repeat(200)}"
-        val payload = ImportPayload.decode("olcrtc+gz:${encodeGzip(raw)}")
+        val payload = ImportPayload.decode("olcrtc+gz:${encodeGzip(raw)}") as DecodedImportPayload.Profile
 
-        assertTrue(payload is DecodedImportPayload.Profile)
         assertEquals(raw, payload.uri)
         assertTrue(ProfileUri.parse(payload.uri) is ImportedProfile.Olcrtc)
     }
