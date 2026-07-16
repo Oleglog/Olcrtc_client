@@ -13,6 +13,12 @@ internal sealed interface BundleImportResult {
     data class Complete(val bundle: SubscriptionBundle) : BundleImportResult
 }
 
+internal sealed interface DecodedImportPayload {
+    data class Profile(val uri: String) : DecodedImportPayload
+    data class Bundle(val raw: String) : DecodedImportPayload
+    data class Multipart(val raw: String) : DecodedImportPayload
+}
+
 internal class BundleImportDispatcher(
     private val multipart: MultipartSession = MultipartSession(),
 ) {
@@ -36,9 +42,28 @@ internal object ImportPayload {
     private const val MAX_COMPRESSED_BYTES = 512 * 1024
     private const val MAX_DECOMPRESSED_BYTES = 4 * 1024 * 1024
 
-    fun parseBundle(raw: String): SubscriptionBundle = SubscriptionBundleParser.parse(
-        if (raw.startsWith(GZIP_PREFIX, ignoreCase = true)) decodeGzip(raw.substring(GZIP_PREFIX.length)) else raw,
-    )
+    fun decode(raw: String): DecodedImportPayload {
+        val encoded = raw.trim()
+        if (encoded.startsWith("olcrtc+part:", ignoreCase = true)) {
+            return DecodedImportPayload.Multipart(encoded)
+        }
+        val value = unpack(encoded)
+        if (!value.startsWith('{')) return DecodedImportPayload.Profile(value)
+        return managerProfileUriOrNull(value)
+            ?.let { DecodedImportPayload.Profile(it) }
+            ?: DecodedImportPayload.Bundle(value)
+    }
+
+    fun unpack(raw: String): String {
+        val value = raw.trim()
+        return (if (value.startsWith(GZIP_PREFIX, ignoreCase = true)) {
+            decodeGzip(value.substring(GZIP_PREFIX.length))
+        } else {
+            value
+        }).trim()
+    }
+
+    fun parseBundle(raw: String): SubscriptionBundle = SubscriptionBundleParser.parse(unpack(raw))
 
     fun managerProfileUriOrNull(raw: String): String? {
         if (!raw.trimStart().startsWith('{')) return null

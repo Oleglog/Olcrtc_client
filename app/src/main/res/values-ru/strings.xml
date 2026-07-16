@@ -52,6 +52,9 @@
     <string name="subscription_add">Добавить подписку по QR-коду</string>
     <string name="subscription_update_now">Обновить</string>
     <string name="subscription_update_failed">Не удалось обновить подписку</string>
+    <string name="subscription_updated">Подписка обновлена</string>
+    <string name="subscription_update_summary">Добавлено: %1$d\nУдалено: %2$d\nВсего подключений: %3$d</string>
+    <string name="subscription_update_preserved">Не удалось обновить подписку. Последние сохранённые подключения оставлены без изменений.</string>
     <string name="subscription_edit">Изменить подписку</string>
     <string name="subscription_name">Название</string>
     <string name="subscription_url">Адрес подписки</string>

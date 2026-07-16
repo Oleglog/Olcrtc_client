@@ -35,12 +35,20 @@ class SubscriptionPayloadTest {
     }
 
     @Test
-    fun rejectsInvalidUtf8EmptyAndOversizedLists() {
+    fun acceptsEmptySubscription() {
+        val result = SubscriptionPayload.parse("# no active profiles\n".encodeToByteArray())
+
+        assertTrue(result.profiles.isEmpty())
+        assertTrue(result.rejectedProfiles.isEmpty())
+    }
+
+    @Test
+    fun rejectsInvalidUtf8UnsupportedOnlyAndOversizedLists() {
         assertThrows(IllegalArgumentException::class.java) {
             SubscriptionPayload.parse(byteArrayOf(0xc3.toByte(), 0x28))
         }
         assertThrows(IllegalArgumentException::class.java) {
-            SubscriptionPayload.parse("# only comments\n".encodeToByteArray())
+            SubscriptionPayload.parse("https://example.com/not-a-profile\n".encodeToByteArray())
         }
         assertThrows(IllegalArgumentException::class.java) {
             SubscriptionPayload.parse((vless + "x".repeat(16 * 1024)).encodeToByteArray())

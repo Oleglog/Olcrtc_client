@@ -47,8 +47,7 @@ internal object SubscriptionBundleParser {
             "Subscription URL must use HTTPS"
         }
 
-        val profileValues = root.alias("p", "profiles").arrayValue("p")
-        require(profileValues.isNotEmpty()) { "Bundle snapshot is empty" }
+        val profileValues = root.aliasOrNull("p", "profiles")?.arrayValue("p").orEmpty()
         require(profileValues.size <= MAX_PROFILE_COUNT) { "Bundle has too many profiles" }
         val profiles = mutableListOf<ImportedProfile>()
         val rejected = mutableListOf<String>()
@@ -59,8 +58,6 @@ internal object SubscriptionBundleParser {
                 .onSuccess(profiles::add)
                 .onFailure { rejected += "p[$index]: ${it.message ?: "unsupported profile"}" }
         }
-        require(profiles.isNotEmpty()) { "Bundle has no supported profiles" }
-
         val mirrors = root.aliasOrNull("m", "mirrors")?.arrayValue("m").orEmpty().mapIndexed { index, value ->
             val mirror = value.objectValue("m[$index]")
             SubscriptionBundle.Mirror(

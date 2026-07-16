@@ -15,6 +15,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import io.github.oleglog.olcrtc.client.R
@@ -23,6 +24,8 @@ import io.github.oleglog.olcrtc.client.data.SubscriptionSummary
 import io.github.oleglog.olcrtc.client.databinding.FragmentProfilesBinding
 import io.github.oleglog.olcrtc.client.importer.BundleImportDispatcher
 import io.github.oleglog.olcrtc.client.importer.BundleImportResult
+import io.github.oleglog.olcrtc.client.importer.DecodedImportPayload
+import io.github.oleglog.olcrtc.client.importer.ImportPayload
 import io.github.oleglog.olcrtc.client.importer.QrScannerActivity
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import java.text.DateFormat
@@ -150,47 +153,61 @@ class ProfilesFragment : Fragment() {
     private fun saveNewSubscription(raw: String) {
         storage.execute {
             val result = runCatching {
-                val value = raw.trim()
-                if (
-                    value.startsWith("{") ||
-                    value.startsWith("olcrtc+gz:", ignoreCase = true) ||
-                    value.startsWith("olcrtc+part:", ignoreCase = true)
-                ) {
-                    when (val bundle = bundleImports.accept(value)) {
-                        is BundleImportResult.Complete -> profiles.insertSubscription(bundle.bundle)
-                        is BundleImportResult.Pending -> error("${bundle.received}/${bundle.total}")
+                when (val payload = ImportPayload.decode(raw)) {
+                    is DecodedImportPayload.Bundle -> importSubscriptionBundle(payload.raw)
+                    is DecodedImportPayload.Multipart -> importSubscriptionBundle(payload.raw)
+                    is DecodedImportPayload.Profile -> {
+                        val uri = java.net.URI(payload.uri)
+                        require(uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank()) {
+                            getString(R.string.subscription_https_required)
+                        }
+                        val id = profiles.insertSubscriptionSource(
+                            name = requireNotNull(uri.host),
+                            url = payload.uri,
+                            kind = "GENERIC",
+                        )
+                        SubscriptionRefresher(profiles).refreshWithChanges(id)
                     }
-                } else {
-                    val uri = java.net.URI(value)
-                    require(uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank()) {
-                        getString(R.string.subscription_https_required)
-                    }
-                    profiles.insertSubscriptionSource(
-                        name = requireNotNull(uri.host),
-                        url = value,
-                        kind = "GENERIC",
-                    ).also { SubscriptionRefresher(profiles).refresh(it) }
                 }
             }
             activity?.runOnUiThread {
-                result.onFailure(::showError)
+                result.onSuccess(::showSubscriptionRefreshResult).onFailure(::showError)
                 loadSubscriptions()
             }
         }
     }
 
+    private fun importSubscriptionBundle(raw: String): SubscriptionRefresher.Result =
+        when (val bundle = bundleImports.accept(raw)) {
+            is BundleImportResult.Complete -> {
+                val id = profiles.insertSubscription(bundle.bundle)
+                SubscriptionRefresher(profiles).refreshWithChanges(id)
+            }
+            is BundleImportResult.Pending -> error("${bundle.received}/${bundle.total}")
+        }
+
     private fun updateSubscription(subscriptionId: Long) {
         storage.execute {
             val result = runCatching {
-                check(SubscriptionRefresher(profiles).refresh(subscriptionId)) {
-                    getString(R.string.subscription_update_failed)
+                SubscriptionRefresher(profiles).refreshWithChanges(subscriptionId).also {
+                    check(it.success) {
+                        getString(R.string.subscription_update_failed)
+                    }
                 }
             }
             activity?.runOnUiThread {
-                result.onFailure(::showError)
+                result.onSuccess(::showSubscriptionRefreshResult).onFailure(::showError)
                 loadSubscriptions()
             }
         }
+    }
+
+    private fun showSubscriptionRefreshResult(result: SubscriptionRefresher.Result) {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.subscription_updated)
+            .setMessage(getString(R.string.subscription_update_summary, result.added, result.removed, result.total))
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     private fun editSubscription(subscription: SubscriptionSummary) {
@@ -204,7 +221,7 @@ class ProfilesFragment : Fragment() {
                     }
                     val name = textField(form, R.string.subscription_name, subscription.name)
                     val url = textField(form, R.string.subscription_url, source.url)
-                    val dialog = AlertDialog.Builder(requireContext())
+                    val dialog = MaterialAlertDialogBuilder(requireContext())
                         .setTitle(R.string.subscription_edit)
                         .setView(form)
                         .setNegativeButton(R.string.cancel, null)
@@ -254,7 +271,7 @@ class ProfilesFragment : Fragment() {
     }
 
     private fun confirmDeleteSubscription(subscription: SubscriptionSummary) {
-        AlertDialog.Builder(requireContext())
+        MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.subscription_delete_title)
             .setMessage(getString(R.string.subscription_delete_message, subscription.name))
             .setNegativeButton(R.string.cancel, null)
@@ -275,7 +292,7 @@ class ProfilesFragment : Fragment() {
 
     private fun showError(error: Throwable) {
         if (!isAdded) return
-        AlertDialog.Builder(requireContext())
+        MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.invalid_profile)
             .setMessage(error.message ?: error.javaClass.simpleName)
             .setPositiveButton(android.R.string.ok, null)

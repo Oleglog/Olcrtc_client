@@ -4,6 +4,8 @@ import io.github.oleglog.olcrtc.client.data.ProfileRepository
 import io.github.oleglog.olcrtc.client.data.SubscriptionSource
 import io.github.oleglog.olcrtc.client.importer.Json
 import io.github.oleglog.olcrtc.client.importer.SubscriptionPayload
+import io.github.oleglog.olcrtc.client.profile.ImportedProfile
+import io.github.oleglog.olcrtc.client.profile.ProfileIdentity
 import java.net.URI
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -13,6 +15,13 @@ internal class SubscriptionRefresher(
     private val userHttp: SubscriptionHttpClient = SubscriptionHttpClient(),
     private val strictHttp: SubscriptionHttpClient = SubscriptionHttpClient(),
 ) {
+    data class Result(
+        val success: Boolean,
+        val added: Int,
+        val removed: Int,
+        val total: Int,
+    )
+
     fun refreshStale(now: Long = System.currentTimeMillis()): Int =
         repository.getStaleSubscriptionIds(now).count { refresh(it, now) }
 
@@ -20,7 +29,7 @@ internal class SubscriptionRefresher(
         val source = requireNotNull(repository.getSubscriptionSource(subscriptionId)) { "Subscription not found" }
         return runCatching { refreshPrimary(subscriptionId, source, now) }
             .recoverCatching { primaryError ->
-                if (source.kind != "OLCRTC" || source.mirrorUrl == null || source.mirrorKey == null) {
+                if (source.mirrorUrl == null || source.mirrorKey == null) {
                     throw primaryError
                 }
                 refreshMirror(subscriptionId, source, now)
@@ -29,6 +38,18 @@ internal class SubscriptionRefresher(
                 repository.markSubscriptionRefresh(subscriptionId, errorCode(error), now)
                 false
             }
+    }
+
+    fun refreshWithChanges(subscriptionId: Long, now: Long = System.currentTimeMillis()): Result {
+        val before = repository.getSubscriptionProfiles(subscriptionId).mapTo(mutableSetOf(), ::identity)
+        if (!refresh(subscriptionId, now)) return Result(false, 0, 0, before.size)
+        val after = repository.getSubscriptionProfiles(subscriptionId).mapTo(mutableSetOf(), ::identity)
+        return Result(
+            success = true,
+            added = (after - before).size,
+            removed = (before - after).size,
+            total = after.size,
+        )
     }
 
     private fun refreshPrimary(subscriptionId: Long, source: SubscriptionSource, now: Long): Boolean {
@@ -86,6 +107,11 @@ internal class SubscriptionRefresher(
         is java.net.SocketTimeoutException -> "TIMEOUT"
         is java.io.IOException -> "NETWORK"
         else -> "INVALID_PAYLOAD"
+    }
+
+    private fun identity(profile: ImportedProfile): String = when (profile) {
+        is ImportedProfile.Olcrtc -> ProfileIdentity.hash(profile.value)
+        is ImportedProfile.Standard -> ProfileIdentity.hash(profile.value)
     }
 
     private companion object {

@@ -167,6 +167,7 @@ internal data class SubscriptionProfileEntity(
     val lastCheckedAt: Long?,
     val createdAt: Long,
     val updatedAt: Long,
+    @ColumnInfo(defaultValue = "0") val isDeleted: Boolean = false,
 )
 
 internal data class SubscriptionGroupRow(
@@ -314,6 +315,9 @@ internal abstract class SubscriptionDao {
     @Query("SELECT * FROM subscription_profiles WHERE groupId = :groupId ORDER BY sortOrder")
     abstract fun getProfiles(groupId: Long): List<SubscriptionProfileEntity>
 
+    @Query("SELECT * FROM subscription_profiles WHERE groupId = :groupId AND isDeleted = 0 ORDER BY sortOrder")
+    abstract fun getVisibleProfiles(groupId: Long): List<SubscriptionProfileEntity>
+
     @Query("SELECT * FROM subscription_profiles WHERE id = :id")
     abstract fun getProfile(id: String): SubscriptionProfileEntity?
 
@@ -408,6 +412,7 @@ internal abstract class SubscriptionDao {
                         incoming.encryptedConfigJson
                     },
                     isLocallyModified = current.isLocallyModified,
+                    isDeleted = current.isDeleted,
                     favorite = current.favorite,
                     lastLatencyMs = current.lastLatencyMs,
                     lastCheckedAt = current.lastCheckedAt,
@@ -419,7 +424,7 @@ internal abstract class SubscriptionDao {
         val inserts = updates.filterNot { it.id in existingIds }
         val changed = updates.filter { it.id in existingIds }
         val deleted = existing
-            .filter { !it.isLocallyModified && it.identityHash !in incomingIdentities }
+            .filter { !it.isLocallyModified && !it.isDeleted && it.identityHash !in incomingIdentities }
             .map(SubscriptionProfileEntity::id)
 
         if (inserts.isNotEmpty()) insertProfiles(inserts)
@@ -530,7 +535,7 @@ internal class RoutingRuleRepository(
         AppRoutingEntryEntity::class,
         RoutingRuleEntity::class,
     ],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 internal abstract class ClientDatabase : RoomDatabase() {
@@ -611,11 +616,25 @@ internal abstract class ClientDatabase : RoomDatabase() {
             }
         }
 
+        internal val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `subscription_profiles` ADD COLUMN `isDeleted` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         fun open(context: Context): ClientDatabase = Room.databaseBuilder(
             context.applicationContext,
             ClientDatabase::class.java,
             "olcrtc-client.db",
-        ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+        ).addMigrations(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_5,
+            MIGRATION_5_6,
+            MIGRATION_6_7,
+            MIGRATION_7_8,
+        )
             .addCallback(localGroupCallback)
             .enableMultiInstanceInvalidation()
             .build()

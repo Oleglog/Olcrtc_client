@@ -431,6 +431,30 @@ class ProfileRepositoryTest {
     }
 
     @Test
+    fun keepsDeletedSubscriptionProfileHiddenAfterRefresh() {
+        val profile = ImportedProfile.Standard(StandardProfile(
+            name = "VLESS",
+            protocol = StandardProfile.Protocol.VLESS,
+            address = "example.com",
+            port = 443,
+            uuid = "00000000-0000-0000-0000-000000000001",
+        ))
+        val subscriptionId = repository.insertSubscription(subscriptionBundle(listOf(profile)), now = 1)
+        val dao = database.subscriptions()
+        val groupId = dao.getSubscriptionGroup(subscriptionId)!!.groupId
+        val profileId = dao.getProfiles(groupId).single().id
+
+        repository.deleteSubscriptionProfile(profileId, now = 2)
+        repository.replaceSubscriptionProfiles(subscriptionId, listOf(profile), now = 3)
+
+        assertTrue(dao.getProfile(profileId)!!.isDeleted)
+        assertTrue(repository.getSubscriptionProfiles(subscriptionId).isEmpty())
+        assertTrue(repository.listSubscriptionProfiles(subscriptionId).isEmpty())
+        assertNull(repository.getSubscriptionProfile(profileId))
+        assertEquals(0, repository.listSubscriptions().single().profileCount)
+    }
+
+    @Test
     fun deletesSubscriptionWithProfiles() {
         val profile = ImportedProfile.Standard(StandardProfile(
             name = "VLESS",

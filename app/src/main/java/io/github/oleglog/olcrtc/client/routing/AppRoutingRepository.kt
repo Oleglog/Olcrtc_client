@@ -18,6 +18,15 @@ internal class AppRoutingRepository(
     private val packageManager: PackageManager,
     private val entries: AppRoutingEntryDao,
 ) {
+    fun cachedInstalled(): List<AppRoutingItem> = entries.getAll().map {
+        AppRoutingItem(
+            packageName = it.packageName,
+            label = it.labelSnapshot,
+            selected = it.selected,
+            system = false,
+        )
+    }
+
     fun refreshInstalled(includeSystem: Boolean): List<AppRoutingItem> {
         val stored = entries.getAll().associateBy(AppRoutingEntryEntity::packageName)
         val installed = packageManager.getInstalledApplications(0)

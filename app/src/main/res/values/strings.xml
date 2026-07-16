@@ -51,6 +51,9 @@
     <string name="subscription_add">Add subscription</string>
     <string name="subscription_update_now">Update now</string>
     <string name="subscription_update_failed">Subscription update failed</string>
+    <string name="subscription_updated">Subscription updated</string>
+    <string name="subscription_update_summary">Added: %1$d\nRemoved: %2$d\nTotal connections: %3$d</string>
+    <string name="subscription_update_preserved">Could not update the subscription. The last saved connections were preserved.</string>
     <string name="subscription_edit">Edit subscription</string>
     <string name="subscription_name">Name</string>
     <string name="subscription_url">Subscription URL</string>

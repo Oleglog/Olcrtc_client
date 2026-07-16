@@ -68,7 +68,7 @@ internal object SubscriptionPayload {
                 .onSuccess(profiles::add)
                 .onFailure { rejected += "line ${index + 1}: ${it.message ?: "unsupported profile"}" }
         }
-        require(profiles.isNotEmpty()) { "Subscription has no supported profiles" }
+        require(profiles.isNotEmpty() || rejected.isEmpty()) { "Subscription has no supported profiles" }
         return SubscriptionProfiles(profiles.distinct(), rejected)
     }
 

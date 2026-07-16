@@ -11,17 +11,19 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
-import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import androidx.core.content.FileProvider
 import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.checkbox.MaterialCheckBox
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import io.github.oleglog.olcrtc.client.BuildConfig
 import io.github.oleglog.olcrtc.client.R
 import io.github.oleglog.olcrtc.client.data.ProfileRepository
@@ -58,20 +60,31 @@ class SettingsFragment : Fragment() {
 
     override fun onViewCreated(view: View, state: Bundle?) {
         val binding = requireNotNull(_binding)
-        binding.routingPreset.adapter = ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_spinner_dropdown_item,
-            listOf(getString(R.string.routing_all_vpn), getString(R.string.routing_russia_direct)),
+        val routingChoices = listOf(
+            RoutingPolicy.Preset.ALL_VPN to getString(R.string.routing_all_vpn),
+            RoutingPolicy.Preset.RUSSIA_DIRECT to getString(R.string.routing_russia_direct),
         )
-        binding.perAppMode.adapter = ArrayAdapter(
+        binding.routingPreset.setAdapter(ArrayAdapter(
             requireContext(),
-            android.R.layout.simple_spinner_dropdown_item,
-            listOf(
-                getString(R.string.settings_per_app_all),
-                getString(R.string.settings_per_app_exclude),
-                getString(R.string.settings_per_app_only),
-            ),
+            android.R.layout.simple_list_item_1,
+            routingChoices.map { it.second },
+        ))
+        binding.routingPreset.setOnItemClickListener { _, _, position, _ ->
+            binding.routingPreset.tag = routingChoices[position].first
+        }
+        val perAppChoices = listOf(
+            PerAppPolicy.Mode.ALL to getString(R.string.settings_per_app_all),
+            PerAppPolicy.Mode.EXCLUDE_SELECTED to getString(R.string.settings_per_app_exclude),
+            PerAppPolicy.Mode.ONLY_SELECTED to getString(R.string.settings_per_app_only),
         )
+        binding.perAppMode.setAdapter(ArrayAdapter(
+            requireContext(),
+            android.R.layout.simple_list_item_1,
+            perAppChoices.map { it.second },
+        ))
+        binding.perAppMode.setOnItemClickListener { _, _, position, _ ->
+            binding.perAppMode.tag = perAppChoices[position].first
+        }
         binding.save.setOnClickListener { save() }
         binding.refreshAppList.setOnClickListener { refreshAppList() }
         binding.selectApps.setOnClickListener { selectApps() }
@@ -108,7 +121,7 @@ class SettingsFragment : Fragment() {
             current.startsWith("en") -> 2
             else -> 0
         }
-        AlertDialog.Builder(requireContext())
+        MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.settings_language)
             .setSingleChoiceItems(options, selected) { dialog, index ->
                 AppCompatDelegate.setApplicationLocales(
@@ -137,10 +150,30 @@ class SettingsFragment : Fragment() {
                 )
             }
             val binding = _binding ?: return@launch
-            binding.routingPreset.setSelection(if (values.routingPolicy.preset == RoutingPolicy.Preset.ALL_VPN) 0 else 1)
+            binding.routingPreset.tag = values.routingPolicy.preset
+            binding.routingPreset.setText(
+                getString(
+                    if (values.routingPolicy.preset == RoutingPolicy.Preset.ALL_VPN) {
+                        R.string.routing_all_vpn
+                    } else {
+                        R.string.routing_russia_direct
+                    },
+                ),
+                false,
+            )
             binding.allowLan.isChecked = values.routingPolicy.allowLan
             binding.dnsServer.setText(values.dnsServer.orEmpty())
-            binding.perAppMode.setSelection(values.perAppPolicy.mode.ordinal)
+            binding.perAppMode.tag = values.perAppPolicy.mode
+            binding.perAppMode.setText(
+                getString(
+                    when (values.perAppPolicy.mode) {
+                        PerAppPolicy.Mode.ALL -> R.string.settings_per_app_all
+                        PerAppPolicy.Mode.EXCLUDE_SELECTED -> R.string.settings_per_app_exclude
+                        PerAppPolicy.Mode.ONLY_SELECTED -> R.string.settings_per_app_only
+                    },
+                ),
+                false,
+            )
             binding.appRoutingSummary.text = getString(
                 R.string.settings_app_routing_summary,
                 0,
@@ -156,15 +189,11 @@ class SettingsFragment : Fragment() {
     private fun save() {
         val binding = _binding ?: return
         val policy = RoutingPolicy(
-            preset = if (binding.routingPreset.selectedItemPosition == 0) {
-                RoutingPolicy.Preset.ALL_VPN
-            } else {
-                RoutingPolicy.Preset.RUSSIA_DIRECT
-            },
+            preset = binding.routingPreset.tag as? RoutingPolicy.Preset ?: RoutingPolicy.Preset.ALL_VPN,
             allowLan = binding.allowLan.isChecked,
         )
         val dnsServer = binding.dnsServer.text?.toString()?.trim()?.takeIf(String::isNotEmpty)
-        val perAppMode = PerAppPolicy.Mode.values()[binding.perAppMode.selectedItemPosition]
+        val perAppMode = binding.perAppMode.tag as? PerAppPolicy.Mode ?: PerAppPolicy.Mode.ALL
         viewLifecycleOwner.lifecycleScope.launch {
             val result = runCatching {
                 withContext(Dispatchers.IO) {
@@ -208,7 +237,7 @@ class SettingsFragment : Fragment() {
             val result = runCatching {
                 withContext(Dispatchers.IO) {
                     val policy = settings.getPerAppPolicy()
-                    val apps = appRouting.refreshInstalled(includeSystem)
+                    val apps = appRouting.cachedInstalled().ifEmpty { appRouting.refreshInstalled(includeSystem) }
                     apps to policy.packages
                 }
             }
@@ -216,7 +245,7 @@ class SettingsFragment : Fragment() {
                 val checked = apps.map { it.packageName in selectedPackages }.toBooleanArray()
                 val list = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
                 val rows = apps.mapIndexed { index, app ->
-                    CheckBox(requireContext()).apply {
+                    MaterialCheckBox(requireContext()).apply {
                         text = "${app.label}\n${app.packageName}"
                         isChecked = checked[index]
                         setPadding(12.dp, 8.dp, 12.dp, 8.dp)
@@ -224,7 +253,7 @@ class SettingsFragment : Fragment() {
                     }.also(list::addView)
                 }
                 val scroll = ScrollView(requireContext()).apply { addView(list) }
-                val search = EditText(requireContext()).apply {
+                val searchInput = TextInputEditText(requireContext()).apply {
                     setHint(R.string.settings_app_search)
                     setSingleLine(true)
                     doAfterTextChanged { text ->
@@ -239,6 +268,12 @@ class SettingsFragment : Fragment() {
                         }
                     }
                 }
+                val search = TextInputLayout(requireContext()).apply {
+                    hint = getString(R.string.settings_app_search)
+                    boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+                    endIconMode = TextInputLayout.END_ICON_CLEAR_TEXT
+                    addView(searchInput)
+                }
                 val content = LinearLayout(requireContext()).apply {
                     orientation = LinearLayout.VERTICAL
                     setPadding(16.dp, 0, 16.dp, 0)
@@ -248,7 +283,7 @@ class SettingsFragment : Fragment() {
                         480.dp,
                     ))
                 }
-                AlertDialog.Builder(requireContext())
+                MaterialAlertDialogBuilder(requireContext())
                     .setTitle(R.string.settings_select_apps)
                     .setView(content)
                     .setNegativeButton(R.string.cancel, null)
@@ -289,7 +324,7 @@ class SettingsFragment : Fragment() {
             setSingleLine(false)
             minLines = 2
         }
-        AlertDialog.Builder(requireContext())
+        MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.settings_add_routing_rule)
             .setView(input)
             .setNegativeButton(R.string.cancel, null)
@@ -341,7 +376,7 @@ class SettingsFragment : Fragment() {
 
     private fun showCoreVersions() {
         val versions = GomobileCore.coreVersions()
-        AlertDialog.Builder(requireContext())
+        MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.settings_core_versions)
             .setMessage(getString(R.string.settings_core_versions_message, versions.xray, versions.olcrtc))
             .setPositiveButton(android.R.string.ok, null)
@@ -367,7 +402,7 @@ class SettingsFragment : Fragment() {
                     else -> getString(R.string.settings_update_current, BuildConfig.VERSION_NAME)
                 }
                 if (update.newerThanCurrent && update.selectedAsset != null) {
-                    AlertDialog.Builder(requireContext())
+                    MaterialAlertDialogBuilder(requireContext())
                         .setTitle(R.string.settings_check_update)
                         .setMessage(binding.status.text)
                         .setNegativeButton(R.string.cancel, null)
@@ -402,7 +437,7 @@ class SettingsFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             val text = withContext(Dispatchers.IO) { diagnostics.readRedacted() }
                 .ifBlank { getString(R.string.settings_no_diagnostics) }
-            AlertDialog.Builder(requireContext())
+            MaterialAlertDialogBuilder(requireContext())
                 .setTitle(R.string.settings_diagnostics_title)
                 .setMessage(text.takeLast(MAX_DIALOG_LOG_CHARS))
                 .setPositiveButton(android.R.string.ok, null)

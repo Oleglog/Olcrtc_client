@@ -1,6 +1,7 @@
 package io.github.oleglog.olcrtc.client.importer
 
 import io.github.oleglog.olcrtc.client.profile.ImportedProfile
+import io.github.oleglog.olcrtc.client.profile.ProfileUri
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -29,6 +30,16 @@ class SubscriptionBundleTest {
         assertEquals(true, bundle.mirrors.single().encrypted)
         assertEquals("AES-256-GCM", bundle.mirrors.single().algorithm)
         assertEquals("AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8", bundle.mirrorKey)
+    }
+
+    @Test
+    fun parsesUrlOnlyManagerSubscriptionBundle() {
+        val bundle = SubscriptionBundleParser.parse(
+            """{"type":"olcrtc-sub","v":2,"n":"Manager","s":"manager","u":"https://example.com/sub/manager","m":[],"uc":true,"d":true}""",
+        )
+
+        assertEquals("https://example.com/sub/manager", bundle.url)
+        assertTrue(bundle.profiles.isEmpty())
     }
 
     @Test
@@ -73,8 +84,6 @@ class SubscriptionBundleTest {
             """{"type":"olcrtc-sub","v":2,"sv":"1.9.44","u":"https://example.com/sub","p":["$profile"]}""",
             """{"type":"olcrtc-sub","v":2,"sv":"latest","u":"https://example.com/sub","p":["$profile"]}""",
             """{"type":"olcrtc-sub","v":2,"u":"http://example.com/sub","p":["$profile"]}""",
-            """{"type":"olcrtc-sub","v":2,"u":"https://example.com/sub","p":[]}""",
-            """{"type":"olcrtc-sub","v":2,"u":"https://example.com/sub","p":["https://example.com/profile"]}""",
             """{"type":"olcrtc-sub","v":2,"u":"https://example.com/sub","url":"https://example.com/other","p":["$profile"]}""",
         ).forEach { raw ->
             assertThrows(IllegalArgumentException::class.java) { SubscriptionBundleParser.parse(raw) }
@@ -87,6 +96,16 @@ class SubscriptionBundleTest {
         val packed = "olcrtc+gz:${encodeGzip(raw)}"
 
         assertEquals("https://example.com/sub", ImportPayload.parseBundle(packed).url)
+    }
+
+    @Test
+    fun dispatchesCompressedWbstreamQrAsProfile() {
+        val raw = "olcrtc://wbstream@r/room?k=${"b".repeat(64)}&t=vp8channel&c=client&a=${"token".repeat(200)}"
+        val payload = ImportPayload.decode("olcrtc+gz:${encodeGzip(raw)}")
+
+        assertTrue(payload is DecodedImportPayload.Profile)
+        assertEquals(raw, payload.uri)
+        assertTrue(ProfileUri.parse(payload.uri) is ImportedProfile.Olcrtc)
     }
 
     @Test

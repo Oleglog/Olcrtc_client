@@ -7,10 +7,10 @@ import android.widget.ArrayAdapter
 import android.widget.CheckBox
 import android.widget.LinearLayout
 import android.widget.ScrollView
-import android.widget.Spinner
-import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import io.github.oleglog.olcrtc.client.R
@@ -38,7 +38,7 @@ internal object ProfileEditorDialog {
             is ProfileConfig.Olcrtc -> profile.value.name
             is ProfileConfig.Standard -> profile.value.name
         }
-        val dialog = AlertDialog.Builder(context)
+        val dialog = MaterialAlertDialogBuilder(context)
             .setTitle(fragment.getString(R.string.profile_edit_title, title))
             .setView(ScrollView(context).apply { addView(form) })
             .setNegativeButton(R.string.cancel, null)
@@ -59,8 +59,8 @@ internal object ProfileEditorDialog {
         profile: OlcrtcProfile,
     ): () -> ProfileConfig {
         val name = field(fragment, form, R.string.profile_field_name, profile.name)
-        val provider = spinner(fragment, form, R.string.profile_field_provider, OlcrtcProfile.Provider.entries, profile.provider)
-        val transport = spinner(fragment, form, R.string.profile_field_transport, OlcrtcProfile.Transport.entries, profile.transport)
+        val provider = choice(fragment, form, R.string.profile_field_provider, OlcrtcProfile.Provider.entries, profile.provider)
+        val transport = choice(fragment, form, R.string.profile_field_transport, OlcrtcProfile.Transport.entries, profile.transport)
         val roomId = field(fragment, form, R.string.profile_field_room_id, profile.roomId)
         val roomPassword = field(fragment, form, R.string.profile_field_room_password, profile.roomPassword.orEmpty(), secret = true)
         val clientId = field(fragment, form, R.string.profile_field_client_id, profile.clientId)
@@ -80,8 +80,8 @@ internal object ProfileEditorDialog {
             ProfileConfig.Olcrtc(
                 OlcrtcProfile(
                     name = name.value(),
-                    provider = provider.selectedItem as OlcrtcProfile.Provider,
-                    transport = transport.selectedItem as OlcrtcProfile.Transport,
+                    provider = provider.selected,
+                    transport = transport.selected,
                     roomId = roomId.value(),
                     roomPassword = roomPassword.optionalValue(),
                     clientId = clientId.value(),
@@ -102,15 +102,15 @@ internal object ProfileEditorDialog {
         profile: StandardProfile,
     ): () -> ProfileConfig {
         val name = field(fragment, form, R.string.profile_field_name, profile.name)
-        val protocol = spinner(fragment, form, R.string.profile_field_protocol, StandardProfile.Protocol.entries, profile.protocol)
+        val protocol = choice(fragment, form, R.string.profile_field_protocol, StandardProfile.Protocol.entries, profile.protocol)
         val address = field(fragment, form, R.string.profile_field_address, profile.address)
         val port = field(fragment, form, R.string.profile_field_port, profile.port.toString(), numeric = true)
         val uuid = field(fragment, form, R.string.profile_field_uuid, profile.uuid.orEmpty())
         val password = field(fragment, form, R.string.profile_field_password, profile.password.orEmpty(), secret = true)
         val alterId = field(fragment, form, R.string.profile_field_alter_id, profile.alterId.toString(), numeric = true)
         val cipher = field(fragment, form, R.string.profile_field_cipher, profile.cipher)
-        val transport = spinner(fragment, form, R.string.profile_field_transport, StandardProfile.Transport.entries, profile.transport)
-        val security = spinner(fragment, form, R.string.profile_field_security, StandardProfile.Security.entries, profile.security)
+        val transport = choice(fragment, form, R.string.profile_field_transport, StandardProfile.Transport.entries, profile.transport)
+        val security = choice(fragment, form, R.string.profile_field_security, StandardProfile.Security.entries, profile.security)
         val flow = field(fragment, form, R.string.profile_field_flow, profile.flow.orEmpty())
         val serverName = field(fragment, form, R.string.profile_field_server_name, profile.serverName.orEmpty())
         val alpn = field(fragment, form, R.string.profile_field_alpn, profile.alpn.joinToString(","))
@@ -137,7 +137,7 @@ internal object ProfileEditorDialog {
         )
         fun updateVisibility() {
             conditional.forEach { it.layout.visibility = View.GONE }
-            when (protocol.selectedItem as StandardProfile.Protocol) {
+            when (protocol.selected) {
                 StandardProfile.Protocol.VLESS -> uuid.show()
                 StandardProfile.Protocol.VMESS -> {
                     uuid.show()
@@ -146,7 +146,7 @@ internal object ProfileEditorDialog {
                 }
                 StandardProfile.Protocol.TROJAN -> password.show()
             }
-            when (transport.selectedItem as StandardProfile.Transport) {
+            when (transport.selected) {
                 StandardProfile.Transport.TCP -> Unit
                 StandardProfile.Transport.WS -> {
                     wsHost.show()
@@ -160,13 +160,13 @@ internal object ProfileEditorDialog {
                     xhttpExtra.show()
                 }
             }
-            if (security.selectedItem == StandardProfile.Security.REALITY) {
+            if (security.selected == StandardProfile.Security.REALITY) {
                 realityKey.show()
                 realityShortId.show()
                 realitySpiderX.show()
                 if (
-                    protocol.selectedItem == StandardProfile.Protocol.VLESS &&
-                    transport.selectedItem == StandardProfile.Transport.TCP
+                    protocol.selected == StandardProfile.Protocol.VLESS &&
+                    transport.selected == StandardProfile.Transport.TCP
                 ) flow.show()
             }
         }
@@ -175,9 +175,9 @@ internal object ProfileEditorDialog {
         security.onSelectionChanged(::updateVisibility)
         updateVisibility()
         return {
-            val selectedProtocol = protocol.selectedItem as StandardProfile.Protocol
-            val selectedTransport = transport.selectedItem as StandardProfile.Transport
-            val selectedSecurity = security.selectedItem as StandardProfile.Security
+            val selectedProtocol = protocol.selected
+            val selectedTransport = transport.selected
+            val selectedSecurity = security.selected
             ProfileConfig.Standard(
                 StandardProfile(
                     name = name.value(),
@@ -240,27 +240,46 @@ internal object ProfileEditorDialog {
         return FormField(layout, input)
     }
 
-    private fun <T> spinner(
+    private fun <T> choice(
         fragment: Fragment,
         form: LinearLayout,
         label: Int,
         values: List<T>,
         selected: T,
-    ): Spinner {
-        form.addView(TextView(fragment.requireContext()).apply {
-            setText(label)
-            setPadding(0, 8.dp(fragment), 0, 0)
-        })
-        return Spinner(fragment.requireContext()).apply {
-            adapter = ArrayAdapter(fragment.requireContext(), android.R.layout.simple_spinner_dropdown_item, values)
-            setSelection(values.indexOf(selected))
-        }.also(form::addView)
+    ): ChoiceField<T> {
+        val input = MaterialAutoCompleteTextView(fragment.requireContext()).apply {
+            inputType = InputType.TYPE_NULL
+            setAdapter(ArrayAdapter(fragment.requireContext(), android.R.layout.simple_list_item_1, values))
+            setText(selected.toString(), false)
+        }
+        val layout = TextInputLayout(fragment.requireContext()).apply {
+            hint = fragment.getString(label)
+            boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
+            endIconMode = TextInputLayout.END_ICON_DROPDOWN_MENU
+            addView(input)
+        }
+        form.addView(layout)
+        return ChoiceField(input, values, selected)
     }
 
-    private fun Spinner.onSelectionChanged(action: () -> Unit) {
-        onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
-            override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: View?, position: Int, id: Long) = action()
-            override fun onNothingSelected(parent: android.widget.AdapterView<*>?) = Unit
+    private class ChoiceField<T>(
+        input: MaterialAutoCompleteTextView,
+        private val values: List<T>,
+        selected: T,
+    ) {
+        var selected: T = selected
+            private set
+        private var onSelectionChanged: () -> Unit = {}
+
+        init {
+            input.setOnItemClickListener { _, _, position, _ ->
+                selected = values[position]
+                onSelectionChanged()
+            }
+        }
+
+        fun onSelectionChanged(action: () -> Unit) {
+            onSelectionChanged = action
         }
     }
 

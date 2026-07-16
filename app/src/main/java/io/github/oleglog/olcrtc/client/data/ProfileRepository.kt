@@ -85,14 +85,14 @@ internal class ProfileRepository(
             lastAttemptAt = subscription.lastAttemptAt,
             lastErrorCode = subscription.lastErrorCode,
             enabled = subscription.enabled,
-            profileCount = subscriptions.getProfiles(subscription.groupId).size,
+            profileCount = subscriptions.getVisibleProfiles(subscription.groupId).size,
             mirrorAvailable = subscription.encryptedMirrorUrl != null && subscription.encryptedMirrorKey != null,
         )
     }
 
     fun listSubscriptionProfiles(subscriptionId: Long): List<SubscriptionProfileSummary> {
         val group = subscriptions.getSubscriptionGroup(subscriptionId) ?: return emptyList()
-        return subscriptions.getProfiles(group.groupId).map { profile ->
+        return subscriptions.getVisibleProfiles(group.groupId).map { profile ->
             val imported = runCatching { profile.toImportedProfile() }.getOrNull()
             SubscriptionProfileSummary(
                 id = profile.id,
@@ -188,11 +188,11 @@ internal class ProfileRepository(
 
     fun getSubscriptionProfiles(subscriptionId: Long): List<ImportedProfile> {
         val groupId = subscriptions.getSubscriptionGroup(subscriptionId)?.groupId ?: return emptyList()
-        return subscriptions.getProfiles(groupId).map { it.toImportedProfile() }
+        return subscriptions.getVisibleProfiles(groupId).map { it.toImportedProfile() }
     }
 
     fun getSubscriptionProfile(profileId: String): ProfileConfig? =
-        subscriptions.getProfile(profileId)?.toImportedProfile()?.let { profile ->
+        subscriptions.getProfile(profileId)?.takeUnless(SubscriptionProfileEntity::isDeleted)?.toImportedProfile()?.let { profile ->
             when (profile) {
                 is ImportedProfile.Olcrtc -> ProfileConfig.Olcrtc(profile.value)
                 is ImportedProfile.Standard -> ProfileConfig.Standard(profile.value)
@@ -347,6 +347,14 @@ internal class ProfileRepository(
                 updatedAt = now,
             ),
         )
+    }
+
+    fun deleteSubscriptionProfile(
+        profileId: String,
+        now: Long = System.currentTimeMillis(),
+    ) {
+        val current = requireNotNull(subscriptions.getProfile(profileId)) { "Subscription profile not found" }
+        subscriptions.updateProfile(current.copy(isDeleted = true, updatedAt = now))
     }
 
     fun resetSubscriptionProfile(

@@ -38,7 +38,7 @@ object OlcrtcUri {
             ?: OlcrtcProfile.Transport.DATACHANNEL
         // QR payloads use the host; legacy links keep the room in the path.
         val roomId = uri.rawPath
-            ?.takeIf { it != "/" }
+            ?.takeIf { it.isNotBlank() && it != "/" }
             ?.removePrefix("/")
             ?.let(::decode)
             ?: decode(requireNotNull(roomHost))
