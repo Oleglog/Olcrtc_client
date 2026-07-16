@@ -273,7 +273,7 @@ internal object ProfileEditorDialog {
 
         init {
             input.setOnItemClickListener { _, _, position, _ ->
-                selected = values[position]
+                this.selected = values[position]
                 onSelectionChanged()
             }
         }
