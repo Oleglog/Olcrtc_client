@@ -16,6 +16,10 @@ internal sealed interface BundleImportResult {
 internal class BundleImportDispatcher(
     private val multipart: MultipartSession = MultipartSession(),
 ) {
+    fun clear() {
+        multipart.clear()
+    }
+
     fun accept(raw: String): BundleImportResult {
         if (!raw.startsWith("olcrtc+part:", ignoreCase = true)) {
             return BundleImportResult.Complete(ImportPayload.parseBundle(raw))

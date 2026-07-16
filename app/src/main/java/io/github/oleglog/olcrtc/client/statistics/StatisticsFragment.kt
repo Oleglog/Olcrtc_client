@@ -115,15 +115,18 @@ class StatisticsFragment : Fragment() {
         AlertDialog.Builder(requireContext())
             .setTitle(session.profileNameSnapshot)
             .setMessage(
-                buildString {
-                    appendLine("Started: ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(session.startedAt))}")
-                    session.endedAt?.let { appendLine("Ended: ${DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))}") }
-                    appendLine("Duration: ${formatDuration((session.endedAt ?: System.currentTimeMillis()) - session.startedAt)}")
-                    appendLine("Up: ${formatBytes(session.bytesUp)}")
-                    appendLine("Down: ${formatBytes(session.bytesDown)}")
-                    appendLine("Reason: ${session.disconnectReason ?: getString(R.string.statistics_disconnect_unknown)}")
-                    appendLine("Network: ${session.networkType}")
-                },
+                getString(
+                    R.string.statistics_session_details_format,
+                    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(session.startedAt)),
+                    session.endedAt?.let {
+                        DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))
+                    } ?: getString(R.string.statistics_session_active),
+                    formatDuration((session.endedAt ?: System.currentTimeMillis()) - session.startedAt),
+                    formatBytes(session.bytesUp),
+                    formatBytes(session.bytesDown),
+                    session.disconnectReason ?: getString(R.string.statistics_disconnect_unknown),
+                    session.networkType,
+                ),
             )
             .setPositiveButton(android.R.string.ok, null)
             .show()

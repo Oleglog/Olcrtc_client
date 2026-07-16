@@ -1,8 +1,10 @@
 package io.github.oleglog.olcrtc.client.profiles
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -11,7 +13,14 @@ import android.widget.Button
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import io.github.oleglog.olcrtc.client.MainActivity
 import io.github.oleglog.olcrtc.client.R
@@ -20,6 +29,9 @@ import io.github.oleglog.olcrtc.client.data.ProfileSummary
 import io.github.oleglog.olcrtc.client.data.SubscriptionProfileSummary
 import io.github.oleglog.olcrtc.client.data.SubscriptionSummary
 import io.github.oleglog.olcrtc.client.databinding.FragmentProfilesBinding
+import io.github.oleglog.olcrtc.client.importer.BundleImportDispatcher
+import io.github.oleglog.olcrtc.client.importer.BundleImportResult
+import io.github.oleglog.olcrtc.client.importer.QrFrameDecoder
 import io.github.oleglog.olcrtc.client.profile.ImportedProfile
 import io.github.oleglog.olcrtc.client.profile.ProfileUri
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
@@ -44,12 +56,14 @@ class ProfilesFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        stopSubscriptionScanner()
         _binding = null
         super.onDestroyView()
     }
 
     override fun onDestroy() {
         storage.shutdownNow()
+        cameraAnalysis.shutdownNow()
         super.onDestroy()
     }
 
@@ -158,54 +172,157 @@ class ProfilesFragment : Fragment() {
             },
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
         )
-        row.addView(Button(requireContext()).apply {
-            setText(R.string.profile_test_latency)
-            isEnabled = profile.type != "OLCRTC"
-            setOnClickListener { testSubscriptionLatency(profile.id) }
-        })
-        row.addView(Button(requireContext()).apply {
-            setText(R.string.edit)
-            setOnClickListener { editSubscriptionProfile(profile) }
-        })
-        row.addView(Button(requireContext()).apply {
-            setText(R.string.copy)
-            setOnClickListener { copySubscriptionProfileLink(profile.id) }
-        })
-        row.addView(Button(requireContext()).apply {
-            setText(R.string.profile_reset)
-            isEnabled = profile.locallyModified
-            setOnClickListener { resetSubscriptionProfile(profile.id) }
-        })
         return row
     }
 
     private fun addSubscription() {
-        val input = EditText(requireContext()).apply {
-            hint = getString(R.string.subscription_edit_hint)
-            setSingleLine(false)
-            minLines = 3
+        if (ContextCompat.checkSelfPermission(requireContext(), Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+            showSubscriptionQrScanner()
+        } else {
+            cameraPermission.launch(Manifest.permission.CAMERA)
         }
-        AlertDialog.Builder(requireContext())
+    }
+
+    private val cameraPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) showSubscriptionQrScanner() else showError(IllegalStateException(getString(R.string.camera_permission_denied)))
+    }
+
+    @Volatile private var scanning = false
+    private var cameraProvider: ProcessCameraProvider? = null
+    private var scannerDialog: AlertDialog? = null
+    private var lastScannedSubscriptionQr: String? = null
+    private val cameraAnalysis = Executors.newSingleThreadExecutor()
+    private val bundleImports = BundleImportDispatcher()
+
+    private fun showSubscriptionQrScanner() {
+        bundleImports.clear()
+        lastScannedSubscriptionQr = null
+        val previewView = PreviewView(requireContext()).apply {
+            layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(240))
+        }
+        scannerDialog = AlertDialog.Builder(requireContext())
             .setTitle(R.string.subscription_add)
-            .setView(input)
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(android.R.string.ok) { _, _ -> saveNewSubscription(input.text?.toString().orEmpty()) }
+            .setView(previewView)
+            .setNegativeButton(R.string.cancel) { _, _ -> stopSubscriptionScanner() }
+            .setOnDismissListener { stopSubscriptionScanner() }
             .show()
+        val providerFuture = ProcessCameraProvider.getInstance(requireContext())
+        providerFuture.addListener({
+            runCatching {
+                if (scannerDialog?.isShowing != true) return@runCatching
+                val provider = providerFuture.get()
+                val cameraSelector = if (provider.hasCamera(CameraSelector.DEFAULT_BACK_CAMERA)) {
+                    CameraSelector.DEFAULT_BACK_CAMERA
+                } else {
+                    CameraSelector.DEFAULT_FRONT_CAMERA
+                }
+                val preview = Preview.Builder().build().also { it.surfaceProvider = previewView.surfaceProvider }
+                val analysis = ImageAnalysis.Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
+                analysis.setAnalyzer(cameraAnalysis) { image ->
+                    try {
+                        if (scanning) QrFrameDecoder.decode(image)?.let { raw ->
+                            scanning = false
+                            activity?.runOnUiThread {
+                                handleSubscriptionQr(raw)
+                            }
+                        }
+                    } catch (_: Throwable) {
+                        // ponytail: defensive — single bad frame should not kill scanner
+                    } finally {
+                        image.close()
+                    }
+                }
+                provider.unbindAll()
+                provider.bindToLifecycle(viewLifecycleOwner, cameraSelector, preview, analysis)
+                cameraProvider = provider
+                scanning = true
+            }.onFailure {
+                stopSubscriptionScanner()
+                showError(it)
+            }
+        }, ContextCompat.getMainExecutor(requireContext()))
+    }
+
+    private fun stopSubscriptionScanner() {
+        scanning = false
+        bundleImports.clear()
+        cameraProvider?.unbindAll()
+        cameraProvider = null
+        scannerDialog?.let { if (it.isShowing) it.dismiss() }
+        scannerDialog = null
+    }
+
+    private fun dpToPx(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    private fun handleSubscriptionQr(raw: String) {
+        val trimmed = raw.trim()
+        if (trimmed == lastScannedSubscriptionQr) {
+            scanning = true
+            return
+        }
+        lastScannedSubscriptionQr = trimmed
+        if (trimmed.startsWith("olcrtc+part:", true)) {
+            runCatching { bundleImports.accept(trimmed) }
+                .onSuccess { result ->
+                    when (result) {
+                        is BundleImportResult.Pending -> {
+                            scannerDialog?.setTitle(
+                                getString(R.string.subscription_qr_progress, result.received, result.total),
+                            )
+                            scanning = true
+                        }
+                        is BundleImportResult.Complete -> {
+                            stopSubscriptionScanner()
+                            saveSubscriptionBundle(result)
+                        }
+                    }
+                }
+                .onFailure {
+                    stopSubscriptionScanner()
+                    showError(it)
+                }
+            return
+        }
+        stopSubscriptionScanner()
+        saveNewSubscription(trimmed)
+    }
+
+    private fun saveSubscriptionBundle(result: BundleImportResult.Complete) {
+        storage.execute {
+            val saved = runCatching {
+                profiles.insertSubscription(result.bundle).also {
+                    SubscriptionRefresher(profiles).refresh(it)
+                }
+            }
+            activity?.runOnUiThread {
+                saved.onFailure(::showError)
+                loadProfiles()
+            }
+        }
     }
 
     private fun saveNewSubscription(raw: String) {
         storage.execute {
             val result = runCatching {
-                val values = parseKeyValueLines(raw)
-                val id = profiles.insertSubscriptionSource(
-                    name = values["name"].orEmpty(),
-                    url = values["url"].orEmpty(),
-                    kind = values["kind"] ?: "GENERIC",
-                )
-                SubscriptionRefresher(profiles).refresh(id)
+                if (raw.startsWith("{") || raw.startsWith("olcrtc+gz:", true)) {
+                    val bundle = bundleImports.accept(raw) as BundleImportResult.Complete
+                    profiles.insertSubscription(bundle.bundle)
+                } else {
+                    val uri = java.net.URI(raw)
+                    require(uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank()) {
+                        getString(R.string.subscription_https_required)
+                    }
+                    profiles.insertSubscriptionSource(
+                        name = requireNotNull(uri.host),
+                        url = raw,
+                        kind = "GENERIC",
+                    )
+                }.also { SubscriptionRefresher(profiles).refresh(it) }
             }
             activity?.runOnUiThread {
-                result.onFailure { showError(it) }
+                result.onFailure(::showError)
                 loadProfiles()
             }
         }
@@ -253,13 +370,19 @@ class ProfilesFragment : Fragment() {
     private fun subscriptionHeader(subscription: SubscriptionSummary): String = buildString {
         append(subscription.name).append(" · ").append(subscription.kind)
         append(" · ").append(subscription.profileCount).append(' ').append(getString(R.string.profiles_count_suffix))
-        subscription.serverVersion?.let { append(" · server ").append(it) }
+        subscription.serverVersion?.let {
+            append(" · ").append(getString(R.string.subscription_server_badge, it))
+        }
         subscription.lastErrorCode?.let { append(" · ").append(it) }
         subscription.lastSuccessAt?.let {
             append(" · ").append(getString(R.string.subscription_last_success, formatTime(it)))
         }
-        if (subscription.mirrorAvailable) append(" · mirror")
-        if (!subscription.enabled) append(" · disabled")
+        if (subscription.mirrorAvailable) {
+            append(" · ").append(getString(R.string.subscription_mirror_badge))
+        }
+        if (!subscription.enabled) {
+            append(" · ").append(getString(R.string.subscription_disabled_badge))
+        }
     }
 
     private fun showSubscriptionDetails(subscription: SubscriptionSummary) {
@@ -270,16 +393,17 @@ class ProfilesFragment : Fragment() {
                     AlertDialog.Builder(requireContext())
                         .setTitle(subscription.name)
                         .setMessage(
-                            buildString {
-                                appendLine("Kind: ${subscription.kind}")
-                                appendLine("Profiles: ${subscription.profileCount}")
-                                appendLine("Server: ${subscription.serverVersion ?: "unknown"}")
-                                appendLine("URL: ${source?.url ?: "unknown"}")
-                                appendLine("Mirror: ${source?.mirrorType ?: "none"}")
-                                appendLine("Last success: ${subscription.lastSuccessAt?.let(::formatTime) ?: "never"}")
-                                appendLine("Last attempt: ${subscription.lastAttemptAt?.let(::formatTime) ?: "never"}")
-                                appendLine("Last error: ${subscription.lastErrorCode ?: "none"}")
-                            },
+                            getString(
+                                R.string.subscription_details_format,
+                                subscription.kind,
+                                subscription.profileCount,
+                                subscription.serverVersion ?: getString(R.string.value_unknown),
+                                source?.url ?: getString(R.string.value_unknown),
+                                source?.mirrorType ?: getString(R.string.value_none),
+                                subscription.lastSuccessAt?.let(::formatTime) ?: getString(R.string.value_never),
+                                subscription.lastAttemptAt?.let(::formatTime) ?: getString(R.string.value_never),
+                                subscription.lastErrorCode ?: getString(R.string.value_none),
+                            ),
                         )
                         .setPositiveButton(android.R.string.ok, null)
                         .show()

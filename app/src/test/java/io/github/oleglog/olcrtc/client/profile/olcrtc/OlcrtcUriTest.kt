@@ -23,6 +23,15 @@ class OlcrtcUriTest {
     }
 
     @Test
+    fun parsesRoomIdFromQrHost() {
+        val profile = OlcrtcUri.parse(
+            "olcrtc://wbstream@room%201?k=$key&t=vp8channel&c=client",
+        )
+
+        assertEquals("room 1", profile.roomId)
+    }
+
+    @Test
     fun parsesVerboseAliasesAndLegacyDefaults() {
         val profile = OlcrtcUri.parse(
             "olcrtc://jitsi@room/test?key=$key&client_id=client&auth.token=token",

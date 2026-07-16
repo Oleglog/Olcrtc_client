@@ -16,6 +16,8 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatDelegate
+import androidx.core.os.LocaleListCompat
 import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
@@ -74,6 +76,7 @@ class SettingsFragment : Fragment() {
         binding.selectApps.setOnClickListener { selectApps() }
         binding.addRoutingRule.setOnClickListener { addRoutingRule() }
         binding.updateGeoAssets.setOnClickListener { updateGeoAssets() }
+        binding.changeLanguage.setOnClickListener { changeLanguage() }
         binding.openAlwaysOn.setOnClickListener { openSystemSettings(Settings.ACTION_VPN_SETTINGS) }
         binding.openBatteryOptimization.setOnClickListener {
             openSystemSettings(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
@@ -90,6 +93,36 @@ class SettingsFragment : Fragment() {
     override fun onDestroyView() {
         _binding = null
         super.onDestroyView()
+    }
+
+    private fun changeLanguage() {
+        val options = arrayOf(
+            getString(R.string.settings_language_system),
+            getString(R.string.settings_language_russian),
+            getString(R.string.settings_language_english),
+        )
+        val current = AppCompatDelegate.getApplicationLocales().toLanguageTags()
+        val selected = when {
+            current.startsWith("ru") -> 1
+            current.startsWith("en") -> 2
+            else -> 0
+        }
+        AlertDialog.Builder(requireContext())
+            .setTitle(R.string.settings_language)
+            .setSingleChoiceItems(options, selected) { dialog, index ->
+                AppCompatDelegate.setApplicationLocales(
+                    LocaleListCompat.forLanguageTags(
+                        when (index) {
+                            1 -> "ru"
+                            2 -> "en"
+                            else -> ""
+                        },
+                    ),
+                )
+                dialog.dismiss()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun load() {

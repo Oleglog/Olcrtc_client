@@ -32,7 +32,12 @@ object OlcrtcUri {
         val transport = parameter(params, "transport", "t")
             ?.let(OlcrtcProfile.Transport::parse)
             ?: OlcrtcProfile.Transport.DATACHANNEL
-        val roomId = decode(uri.rawPath.removePrefix("/"))
+        // QR payloads use the host; legacy links keep the room in the path.
+        val roomId = uri.rawPath
+            ?.takeIf { it != "/" }
+            ?.removePrefix("/")
+            ?.let(::decode)
+            ?: decode(requireNotNull(uri.host))
         val keyHex = required(params, "key", "k")
         val clientId = required(params, "client_id", "c")
 

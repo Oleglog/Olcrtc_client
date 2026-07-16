@@ -66,6 +66,7 @@ class OlcrtcVpnService : VpnService() {
     private var nativeSession: NativeSession? = null
     private var reconnectFuture: ScheduledFuture<*>? = null
     private var networkReconnectRequested = false
+    private var reconnectAttemptCount = 0
     @Volatile private var activeNetwork: Network? = null
 
     private val userUnlockedReceiver = object : BroadcastReceiver() {
@@ -307,7 +308,8 @@ class OlcrtcVpnService : VpnService() {
         if (activeNetwork == null) {
             startForeground(NOTIFICATION_ID, notification())
             transition(VpnState.PREPARING)
-            requestNetworkReconnect(null)
+            networkReconnectRequested = true
+            transition(VpnState.RECONNECTING)
             return
         }
         startForeground(NOTIFICATION_ID, notification())
@@ -379,6 +381,8 @@ class OlcrtcVpnService : VpnService() {
 
     private fun requestNetworkReconnect(delayMillis: Long?) {
         if (activeProfile == null || publishedState !in RECONNECTABLE_STATES) return
+        // Ignore capability callbacks until the initial native session has started.
+        if (nativeSession == null && (publishedState == VpnState.PREPARING || publishedState == VpnState.CONNECTING)) return
         networkReconnectRequested = true
         reconnectFuture?.cancel(false)
         reconnectFuture = null
@@ -414,7 +418,7 @@ class OlcrtcVpnService : VpnService() {
     }
 
     private fun handleConnectionFailure(error: Throwable) {
-        if (isFatalReconnectError(error)) {
+        if (isFatalReconnectError(error) || reconnectAttemptCount >= MAX_RECONNECT_ATTEMPTS) {
             cancelAutomaticReconnect()
             finishConnectionSession(error.message ?: error.javaClass.simpleName)
             persistVpnIntent(false, activeProfile ?: persistedProfileReference())
@@ -423,6 +427,7 @@ class OlcrtcVpnService : VpnService() {
             return
         }
         networkReconnectRequested = true
+        reconnectAttemptCount++
         if (publishedState != VpnState.RECONNECTING) transition(VpnState.RECONNECTING)
         scheduleAutomaticReconnect()
     }
@@ -432,6 +437,7 @@ class OlcrtcVpnService : VpnService() {
         reconnectFuture?.cancel(false)
         reconnectFuture = null
         reconnectBackoff.reset()
+        reconnectAttemptCount = 0
     }
 
     private fun isFatalReconnectError(error: Throwable): Boolean =
@@ -812,6 +818,7 @@ class OlcrtcVpnService : VpnService() {
         const val VPN_IPV6_ADDRESS = "fd00::2"
         const val VPN_IPV6_PREFIX = 128
         const val DATAPATH_TIMEOUT_MILLIS = 10_000
+        const val MAX_RECONNECT_ATTEMPTS = 3
         private val RECONNECTABLE_STATES = setOf(
             VpnState.PREPARING,
             VpnState.CONNECTING,

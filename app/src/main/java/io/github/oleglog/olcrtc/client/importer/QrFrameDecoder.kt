@@ -13,8 +13,13 @@ import com.google.zxing.common.HybridBinarizer
 
 internal object QrFrameDecoder {
     private val hints = mapOf(
-        DecodeHintType.POSSIBLE_FORMATS to listOf(BarcodeFormat.QR_CODE),
+        DecodeHintType.POSSIBLE_FORMATS to listOf(
+            BarcodeFormat.QR_CODE,
+            BarcodeFormat.DATA_MATRIX,
+            BarcodeFormat.AZTEC,
+        ),
         DecodeHintType.TRY_HARDER to true,
+        DecodeHintType.ASSUME_CODE_39_CHECK_DIGIT to false,
         DecodeHintType.CHARACTER_SET to "UTF-8",
     )
 

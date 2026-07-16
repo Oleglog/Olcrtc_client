@@ -76,7 +76,7 @@ class ConnectionFragment : Fragment() {
 
     override fun onViewCreated(view: View, state: Bundle?) {
         binding.connect.setOnClickListener {
-            if (currentState == VpnState.CONNECTED) activityHost.stopVpn() else if (currentState !in BUSY_STATES) connectSelectedOrImport()
+            if (currentState == VpnState.CONNECTED || currentState in BUSY_STATES) activityHost.stopVpn() else connectSelectedOrImport()
         }
         binding.pasteClipboard.setOnClickListener { pasteClipboard() }
         binding.scanQr.setOnClickListener { if (scanning) stopScanner() else requestScanner() }
@@ -224,7 +224,7 @@ class ConnectionFragment : Fragment() {
         selectedSubscriptionProfileId = id
         binding.selectedProfile.text = "$name\n$type - $endpoint"
         binding.status.text = getString(R.string.connection_selected_profile, name)
-        binding.connect.isEnabled = currentState !in BUSY_STATES
+        binding.connect.isEnabled = currentState in BUSY_STATES || currentState == VpnState.CONNECTED || selectedSubscriptionProfileId != null
         refreshAllCardStrokes()
     }
 
@@ -233,7 +233,7 @@ class ConnectionFragment : Fragment() {
         selectedProfileId = id
         binding.selectedProfile.text = "$name\n$type - $endpoint"
         binding.status.text = getString(R.string.connection_selected_profile, name)
-        binding.connect.isEnabled = currentState !in BUSY_STATES
+        binding.connect.isEnabled = currentState in BUSY_STATES || currentState == VpnState.CONNECTED || selectedProfileId != null
         refreshAllCardStrokes()
     }
 
@@ -298,8 +298,10 @@ class ConnectionFragment : Fragment() {
             else -> {}
         }
         binding.status.text = error ?: state.name
-        binding.connect.text = getString(if (state == VpnState.CONNECTED) R.string.disconnect else R.string.connect)
-        binding.connect.isEnabled = state !in BUSY_STATES && (state == VpnState.CONNECTED || selectedProfileId != null || selectedSubscriptionProfileId != null || !binding.profileUri.text.isNullOrBlank())
+        binding.connect.text = getString(
+            if (state == VpnState.CONNECTED || state in BUSY_STATES) R.string.disconnect else R.string.connect
+        )
+        binding.connect.isEnabled = state == VpnState.CONNECTED || state in BUSY_STATES || selectedProfileId != null || selectedSubscriptionProfileId != null || !binding.profileUri.text.isNullOrBlank()
         refreshAllCardStrokes()
     }
 
@@ -426,7 +428,7 @@ class ConnectionFragment : Fragment() {
             selectedProfileId = null
             selectedSubscriptionProfileId = null
             binding.selectedProfile.text = preview.description
-            binding.connect.isEnabled = preview.profileUri != null && currentState !in BUSY_STATES
+            binding.connect.isEnabled = preview.profileUri != null || currentState in BUSY_STATES || currentState == VpnState.CONNECTED
             binding.status.text = "${getString(R.string.import_source, getString(source))}\n$description"
         }.onFailure { binding.status.text = it.message ?: getString(fallbackError) }
     }

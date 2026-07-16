@@ -31,6 +31,17 @@ class MultipartSessionTest {
     }
 
     @Test
+    fun dispatcherCanResetCancelledSession() {
+        val first = parts("first-payload")
+        val second = parts("second-payload")
+        val dispatcher = BundleImportDispatcher()
+
+        assertEquals(BundleImportResult.Pending(1, 2), dispatcher.accept(first[0]))
+        dispatcher.clear()
+        assertEquals(BundleImportResult.Pending(1, 2), dispatcher.accept(second[0]))
+    }
+
+    @Test
     fun rejectsConflictsOtherSessionsAndBadChecksum() {
         val first = parts("first-payload")
         val other = parts("other-payload")

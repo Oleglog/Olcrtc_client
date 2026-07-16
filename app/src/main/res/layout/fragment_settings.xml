@@ -161,11 +161,19 @@
                     android:textAppearance="?attr/textAppearanceBodyMedium" />
 
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/open_always_on"
+                    android:id="@+id/change_language"
                     style="?attr/materialButtonOutlinedStyle"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="12dp"
+                    android:text="@string/settings_language" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/open_always_on"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
                     android:text="@string/settings_always_on" />
 
                 <com.google.android.material.button.MaterialButton
