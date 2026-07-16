@@ -11,6 +11,7 @@ internal data class DnsEndpoint private constructor(
 
     companion object {
         const val DEFAULT = "77.88.8.8:53"
+        const val TUNNEL_DEFAULT = "1.1.1.1:53"
 
         fun parse(value: String): DnsEndpoint {
             val trimmed = value.trim()

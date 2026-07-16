@@ -300,6 +300,7 @@ class NativeSessionTest {
         assertTrue(xray.contains("\"udp\": true"))
         assertTrue(hev.contains("address: 127.0.0.1"))
         assertTrue(hev.contains("port: 1080"))
+        assertFalse(hev.contains("ipv6:"))
         val olcrtcXray = NativeConfig.xray(1080, 1081)
         assertTrue(olcrtcXray.contains("\"protocol\": \"socks\""))
         assertTrue(olcrtcXray.contains("\"port\": 1081"))

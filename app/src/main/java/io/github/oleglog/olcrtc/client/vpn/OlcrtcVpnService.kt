@@ -589,9 +589,7 @@ class OlcrtcVpnService : VpnService() {
             .setSession(getString(R.string.app_name))
             .setMtu(VPN_MTU)
             .addAddress(VPN_IPV4_ADDRESS, VPN_IPV4_PREFIX)
-            .addAddress(VPN_IPV6_ADDRESS, VPN_IPV6_PREFIX)
             .addRoute("0.0.0.0", 0)
-            .addRoute("::", 0)
             .addDnsServer(NativeConfig.VPN_DNS_ADDRESS)
         activeNetwork?.let { builder.setUnderlyingNetworks(arrayOf(it)) }
         applyPerAppPolicy(builder, routingSettings.getPerAppPolicy())
@@ -638,22 +636,18 @@ class OlcrtcVpnService : VpnService() {
         } else {
             requestedRoutingPolicy
         }
-        val profileDns = when (profile) {
-            is ProfileConfig.Olcrtc -> profile.value.dnsServer
-            is ProfileConfig.Standard -> profile.value.dnsServer
-        }
-        val dns = DnsEndpoint.parse(profileDns ?: routingSettings.getDnsServer() ?: DnsEndpoint.DEFAULT)
+        val dns = sessionDns(profile, routingSettings.getDnsServer())
         val xraySocksPort: Int
         val xrayConfig: String
         val olcrtcConfig: NativeOlcrtcConfig?
         when (profile) {
             is ProfileConfig.Olcrtc -> {
-                olcrtcConfig = NativeOlcrtcConfig.from(profile.value, freeLoopbackPort(), dns)
+                olcrtcConfig = NativeOlcrtcConfig.from(profile.value, freeLoopbackPort(), checkNotNull(dns.carrier))
                 xraySocksPort = freeLoopbackPort(olcrtcConfig.socksPort)
                 xrayConfig = NativeConfig.xray(
                     socksPort = xraySocksPort,
                     olcrtcSocksPort = olcrtcConfig.socksPort,
-                    dns = dns,
+                    dns = dns.tunnel,
                     routingRules = routingRules,
                     routingPolicy = routingPolicy,
                 )
@@ -664,7 +658,7 @@ class OlcrtcVpnService : VpnService() {
                 xrayConfig = NativeConfig.xray(
                     socksPort = xraySocksPort,
                     profile = profile.value,
-                    dns = dns,
+                    dns = dns.tunnel,
                     routingRules = routingRules,
                     routingPolicy = routingPolicy,
                 )
@@ -674,7 +668,7 @@ class OlcrtcVpnService : VpnService() {
             nativeCore = GomobileCore,
             hevTunnel = HevTunnel(),
             establishTun = ::establishTun,
-            verifyDatapath = { verifyDatapath(xraySocksPort, dns) },
+            verifyDatapath = { verifyDatapath(xraySocksPort, dns.tunnel) },
             reportStage = { message, error ->
                 diagnostics.append(
                     if (error == null) "info" else "error",
@@ -691,7 +685,7 @@ class OlcrtcVpnService : VpnService() {
                 olcrtcConfig = olcrtcConfig,
             )
             activeSocksPort = xraySocksPort
-            activeDnsEndpoint = dns
+            activeDnsEndpoint = dns.tunnel
         }
     }
 
@@ -991,8 +985,6 @@ class OlcrtcVpnService : VpnService() {
         const val VPN_MTU = 1500
         const val VPN_IPV4_ADDRESS = "10.0.0.2"
         const val VPN_IPV4_PREFIX = 32
-        const val VPN_IPV6_ADDRESS = "fd00::2"
-        const val VPN_IPV6_PREFIX = 128
         const val DATAPATH_TIMEOUT_MILLIS = 10_000
         const val MAX_DNS_RESPONSE_BYTES = 65_535
         const val MAX_RECONNECT_ATTEMPTS = 3

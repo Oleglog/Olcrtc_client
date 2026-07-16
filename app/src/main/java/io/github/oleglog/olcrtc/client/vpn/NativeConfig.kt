@@ -37,7 +37,6 @@ internal object NativeConfig {
         tunnel:
           mtu: 1500
           ipv4: 10.0.0.2
-          ipv6: 'fd00::2'
         socks5:
           port: $socksPort
           address: 127.0.0.1

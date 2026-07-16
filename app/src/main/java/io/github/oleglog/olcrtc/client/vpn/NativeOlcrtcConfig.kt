@@ -1,7 +1,23 @@
 package io.github.oleglog.olcrtc.client.vpn
 
+import io.github.oleglog.olcrtc.client.data.ProfileConfig
 import io.github.oleglog.olcrtc.client.profile.olcrtc.OlcrtcProfile
 import io.github.oleglog.olcrtc.client.routing.DnsEndpoint
+
+internal data class SessionDns(
+    val tunnel: DnsEndpoint,
+    val carrier: DnsEndpoint? = null,
+)
+
+internal fun sessionDns(profile: ProfileConfig, globalDns: String?): SessionDns = when (profile) {
+    is ProfileConfig.Olcrtc -> SessionDns(
+        tunnel = DnsEndpoint.parse(globalDns ?: DnsEndpoint.TUNNEL_DEFAULT),
+        carrier = DnsEndpoint.parse(profile.value.dnsServer ?: globalDns ?: DnsEndpoint.DEFAULT),
+    )
+    is ProfileConfig.Standard -> SessionDns(
+        tunnel = DnsEndpoint.parse(profile.value.dnsServer ?: globalDns ?: DnsEndpoint.TUNNEL_DEFAULT),
+    )
+}
 
 internal data class NativeOlcrtcConfig(
     val provider: String,
