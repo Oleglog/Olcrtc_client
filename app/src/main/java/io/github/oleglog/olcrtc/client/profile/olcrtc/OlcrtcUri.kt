@@ -23,7 +23,10 @@ object OlcrtcUri {
         require(uri.scheme.equals("olcrtc", ignoreCase = true)) { "Unsupported URI scheme" }
         val provider = uri.userInfo?.let(OlcrtcProfile.Provider::parse)
             ?: throw IllegalArgumentException("Provider is required")
-        require(!uri.host.isNullOrBlank()) { "olcRTC URI host is required" }
+        val roomHost = uri.host ?: uri.rawAuthority
+            ?.substringAfter('@', missingDelimiterValue = "")
+            ?.takeIf { it.isNotBlank() && ':' !in it }
+        require(!roomHost.isNullOrBlank()) { "olcRTC URI host is required" }
 
         val params = parseQuery(uri.rawQuery)
         val unknown = params.keys - allowedParameters
@@ -37,7 +40,7 @@ object OlcrtcUri {
             ?.takeIf { it != "/" }
             ?.removePrefix("/")
             ?.let(::decode)
-            ?: decode(requireNotNull(uri.host))
+            ?: decode(requireNotNull(roomHost))
         val keyHex = required(params, "key", "k")
         val clientId = required(params, "client_id", "c")
 

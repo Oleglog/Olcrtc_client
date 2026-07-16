@@ -62,13 +62,14 @@ object StandardUri {
             realityPublicKey = params["pbk"]?.takeIf(String::isNotBlank),
             realityShortId = params["sid"]?.takeIf(String::isNotBlank),
             realitySpiderX = params["spx"]?.takeIf(String::isNotBlank),
-            webSocketHost = params["host"]?.takeIf(String::isNotBlank),
-            webSocketPath = path?.takeIf(String::isNotBlank),
-            grpcServiceName = (params["serviceName"] ?: path)?.takeIf(String::isNotBlank),
-            xhttpMode = params["mode"]?.takeIf(String::isNotBlank),
-            xhttpHost = params["host"]?.takeIf(String::isNotBlank),
-            xhttpPath = path?.takeIf(String::isNotBlank),
-            xhttpExtraJson = params["extra"]?.takeIf(String::isNotBlank),
+            webSocketHost = params["host"]?.takeIf { transport == StandardProfile.Transport.WS && it.isNotBlank() },
+            webSocketPath = path?.takeIf { transport == StandardProfile.Transport.WS && it.isNotBlank() },
+            grpcServiceName = (params["serviceName"] ?: path)
+                ?.takeIf { transport == StandardProfile.Transport.GRPC && it.isNotBlank() },
+            xhttpMode = params["mode"]?.takeIf { transport == StandardProfile.Transport.XHTTP && it.isNotBlank() },
+            xhttpHost = params["host"]?.takeIf { transport == StandardProfile.Transport.XHTTP && it.isNotBlank() },
+            xhttpPath = path?.takeIf { transport == StandardProfile.Transport.XHTTP && it.isNotBlank() },
+            xhttpExtraJson = params["extra"]?.takeIf { transport == StandardProfile.Transport.XHTTP && it.isNotBlank() },
             dnsServer = params["dns"]?.takeIf(String::isNotBlank),
         )
     }

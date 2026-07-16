@@ -18,7 +18,7 @@ internal object IssueReportBuilder {
             appendLine("- App version: ${info.appVersion}")
             appendLine("- Android API: ${Build.VERSION.SDK_INT}")
             appendLine("- Device: ${Build.MANUFACTURER} ${Build.MODEL}")
-            appendLine("- ABI: ${Build.SUPPORTED_ABIS.joinToString()}")
+            appendLine("- ABI: ${Build.SUPPORTED_ABIS.orEmpty().joinToString()}")
             appendLine("- Protocol: ${info.protocol ?: "not selected"}")
             info.xrayVersion?.let { appendLine("- Xray: $it") }
             info.olcrtcCoreVersion?.let { appendLine("- olcRTC core: $it") }

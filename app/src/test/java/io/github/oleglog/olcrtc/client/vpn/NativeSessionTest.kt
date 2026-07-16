@@ -88,6 +88,7 @@ class NativeSessionTest {
             vp8BatchSize = 64,
             keepaliveSeconds = 15,
             socksPort = 1081,
+            readyTimeoutMillis = NativeOlcrtcConfig.WBSTREAM_READY_TIMEOUT_MILLIS,
         )
 
         runCatching { session.start(1080, "/assets", "{}", byteArrayOf(1), config) }
