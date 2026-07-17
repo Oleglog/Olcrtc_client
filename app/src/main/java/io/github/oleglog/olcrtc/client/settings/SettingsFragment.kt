@@ -196,12 +196,15 @@ class SettingsFragment : Fragment() {
     private fun toggleBackgroundEffects() {
         val current = settings.getBackgroundEffects()
         val next = !current
-        binding.settingsEffectsSwitch.tag = true
-        binding.settingsEffectsSwitch.isChecked = next
-        binding.settingsEffectsSwitch.tag = null
+        _binding?.let { binding ->
+            binding.settingsEffectsSwitch.tag = true
+            binding.settingsEffectsSwitch.isChecked = next
+            binding.settingsEffectsSwitch.tag = null
+        }
         viewLifecycleOwner.lifecycleScope.launch {
             withContext(Dispatchers.IO) { settings.setBackgroundEffects(next) }
             _binding?.status?.setText(R.string.settings_saved)
+            load()
         }
     }
 

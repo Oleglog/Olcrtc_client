@@ -31,7 +31,6 @@ internal class ParticleDriftView @JvmOverloads constructor(
     private var running = false
     private var lastWidth = 0
     private var lastHeight = 0
-
     private val frameCallback = object : Choreographer.FrameCallback {
         override fun doFrame(frameTimeNanos: Long) {
             if (!running) return
@@ -46,7 +45,7 @@ internal class ParticleDriftView @JvmOverloads constructor(
 
     init {
         val a = context.obtainStyledAttributes(
-            attrs, intArrayOf(com.google.android.material.R.attr.colorPrimary), defStyleAttr, 0,
+            attrs, intArrayOf(android.R.attr.colorPrimary), defStyleAttr, 0,
         )
         accentColor = a.getColor(0, 0).also { a.recycle() }
         setLayerType(LAYER_TYPE_HARDWARE, null)
@@ -58,6 +57,11 @@ internal class ParticleDriftView @JvmOverloads constructor(
         updateRunning()
     }
 
+    override fun setVisibility(visibility: Int) {
+        super.setVisibility(visibility)
+        updateRunning()
+    }
+
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         lastWidth = w
@@ -66,16 +70,8 @@ internal class ParticleDriftView @JvmOverloads constructor(
         updateRunning()
     }
 
-    override fun onWindowVisibilityChanged(visible: Boolean) {
-        super.onWindowVisibilityChanged(visible)
-        windowVisible = visible
-        updateRunning()
-    }
-
-    private var windowVisible = true
-
     private fun updateRunning() {
-        val shouldRun = active && isShown && windowVisible && animationsEnabled() && width > 0
+        val shouldRun = active && isShown && animationsEnabled() && width > 0
         if (shouldRun == running) return
         running = shouldRun
         if (running) {

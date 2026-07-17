@@ -118,6 +118,8 @@ class ConnectionFragment : Fragment() {
     }
 
     override fun onDestroyView() {
+        pulseAnimator?.cancel()
+        pulseAnimator = null
         _binding = null
         super.onDestroyView()
     }
@@ -337,7 +339,7 @@ class ConnectionFragment : Fragment() {
         setBackgroundResource(backgroundValue.resourceId)
         setImageResource(iconRes)
         val pressedColor = if (destructive) {
-            resolveColor(com.google.android.material.R.attr.colorError)
+            ContextCompat.getColor(requireContext(), R.color.olcrtc_error)
         } else {
             ContextCompat.getColor(requireContext(), R.color.olcrtc_primary)
         }
@@ -690,22 +692,26 @@ class ConnectionFragment : Fragment() {
     }
 
     private var applyingPulse = false
+    private var pulseAnimator: android.animation.ObjectAnimator? = null
 
     private fun updateConnectPulse() {
         if (_binding == null) return
         val button = binding.connect
-        button.animate().setListener(null)
-        button.animate().cancel()
+        pulseAnimator?.cancel()
+        pulseAnimator = null
         if (!applyingPulse || !animationsEnabled()) {
             button.translationZ = 0f
             return
         }
-        button.animate()
-            .translationZ(dimen(R.dimen.button_pulse_elevation).toFloat())
-            .setDuration(600L)
-            .setRepeatMode(android.animation.ValueAnimator.REVERSE)
-            .setRepeatCount(android.animation.ValueAnimator.INFINITE)
-            .start()
+        val targetZ = dimen(R.dimen.button_pulse_elevation).toFloat()
+        // ponytail: ObjectAnimator used because ViewPropertyAnimator has no repeat.
+        android.animation.ObjectAnimator.ofFloat(button, "translationZ", 0f, targetZ, 0f).apply {
+            duration = 600L
+            repeatMode = android.animation.ValueAnimator.REVERSE
+            repeatCount = android.animation.ValueAnimator.INFINITE
+            start()
+            pulseAnimator = this
+        }
     }
 
     private fun vpnStateText(state: VpnState, stage: ConnectionStage, reconnectAttempt: Int): String = when (state) {
