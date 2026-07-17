@@ -63,6 +63,7 @@
         android:layout_marginStart="@dimen/page_padding"
         android:layout_marginTop="@dimen/space_3"
         android:layout_marginEnd="@dimen/page_padding"
+        android:orientation="vertical"
         app:checkedButton="@id/mode_all"
         app:selectionRequired="true"
         app:singleSelection="true">
@@ -70,33 +71,49 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/mode_all"
             style="?attr/materialButtonOutlinedStyle"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:gravity="start|center_vertical"
+            android:minHeight="52dp"
             android:maxLines="2"
+            android:ellipsize="end"
             android:text="@string/settings_per_app_all"
             app:cornerRadius="@dimen/corner_button" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/mode_exclude"
             style="?attr/materialButtonOutlinedStyle"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:gravity="start|center_vertical"
+            android:minHeight="52dp"
             android:maxLines="2"
+            android:ellipsize="end"
             android:text="@string/settings_per_app_exclude"
             app:cornerRadius="@dimen/corner_button" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/mode_only"
             style="?attr/materialButtonOutlinedStyle"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:gravity="start|center_vertical"
+            android:minHeight="52dp"
             android:maxLines="2"
+            android:ellipsize="end"
             android:text="@string/settings_per_app_only"
             app:cornerRadius="@dimen/corner_button" />
     </com.google.android.material.button.MaterialButtonToggleGroup>
+
+    <TextView
+        android:id="@+id/mode_preview"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/page_padding"
+        android:layout_marginTop="@dimen/space_2"
+        android:layout_marginEnd="@dimen/page_padding"
+        android:textAppearance="?attr/textAppearanceBodyMedium"
+        android:textColor="?attr/colorOnSurfaceVariant" />
 
     <com.google.android.material.button.MaterialButtonToggleGroup
         android:id="@+id/type_filter"

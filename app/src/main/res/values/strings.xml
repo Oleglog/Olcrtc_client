@@ -146,6 +146,9 @@
     <string name="settings_apps_select_all">Select all</string>
     <string name="settings_apps_clear">Clear</string>
     <string name="settings_apps_selected">Selected: %1$d</string>
+    <string name="settings_per_app_preview_all">All applications go through VPN.</string>
+    <string name="settings_per_app_preview_exclude">All apps through VPN, except %1$d selected.</string>
+    <string name="settings_per_app_preview_only">Only %1$d selected apps go through VPN.</string>
     <string name="settings_apps_only_empty">Select at least one application for “Only selected”.</string>
     <string name="settings_app_selected">selected</string>
     <string name="settings_app_not_selected">not selected</string>
@@ -200,6 +203,8 @@
     <string name="settings_update_no_asset">Release found, but no compatible APK asset is available</string>
     <string name="settings_system_screen_unavailable">System settings screen is unavailable on this device</string>
     <string name="settings_diagnostics_title">Diagnostics</string>
+    <string name="settings_background_effects">Background particles</string>
+    <string name="settings_background_effects_summary">Light drifting particles on the connection screen. Turns off automatically when the VPN is stopped.</string>
     <string name="settings_diagnostics_description">Local troubleshooting logs with secrets removed. Nothing is sent automatically.</string>
     <string name="settings_view_diagnostics">View redacted diagnostics</string>
     <string name="settings_copy_diagnostics">Copy redacted diagnostics</string>

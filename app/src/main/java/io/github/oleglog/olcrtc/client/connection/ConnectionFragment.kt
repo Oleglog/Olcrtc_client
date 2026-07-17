@@ -42,6 +42,7 @@ import io.github.oleglog.olcrtc.client.importer.ImportPayload
 import io.github.oleglog.olcrtc.client.importer.QrScannerActivity
 import io.github.oleglog.olcrtc.client.profile.ImportedProfile
 import io.github.oleglog.olcrtc.client.profile.ProfileUri
+import io.github.oleglog.olcrtc.client.routing.RoutingSettings
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import io.github.oleglog.olcrtc.client.vpn.VpnState
 import io.github.oleglog.olcrtc.client.vpn.ConnectionStage
@@ -98,16 +99,21 @@ class ConnectionFragment : Fragment() {
         binding.testSelected.setOnClickListener { testSelectedProfile() }
     }
 
+    private var backgroundEffectsEnabled = false
+
     override fun onStart() {
         super.onStart()
         activityHost.setVpnStateListener(::showVpnState)
         activityHost.setImportListener { validatePreview(it, R.string.source_deep_link) }
+        backgroundEffectsEnabled = RoutingSettings.open(requireContext().applicationContext).getBackgroundEffects()
+        applyParticleDrift()
         loadProfiles()
     }
 
     override fun onStop() {
         activityHost.setImportListener(null)
         activityHost.setVpnStateListener(null)
+        _binding?.particleDrift?.setActive(false)
         super.onStop()
     }
 
@@ -249,6 +255,20 @@ class ConnectionFragment : Fragment() {
         radius = dimen(R.dimen.corner_card).toFloat()
         cardElevation = 0f
         setCardBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurface))
+        val rippleValue = TypedValue()
+        requireContext().theme.resolveAttribute(
+            android.R.attr.selectableItemBackground,
+            rippleValue,
+            true,
+        )
+        foreground = ContextCompat.getDrawable(requireContext(), rippleValue.resourceId)
+        clipChildren = false
+        val mark = View(requireContext()).apply {
+            setBackgroundColor(resolveColor(com.google.android.material.R.attr.colorOutline))
+        }
+        addView(mark, LinearLayout.LayoutParams(
+            dimen(R.dimen.card_status_mark_width), LinearLayout.LayoutParams.MATCH_PARENT,
+        ))
 
         val detail = TextView(requireContext()).apply {
             text = type
@@ -270,7 +290,7 @@ class ConnectionFragment : Fragment() {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(
-                dimen(R.dimen.space_4),
+                dimen(R.dimen.space_3),
                 dimen(R.dimen.space_3),
                 dimen(R.dimen.space_1),
                 dimen(R.dimen.space_3),
@@ -289,36 +309,54 @@ class ConnectionFragment : Fragment() {
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(progress)
             addView(iconButton(R.drawable.ic_edit_20, R.string.edit, onEdit))
-            addView(iconButton(R.drawable.ic_delete_20, R.string.delete, onDelete))
-        })
-        tag = ConnectionCardViews(reference, name, type, detail, progress)
+            addView(iconButton(R.drawable.ic_delete_20, R.string.delete, onDelete, destructive = true))
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT,
+        ))
+        tag = ConnectionCardViews(reference, name, type, detail, progress, mark)
         setOnClickListener { onSelect() }
         applyCardAppearance(this, isReferenceSelected(reference), isReferenceConnected(reference))
     }
 
-    private fun iconButton(iconRes: Int, descriptionRes: Int, action: () -> Unit): AppCompatImageButton =
-        AppCompatImageButton(requireContext()).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                dimen(R.dimen.icon_touch_target),
-                dimen(R.dimen.icon_touch_target),
-            )
-            val backgroundValue = TypedValue()
-            requireContext().theme.resolveAttribute(
-                android.R.attr.selectableItemBackgroundBorderless,
-                backgroundValue,
-                true,
-            )
-            setBackgroundResource(backgroundValue.resourceId)
-            setImageResource(iconRes)
-            imageTintList = ColorStateList.valueOf(
-                resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant),
-            )
-            scaleType = ImageView.ScaleType.CENTER
-            val iconPadding = (dimen(R.dimen.icon_touch_target) - dimen(R.dimen.icon_action_size)) / 2
-            setPadding(iconPadding, iconPadding, iconPadding, iconPadding)
-            contentDescription = getString(descriptionRes)
-            setOnClickListener { action() }
+    private fun iconButton(
+        iconRes: Int,
+        descriptionRes: Int,
+        action: () -> Unit,
+        destructive: Boolean = false,
+    ): AppCompatImageButton = AppCompatImageButton(requireContext()).apply {
+        layoutParams = LinearLayout.LayoutParams(
+            dimen(R.dimen.icon_touch_target),
+            dimen(R.dimen.icon_touch_target),
+        )
+        val backgroundValue = TypedValue()
+        requireContext().theme.resolveAttribute(
+            android.R.attr.selectableItemBackgroundBorderless,
+            backgroundValue,
+            true,
+        )
+        setBackgroundResource(backgroundValue.resourceId)
+        setImageResource(iconRes)
+        val pressedColor = if (destructive) {
+            resolveColor(com.google.android.material.R.attr.colorError)
+        } else {
+            ContextCompat.getColor(requireContext(), R.color.olcrtc_primary)
         }
+        imageTintList = ColorStateList(
+            arrayOf(
+                intArrayOf(android.R.attr.state_pressed),
+                intArrayOf(),
+            ),
+            intArrayOf(
+                pressedColor,
+                resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant),
+            ),
+        )
+        scaleType = ImageView.ScaleType.CENTER
+        val iconPadding = (dimen(R.dimen.icon_touch_target) - dimen(R.dimen.icon_action_size)) / 2
+        setPadding(iconPadding, iconPadding, iconPadding, iconPadding)
+        contentDescription = getString(descriptionRes)
+        setOnClickListener { action() }
+    }
 
     private fun applyCardAppearance(card: MaterialCardView, selected: Boolean, connected: Boolean) {
         val state = connectionCardState(
@@ -335,10 +373,34 @@ class ConnectionFragment : Fragment() {
             ConnectionCardState.CONNECTED -> dimen(R.dimen.card_border_active)
             ConnectionCardState.SELECTED, ConnectionCardState.INACTIVE -> dimen(R.dimen.card_border)
         }
-        card.cardElevation = 0f
+        animateCardElevation(card, when (state) {
+            ConnectionCardState.CONNECTED -> dimen(R.dimen.card_elevation_connected).toFloat()
+            ConnectionCardState.SELECTED -> dimen(R.dimen.card_elevation_selected).toFloat()
+            ConnectionCardState.INACTIVE -> 0f
+        })
         card.alpha = 1f
         card.setCardBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurface))
+        (card.tag as? ConnectionCardViews)?.mark?.setBackgroundColor(
+            if (state == ConnectionCardState.INACTIVE) {
+                resolveColor(com.google.android.material.R.attr.colorSurfaceVariant)
+            } else {
+                ContextCompat.getColor(requireContext(), R.color.olcrtc_primary)
+            },
+        )
         updateCardContent(card, state)
+    }
+
+    private fun animateCardElevation(card: MaterialCardView, targetElevation: Float) {
+        if (!animationsEnabled()) {
+            card.cardElevation = targetElevation
+            return
+        }
+        val start = card.cardElevation
+        if (start == targetElevation) return
+        android.animation.ValueAnimator.ofFloat(start, targetElevation).apply {
+            duration = 150L
+            addUpdateListener { card.cardElevation = it.animatedValue as Float }
+        }.start()
     }
 
     private fun resolveColor(attribute: Int): Int {
@@ -558,6 +620,7 @@ class ConnectionFragment : Fragment() {
             latencyRequestId++
             latencyInProgress = false
         }
+        applyParticleDrift()
         when (state) {
             VpnState.CONNECTED -> {
                 val active = activityHost.activeProfileReference()
@@ -574,7 +637,7 @@ class ConnectionFragment : Fragment() {
         }
         binding.connectionSummary.text = vpnStateText(state, stage, reconnectAttempt)
         showStatus(error ?: if (state == VpnState.ERROR) getString(R.string.vpn_notification_error) else null)
-        binding.connect.text = getString(
+        val connectText = getString(
             when (state) {
                 VpnState.PREPARING, VpnState.CONNECTING -> R.string.cancel_connection
                 VpnState.CONNECTED, VpnState.RECONNECTING -> R.string.disconnect
@@ -583,8 +646,66 @@ class ConnectionFragment : Fragment() {
                 VpnState.NO_PROFILE, VpnState.DISCONNECTED -> R.string.connect
             },
         )
+        setConnectButtonText(connectText)
+        applyingPulse = state in PULSE_STATES
+        updateConnectPulse()
         updateActionAvailability()
         refreshCardAppearance()
+    }
+
+    private fun applyParticleDrift() {
+        val view = _binding?.particleDrift ?: return
+        view.visibility = if (backgroundEffectsEnabled) View.VISIBLE else View.GONE
+        view.setActive(backgroundEffectsEnabled && currentState == VpnState.CONNECTED)
+    }
+
+    private fun setConnectButtonText(text: CharSequence) {
+        if (_binding == null) return
+        val button = binding.connect
+        if (button.text == text) return
+        if (!animationsEnabled()) {
+            button.text = text
+            return
+        }
+        button.animate().cancel()
+        button.animate()
+            .alpha(0f)
+            .setDuration(100L)
+            .withEndAction {
+                button.text = text
+                button.animate().cancel()
+                button.animate().alpha(1f).setDuration(120L).start()
+            }
+            .start()
+    }
+
+    private fun animationsEnabled(): Boolean {
+        val resolver = requireContext().contentResolver
+        val scale = android.provider.Settings.Global.getFloat(
+            resolver,
+            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+            1f,
+        )
+        return scale != 0f
+    }
+
+    private var applyingPulse = false
+
+    private fun updateConnectPulse() {
+        if (_binding == null) return
+        val button = binding.connect
+        button.animate().setListener(null)
+        button.animate().cancel()
+        if (!applyingPulse || !animationsEnabled()) {
+            button.translationZ = 0f
+            return
+        }
+        button.animate()
+            .translationZ(dimen(R.dimen.button_pulse_elevation).toFloat())
+            .setDuration(600L)
+            .setRepeatMode(android.animation.ValueAnimator.REVERSE)
+            .setRepeatCount(android.animation.ValueAnimator.INFINITE)
+            .start()
     }
 
     private fun vpnStateText(state: VpnState, stage: ConnectionStage, reconnectAttempt: Int): String = when (state) {
@@ -951,6 +1072,7 @@ class ConnectionFragment : Fragment() {
         val type: String,
         val detail: TextView,
         val progress: CircularProgressIndicator,
+        val mark: View,
     )
 
     companion object {
@@ -961,6 +1083,10 @@ class ConnectionFragment : Fragment() {
             VpnState.STOPPING,
         )
         private val CARD_PROGRESS_STATES = BUSY_STATES
+        private val PULSE_STATES = setOf(
+            VpnState.PREPARING,
+            VpnState.CONNECTING,
+        )
     }
 }
 

@@ -64,6 +64,7 @@ class SettingsFragment : Fragment() {
         val binding = requireNotNull(_binding)
         binding.settingsRoutingRow.setOnClickListener { showRoutingSettings() }
         binding.settingsAppsRow.setOnClickListener { selectApps() }
+        binding.settingsEffectsRow.setOnClickListener { toggleBackgroundEffects() }
         binding.settingsDnsRow.setOnClickListener { showDnsSettings() }
         binding.settingsSystemRow.setOnClickListener {
             showActions(
@@ -151,9 +152,13 @@ class SettingsFragment : Fragment() {
                     dnsServer = settings.getDnsServer(),
                     perAppPolicy = settings.getPerAppPolicy(),
                     routingRules = profiles.getEnabledRoutingRules().size,
+                    backgroundEffects = settings.getBackgroundEffects(),
                 )
             }
             val binding = _binding ?: return@launch
+            binding.settingsEffectsSwitch.tag = true
+            binding.settingsEffectsSwitch.isChecked = values.backgroundEffects
+            binding.settingsEffectsSwitch.tag = null
             val preset = getString(
                 if (values.routingPolicy.preset == RoutingPolicy.Preset.ALL_VPN) {
                     R.string.routing_all_vpn
@@ -186,6 +191,18 @@ class SettingsFragment : Fragment() {
 
     private fun selectApps() {
         startActivity(Intent(requireContext(), AppSelectorActivity::class.java))
+    }
+
+    private fun toggleBackgroundEffects() {
+        val current = settings.getBackgroundEffects()
+        val next = !current
+        binding.settingsEffectsSwitch.tag = true
+        binding.settingsEffectsSwitch.isChecked = next
+        binding.settingsEffectsSwitch.tag = null
+        viewLifecycleOwner.lifecycleScope.launch {
+            withContext(Dispatchers.IO) { settings.setBackgroundEffects(next) }
+            _binding?.status?.setText(R.string.settings_saved)
+        }
     }
 
     private fun showRoutingSettings() {
@@ -743,6 +760,7 @@ class SettingsFragment : Fragment() {
         val dnsServer: String?,
         val perAppPolicy: PerAppPolicy,
         val routingRules: Int,
+        val backgroundEffects: Boolean,
     )
 
     private companion object {

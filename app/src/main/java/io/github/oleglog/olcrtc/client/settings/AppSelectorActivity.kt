@@ -63,6 +63,7 @@ class AppSelectorActivity : AppCompatActivity() {
                 render()
             }
         }
+        binding.modeGroup.addOnButtonCheckedListener { _, _, _ -> render() }
         binding.selectAll.setOnClickListener {
             adapter.currentList.mapTo(selectedPackages, AppRoutingItem::packageName)
             render()
@@ -122,6 +123,13 @@ class AppSelectorActivity : AppCompatActivity() {
         }
         adapter.submitList(visible)
         binding.selectedCount.text = getString(R.string.settings_apps_selected, selectedPackages.size)
+        binding.modePreview.text = when (binding.modeGroup.checkedButtonId.mode) {
+            PerAppPolicy.Mode.ALL -> getString(R.string.settings_per_app_preview_all)
+            PerAppPolicy.Mode.EXCLUDE_SELECTED ->
+                getString(R.string.settings_per_app_preview_exclude, selectedPackages.size)
+            PerAppPolicy.Mode.ONLY_SELECTED ->
+                getString(R.string.settings_per_app_preview_only, selectedPackages.size)
+        }
         binding.error.isVisible = false
     }
 

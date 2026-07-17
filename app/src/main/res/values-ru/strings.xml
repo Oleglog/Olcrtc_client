@@ -147,6 +147,9 @@
     <string name="settings_apps_select_all">Выбрать все</string>
     <string name="settings_apps_clear">Очистить</string>
     <string name="settings_apps_selected">Выбрано: %1$d</string>
+    <string name="settings_per_app_preview_all">Все приложения идут через VPN.</string>
+    <string name="settings_per_app_preview_exclude">Все приложения через VPN, кроме %1$d выбранных.</string>
+    <string name="settings_per_app_preview_only">Только выбранные приложения (%1$d) идут через VPN.</string>
     <string name="settings_apps_only_empty">Выберите хотя бы одно приложение для режима «Только выбранные».</string>
     <string name="settings_app_selected">выбрано</string>
     <string name="settings_app_not_selected">не выбрано</string>
@@ -201,6 +204,8 @@
     <string name="settings_update_no_asset">Релиз найден, но совместимого APK-файла нет</string>
     <string name="settings_system_screen_unavailable">Эти системные настройки недоступны на устройстве</string>
     <string name="settings_diagnostics_title">Диагностика и обновления</string>
+    <string name="settings_background_effects">Частицы на фоне</string>
+    <string name="settings_background_effects_summary">Лёгкие дрейфующие частицы на экране подключения. Выключаются автоматически при остановке VPN.</string>
     <string name="settings_diagnostics_description">Локальные журналы без секретных данных. Ничего не отправляется автоматически.</string>
     <string name="settings_view_diagnostics">Открыть очищенный журнал</string>
     <string name="settings_copy_diagnostics">Копировать очищенный журнал</string>

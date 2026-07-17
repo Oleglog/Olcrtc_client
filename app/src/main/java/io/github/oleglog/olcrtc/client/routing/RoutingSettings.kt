@@ -31,6 +31,10 @@ internal class RoutingSettings private constructor(
         store.data.first()[DNS_SERVER]
     }
 
+    fun getBackgroundEffects(): Boolean = runBlocking {
+        store.data.first()[BACKGROUND_EFFECTS] ?: false
+    }
+
     fun getPerAppPolicy(): PerAppPolicy = runBlocking {
         val preferences = store.data.first()
         PerAppPolicy(
@@ -57,6 +61,10 @@ internal class RoutingSettings private constructor(
         store.edit { preferences ->
             if (normalized == null) preferences.remove(DNS_SERVER) else preferences[DNS_SERVER] = normalized
         }
+    }
+
+    suspend fun setBackgroundEffects(enabled: Boolean) {
+        store.edit { preferences -> preferences[BACKGROUND_EFFECTS] = enabled }
     }
 
     suspend fun set(policy: RoutingPolicy) {
@@ -110,6 +118,7 @@ internal class RoutingSettings private constructor(
         private val PRESET = stringPreferencesKey("preset")
         private val ALLOW_LAN = booleanPreferencesKey("allow_lan")
         private val DNS_SERVER = stringPreferencesKey("dns_server")
+        private val BACKGROUND_EFFECTS = booleanPreferencesKey("background_effects")
         private val PER_APP_MODE = stringPreferencesKey("per_app_mode")
         private val PER_APP_PACKAGES = stringSetPreferencesKey("per_app_packages")
         private val VPN_DESIRED_CONNECTED = booleanPreferencesKey("vpn_desired_connected")

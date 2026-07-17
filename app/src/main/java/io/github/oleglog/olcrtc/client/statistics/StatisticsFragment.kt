@@ -6,7 +6,6 @@ import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
@@ -89,7 +88,6 @@ class StatisticsFragment : Fragment() {
                     currentSession = null
                     b.activeContent.text = it.message ?: getString(R.string.statistics_error)
                     b.todayContent.text = ""
-                    b.monthContent.text = ""
                     b.historyEmpty.visibility = View.VISIBLE
                     b.historyList.removeAllViews()
                 }
@@ -102,13 +100,12 @@ class StatisticsFragment : Fragment() {
         currentSession = summary.current
         b.activeContent.text = summary.current?.let(::formatCurrentSession) ?: getString(R.string.statistics_no_active_session)
         b.todayContent.text = formatTotals(summary.today)
-        b.monthContent.text = formatTotals(summary.month)
         b.historyList.removeAllViews()
         if (summary.recent.isEmpty()) {
             b.historyEmpty.visibility = View.VISIBLE
         } else {
             b.historyEmpty.visibility = View.GONE
-            summary.recent.take(8).forEach { b.historyList.addView(recentSessionRow(it)) }
+            summary.recent.take(5).forEach { b.historyList.addView(recentSessionRow(it)) }
         }
     }
 
@@ -123,35 +120,13 @@ class StatisticsFragment : Fragment() {
             formatBytes(session.bytesUp + session.bytesDown),
             disconnectReasonLabel(session.disconnectReason),
         )
-        val row = LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER_VERTICAL
-            setPadding(0, 6.dp, 0, 6.dp)
-        }
-        row.addView(View(requireContext()).apply {
-            setBackgroundColor(disconnectColor(session.disconnectReason))
-            layoutParams = LinearLayout.LayoutParams(8.dp, 8.dp).apply {
-                marginEnd = 12.dp
-            }
-        })
-        row.addView(TextView(requireContext()).apply {
+        return TextView(requireContext()).apply {
             this.text = text
             setTextAppearance(android.R.style.TextAppearance_Material_Body1)
+            setPadding(0, 6.dp, 0, 6.dp)
             setOnClickListener { showReasonDialog(session) }
-        }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-        return row
+        }
     }
-
-    private fun disconnectColor(reason: String?): Int = requireContext().getColor(
-        when {
-            reason == null -> R.color.olcrtc_primary
-            reason.startsWith("error", ignoreCase = true) || reason.contains("fail", ignoreCase = true) ->
-                R.color.olcrtc_error
-            reason.startsWith("manual", ignoreCase = true) || reason.equals("user", ignoreCase = true) ->
-                R.color.olcrtc_secondary
-            else -> R.color.olcrtc_outline
-        },
-        )
 
     private fun showReasonDialog(session: ConnectionSessionEntity) {
         AlertDialog.Builder(requireContext())
