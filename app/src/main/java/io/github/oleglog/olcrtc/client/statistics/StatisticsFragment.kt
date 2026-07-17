@@ -10,7 +10,6 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
-import com.google.android.material.color.MaterialColors
 import io.github.oleglog.olcrtc.client.MainActivity
 import io.github.oleglog.olcrtc.client.R
 import io.github.oleglog.olcrtc.client.data.ConnectionSessionEntity
@@ -143,18 +142,16 @@ class StatisticsFragment : Fragment() {
         return row
     }
 
-    private fun disconnectColor(reason: String?): Int = MaterialColors.getColor(
-        requireContext(),
+    private fun disconnectColor(reason: String?): Int = requireContext().getColor(
         when {
-            reason == null -> com.google.android.material.R.attr.colorPrimary
+            reason == null -> R.color.olcrtc_primary
             reason.startsWith("error", ignoreCase = true) || reason.contains("fail", ignoreCase = true) ->
-                com.google.android.material.R.attr.colorError
+                R.color.olcrtc_error
             reason.startsWith("manual", ignoreCase = true) || reason.equals("user", ignoreCase = true) ->
-                com.google.android.material.R.attr.colorSecondary
-            else -> com.google.android.material.R.attr.colorOutline
+                R.color.olcrtc_secondary
+            else -> R.color.olcrtc_outline
         },
-        0,
-    )
+        )
 
     private fun showReasonDialog(session: ConnectionSessionEntity) {
         AlertDialog.Builder(requireContext())
