@@ -74,7 +74,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:maxLines="2"
-            android:text="@string/settings_per_app_all" />
+            android:text="@string/settings_per_app_all"
+            app:cornerRadius="@dimen/corner_button" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/mode_exclude"
@@ -83,7 +84,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:maxLines="2"
-            android:text="@string/settings_per_app_exclude" />
+            android:text="@string/settings_per_app_exclude"
+            app:cornerRadius="@dimen/corner_button" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/mode_only"
@@ -92,7 +94,8 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:maxLines="2"
-            android:text="@string/settings_per_app_only" />
+            android:text="@string/settings_per_app_only"
+            app:cornerRadius="@dimen/corner_button" />
     </com.google.android.material.button.MaterialButtonToggleGroup>
 
     <com.google.android.material.button.MaterialButtonToggleGroup
@@ -112,7 +115,8 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/settings_apps_user" />
+            android:text="@string/settings_apps_user"
+            app:cornerRadius="@dimen/corner_button" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/filter_system"
@@ -120,7 +124,8 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="@string/settings_apps_system" />
+            android:text="@string/settings_apps_system"
+            app:cornerRadius="@dimen/corner_button" />
     </com.google.android.material.button.MaterialButtonToggleGroup>
 
     <LinearLayout

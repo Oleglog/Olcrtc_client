@@ -12,7 +12,6 @@ import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -24,7 +23,6 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
-import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import io.github.oleglog.olcrtc.client.BuildConfig
@@ -196,39 +194,42 @@ class SettingsFragment : Fragment() {
             RoutingPolicy.Preset.RUSSIA_DIRECT to getString(R.string.routing_russia_direct),
         )
         val current = settings.get()
-        val presetInput = MaterialAutoCompleteTextView(requireContext()).apply {
-            inputType = android.text.InputType.TYPE_NULL
-            setAdapter(ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, choices.map { it.second }))
-            setText(choices.first { it.first == current.preset }.second, false)
-            tag = current.preset
-            setOnItemClickListener { _, _, position, _ -> tag = choices[position].first }
+        var selectedPreset = current.preset
+
+        val presetButton = com.google.android.material.button.MaterialButton(requireContext()).apply {
+            text = choices.first { it.first == selectedPreset }.second
+            setOnClickListener {
+                val labels = choices.map { it.second }.toTypedArray()
+                val initial = choices.indexOfFirst { it.first == selectedPreset }
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(R.string.settings_routing_preset)
+                    .setSingleChoiceItems(labels, initial) { d, which ->
+                        selectedPreset = choices[which].first
+                        text = choices[which].second
+                        d.dismiss()
+                    }
+                    .setNegativeButton(R.string.cancel, null)
+                    .show()
+            }
         }
         val allowLan = MaterialSwitch(requireContext()).apply {
             setText(R.string.allow_lan)
             isChecked = current.allowLan
         }
-        val manageRules = com.google.android.material.button.MaterialButton(requireContext()).apply {
-            setText(R.string.settings_manage_rules)
-            setOnClickListener { showRoutingRules() }
-        }
-        val updateGeo = com.google.android.material.button.MaterialButton(requireContext()).apply {
-            setText(R.string.settings_update_geo_assets)
-            setOnClickListener { updateGeoAssets() }
-        }
         val content = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(24.dp, 8.dp, 24.dp, 0)
-            addView(TextInputLayout(requireContext()).apply {
-                hint = getString(R.string.settings_routing_preset)
-                endIconMode = TextInputLayout.END_ICON_DROPDOWN_MENU
-                addView(presetInput)
-            })
+            addView(presetButton)
             addView(allowLan)
-            addView(manageRules)
-            addView(updateGeo)
+            addView(com.google.android.material.button.MaterialButton(requireContext()).apply {
+                setText(R.string.settings_manage_rules)
+                setOnClickListener { showRoutingRules() }
+            })
+            addView(com.google.android.material.button.MaterialButton(requireContext()).apply {
+                setText(R.string.settings_update_geo_assets)
+                setOnClickListener { updateGeoAssets() }
+            })
         }
-        // ponytail: MaterialAutoCompleteTextView must be a direct child of TextInputLayout
-        // with END_ICON_DROPDOWN_MENU to render its dropdown without crashing.
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.settings_routing_title)
             .setView(content)
@@ -236,7 +237,7 @@ class SettingsFragment : Fragment() {
             .setPositiveButton(R.string.save_settings) { _, _ ->
                 viewLifecycleOwner.lifecycleScope.launch {
                     withContext(Dispatchers.IO) {
-                        settings.set(RoutingPolicy(presetInput.tag as RoutingPolicy.Preset, allowLan.isChecked))
+                        settings.set(RoutingPolicy(selectedPreset, allowLan.isChecked))
                     }
                     _binding?.status?.setText(R.string.settings_saved)
                     load()
@@ -407,27 +408,40 @@ class SettingsFragment : Fragment() {
     private fun showRoutingRuleEditor(existing: RoutingRule?) {
         val actions = RoutingRule.Action.entries
         val types = RoutingRule.MatchType.entries
-        val action = MaterialAutoCompleteTextView(requireContext()).apply {
-            inputType = android.text.InputType.TYPE_NULL
-            setAdapter(ArrayAdapter(
-                requireContext(),
-                android.R.layout.simple_list_item_1,
-                actions.map(::routingActionLabel),
-            ))
-            setText(routingActionLabel(existing?.action ?: actions.first()), false)
-            tag = existing?.action ?: actions.first()
-            setOnItemClickListener { _, _, position, _ -> tag = actions[position] }
+        var chosenAction = existing?.action ?: actions.first()
+        var chosenType = existing?.matchType ?: types.first()
+
+        val actionButton = com.google.android.material.button.MaterialButton(requireContext()).apply {
+            text = routingActionLabel(chosenAction)
+            setOnClickListener {
+                val labels = actions.map(::routingActionLabel).toTypedArray()
+                val initial = actions.indexOf(chosenAction)
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(R.string.settings_rule_action)
+                    .setSingleChoiceItems(labels, initial) { d, which ->
+                        chosenAction = actions[which]
+                        text = labels[which]
+                        d.dismiss()
+                    }
+                    .setNegativeButton(R.string.cancel, null)
+                    .show()
+            }
         }
-        val type = MaterialAutoCompleteTextView(requireContext()).apply {
-            inputType = android.text.InputType.TYPE_NULL
-            setAdapter(ArrayAdapter(
-                requireContext(),
-                android.R.layout.simple_list_item_1,
-                types.map(::routingTypeLabel),
-            ))
-            setText(routingTypeLabel(existing?.matchType ?: types.first()), false)
-            tag = existing?.matchType ?: types.first()
-            setOnItemClickListener { _, _, position, _ -> tag = types[position] }
+        val typeButton = com.google.android.material.button.MaterialButton(requireContext()).apply {
+            text = routingTypeLabel(chosenType)
+            setOnClickListener {
+                val labels = types.map(::routingTypeLabel).toTypedArray()
+                val initial = types.indexOf(chosenType)
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(R.string.settings_rule_type)
+                    .setSingleChoiceItems(labels, initial) { d, which ->
+                        chosenType = types[which]
+                        text = labels[which]
+                        d.dismiss()
+                    }
+                    .setNegativeButton(R.string.cancel, null)
+                    .show()
+            }
         }
         val value = TextInputEditText(requireContext()).apply { setText(existing?.value.orEmpty()) }
         val valueLayout = TextInputLayout(requireContext()).apply {
@@ -437,16 +451,13 @@ class SettingsFragment : Fragment() {
         val content = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(24.dp, 8.dp, 24.dp, 0)
-            addView(TextInputLayout(requireContext()).apply {
-                hint = getString(R.string.settings_rule_action)
-                endIconMode = TextInputLayout.END_ICON_DROPDOWN_MENU
-                addView(action)
+            addView(TextView(requireContext()).apply {
+                setText(R.string.settings_routing_rule_hint)
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+                setPadding(0, 0, 0, 8.dp)
             })
-            addView(TextInputLayout(requireContext()).apply {
-                hint = getString(R.string.settings_rule_type)
-                endIconMode = TextInputLayout.END_ICON_DROPDOWN_MENU
-                addView(type)
-            })
+            addView(actionButton)
+            addView(typeButton)
             addView(valueLayout)
         }
         val dialog = MaterialAlertDialogBuilder(requireContext())
@@ -460,9 +471,9 @@ class SettingsFragment : Fragment() {
                 val draft = runCatching {
                     RoutingRule.create(
                         id = existing?.id ?: 0,
-                        matchType = type.tag as RoutingRule.MatchType,
+                        matchType = chosenType,
                         value = value.text?.toString().orEmpty(),
-                        action = action.tag as RoutingRule.Action,
+                        action = chosenAction,
                         enabled = existing?.enabled ?: true,
                         sortOrder = existing?.sortOrder ?: 0,
                     )

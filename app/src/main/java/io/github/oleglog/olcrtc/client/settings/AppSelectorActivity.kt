@@ -18,7 +18,9 @@ import io.github.oleglog.olcrtc.client.routing.AppRoutingItem
 import io.github.oleglog.olcrtc.client.routing.AppRoutingRepository
 import io.github.oleglog.olcrtc.client.routing.PerAppPolicy
 import io.github.oleglog.olcrtc.client.routing.RoutingSettings
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import java.util.Locale
 import java.util.concurrent.Executors
 
@@ -90,7 +92,14 @@ class AppSelectorActivity : AppCompatActivity() {
 
     private fun load() {
         worker.execute {
-            val policy = settings.getPerAppPolicy()
+            val policy = runCatching {
+                withContext(Dispatchers.IO) { settings.getPerAppPolicy() }
+            }.getOrElse {
+                runOnUiThread {
+                    if (!isDestroyed) showError(it.message)
+                }
+                return@execute
+            }
             if (!restoredSelection) selectedPackages.addAll(policy.packages)
             runOnUiThread {
                 if (isDestroyed) return@runOnUiThread
