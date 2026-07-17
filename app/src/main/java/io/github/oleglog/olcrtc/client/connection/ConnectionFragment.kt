@@ -16,6 +16,7 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.AppCompatImageButton
+import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import com.google.android.material.button.MaterialButton
@@ -325,11 +326,11 @@ class ConnectionFragment : Fragment() {
             connected = connected,
             hasConnectedProfile = connectedProfileId != null || connectedSubscriptionProfileId != null,
         )
-        val strokeAttr = when (state) {
-            ConnectionCardState.CONNECTED, ConnectionCardState.SELECTED -> com.google.android.material.R.attr.colorPrimary
-            ConnectionCardState.INACTIVE -> com.google.android.material.R.attr.colorOutline
+        card.strokeColor = if (state == ConnectionCardState.INACTIVE) {
+            resolveColor(com.google.android.material.R.attr.colorOutline)
+        } else {
+            ContextCompat.getColor(requireContext(), R.color.olcrtc_primary)
         }
-        card.strokeColor = resolveColor(strokeAttr)
         card.strokeWidth = when (state) {
             ConnectionCardState.CONNECTED -> dimen(R.dimen.card_border_active)
             ConnectionCardState.SELECTED, ConnectionCardState.INACTIVE -> dimen(R.dimen.card_border)
@@ -516,7 +517,9 @@ class ConnectionFragment : Fragment() {
             )
             addView(ImageView(requireContext()).apply {
                 setImageResource(iconRes)
-                imageTintList = ColorStateList.valueOf(resolveColor(com.google.android.material.R.attr.colorPrimary))
+                imageTintList = ColorStateList.valueOf(
+                    ContextCompat.getColor(requireContext(), R.color.olcrtc_primary),
+                )
                 contentDescription = null
             }, LinearLayout.LayoutParams(24.dp, 24.dp))
             addView(LinearLayout(requireContext()).apply {
@@ -874,7 +877,7 @@ class ConnectionFragment : Fragment() {
             }
             .show()
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            .setTextColor(resolveColor(com.google.android.material.R.attr.colorError))
+            .setTextColor(ContextCompat.getColor(requireContext(), R.color.olcrtc_error))
     }
 
     private fun confirmDeleteProfile(profileId: Long, name: String) {
@@ -900,7 +903,7 @@ class ConnectionFragment : Fragment() {
             }
             .show()
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            .setTextColor(resolveColor(com.google.android.material.R.attr.colorError))
+            .setTextColor(ContextCompat.getColor(requireContext(), R.color.olcrtc_error))
     }
 
     private val activityHost get() = requireActivity() as MainActivity
