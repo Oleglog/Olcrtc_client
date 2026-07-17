@@ -162,7 +162,7 @@ class MainActivity : AppCompatActivity() {
             added = values[1],
             removed = values[2],
             total = values[3],
-            source = values.getOrNull(4)?.let(SubscriptionRefresher.Source::fromWireCode),
+            source = values.getOrNull(4)?.let { SubscriptionRefresher.Source.fromWireCode(it) },
         )
     }
 
