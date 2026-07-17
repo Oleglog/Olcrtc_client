@@ -227,6 +227,8 @@ class SettingsFragment : Fragment() {
             addView(manageRules)
             addView(updateGeo)
         }
+        // ponytail: MaterialAutoCompleteTextView must be a direct child of TextInputLayout
+        // with END_ICON_DROPDOWN_MENU to render its dropdown without crashing.
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.settings_routing_title)
             .setView(content)

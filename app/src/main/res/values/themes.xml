@@ -17,5 +17,15 @@
         <item name="android:colorBackground">@color/olcrtc_surface</item>
         <item name="android:navigationBarColor">@color/olcrtc_surface</item>
         <item name="android:windowActionModeOverlay">true</item>
+        <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.OlcrtcClient.MediumComponent</item>
+        <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.OlcrtcClient.LargeComponent</item>
+    </style>
+
+    <style name="ShapeAppearance.OlcrtcClient.MediumComponent" parent="ShapeAppearance.Material3.MediumComponent">
+        <item name="cornerSize">8dp</item>
+    </style>
+
+    <style name="ShapeAppearance.OlcrtcClient.LargeComponent" parent="ShapeAppearance.Material3.LargeComponent">
+        <item name="cornerSize">8dp</item>
     </style>
 </resources>
