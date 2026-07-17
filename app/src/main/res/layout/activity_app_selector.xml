@@ -15,7 +15,7 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/cancel"
-            style="?attr/materialButtonTextStyle"
+            style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="wrap_content"
             android:layout_height="@dimen/icon_touch_target"
             android:text="@string/cancel" />
@@ -133,14 +133,14 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/select_all"
-            style="?attr/materialButtonTextStyle"
+            style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="wrap_content"
             android:layout_height="@dimen/icon_touch_target"
             android:text="@string/settings_apps_select_all" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/clear"
-            style="?attr/materialButtonTextStyle"
+            style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="wrap_content"
             android:layout_height="@dimen/icon_touch_target"
             android:text="@string/settings_apps_clear" />
