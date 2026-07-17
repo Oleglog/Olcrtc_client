@@ -6,6 +6,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
+import java.util.Collections
+import java.util.concurrent.CancellationException
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 @RunWith(JUnit4::class)
 class NativeSessionTest {
@@ -37,7 +42,7 @@ class NativeSessionTest {
         val failure = runCatching { session.start(1080, "/assets", "{}", byteArrayOf(1)) }.exceptionOrNull()
 
         assertEquals("not ready", failure?.message)
-        assertEquals(listOf("xray:start", "xray:ready", "tunnel:close", "tun:close", "core:stop"), events)
+        assertEquals(listOf("xray:start", "xray:ready", "tun:close", "tunnel:close", "core:stop"), events)
     }
 
     @Test
@@ -49,8 +54,12 @@ class NativeSessionTest {
             RecordingTunnel(events),
             establishTun = { RecordingTun(events) },
             verifyDatapath = {},
-            reportStage = { message, error ->
-                stages += if (error == null) message else "$message: ${error.message}"
+            reportStage = { stage, elapsed, error ->
+                stages += when {
+                    elapsed == null -> "$stage started"
+                    error == null -> "$stage ready"
+                    else -> "$stage failed: ${error.message}"
+                }
             },
         )
 
@@ -60,11 +69,45 @@ class NativeSessionTest {
 
         assertEquals(
             listOf(
-                "Xray startup started",
-                "Xray startup failed: not ready",
+                "CREATE_TUN started",
+                "CREATE_TUN ready",
+                "START_XRAY started",
+                "START_XRAY failed: not ready",
             ),
             stages,
         )
+    }
+
+    @Test
+    fun closeDuringOlcrtcReadinessCancelsBeforeXrayStarts() {
+        val events = Collections.synchronizedList(mutableListOf<String>())
+        val readyEntered = CountDownLatch(1)
+        val releaseReady = CountDownLatch(1)
+        val core = BlockingOlcrtcCore(events, readyEntered, releaseReady)
+        val session = NativeSession(
+            core,
+            RecordingTunnel(events),
+            establishTun = { RecordingTun(events) },
+            verifyDatapath = {},
+        )
+        val executor = Executors.newSingleThreadExecutor()
+        try {
+            val startup = executor.submit<Throwable?> {
+                runCatching {
+                    session.start(1080, "/assets", "{}", byteArrayOf(1), olcrtcConfig())
+                }.exceptionOrNull()
+            }
+
+            assertTrue(readyEntered.await(1, TimeUnit.SECONDS))
+            session.close()
+
+            assertTrue(startup.get(2, TimeUnit.SECONDS) is CancellationException)
+            assertFalse(events.contains("xray:start"))
+            assertEquals(1, events.count { it == "core:stop" })
+        } finally {
+            releaseReady.countDown()
+            executor.shutdownNow()
+        }
     }
 
     @Test
@@ -126,7 +169,7 @@ class NativeSessionTest {
         }.exceptionOrNull()
 
         assertEquals("olcrtc start", failure?.message)
-        assertEquals(listOf("olcrtc:start", "tunnel:close", "tun:close", "core:stop"), events)
+        assertEquals(listOf("olcrtc:start", "tun:close", "tunnel:close", "core:stop"), events)
     }
 
     @Test
@@ -145,7 +188,7 @@ class NativeSessionTest {
 
         assertEquals("olcrtc readiness", failure?.message)
         assertEquals(
-            listOf("olcrtc:start", "olcrtc:ready", "tunnel:close", "tun:close", "core:stop"),
+            listOf("olcrtc:start", "olcrtc:ready", "tun:close", "tunnel:close", "core:stop"),
             events,
         )
     }
@@ -241,7 +284,7 @@ class NativeSessionTest {
 
         assertEquals("HEV tunnel exited during startup", failure?.message)
         assertEquals(
-            listOf("xray:start", "xray:ready", "tunnel:start", "tunnel:close", "tun:close", "core:stop"),
+            listOf("xray:start", "xray:ready", "tunnel:start", "tun:close", "tunnel:close", "core:stop"),
             events,
         )
     }
@@ -268,8 +311,8 @@ class NativeSessionTest {
                 "xray:ready",
                 "tunnel:start",
                 "datapath:verify",
-                "tunnel:close",
                 "tun:close",
+                "tunnel:close",
                 "core:stop",
             ),
             events,
@@ -290,6 +333,25 @@ class NativeSessionTest {
         session.close()
 
         assertEquals(listOf("tunnel:close"), events)
+    }
+
+    @Test
+    fun reportsRouteReleaseBeforeFullNativeStop() {
+        val events = mutableListOf<String>()
+        var timings: Pair<Long, Long>? = null
+        val session = NativeSession(
+            RecordingCore(events),
+            RecordingTunnel(events),
+            establishTun = { RecordingTun(events) },
+            verifyDatapath = {},
+            reportStop = { routeReleased, total -> timings = routeReleased to total },
+        )
+
+        session.start(1080, "/assets", "{}", byteArrayOf(1))
+        session.close()
+
+        assertTrue(timings != null)
+        assertTrue(requireNotNull(timings).first <= requireNotNull(timings).second)
     }
 
     @Test
@@ -363,6 +425,44 @@ class NativeSessionTest {
             events += "core:stop"
             xrayRunning = false
             olcrtcRunning = false
+        }
+    }
+
+    private class BlockingOlcrtcCore(
+        private val events: MutableList<String>,
+        private val readyEntered: CountDownLatch,
+        private val releaseReady: CountDownLatch,
+    ) : NativeCore {
+        @Volatile private var running = false
+
+        override fun setProtector(protector: SocketProtector) = Unit
+
+        override fun startOlcrtc(config: NativeOlcrtcConfig) {
+            events += "olcrtc:start"
+            running = true
+        }
+
+        override fun waitOlcrtcReady(timeoutMillis: Int) {
+            events += "olcrtc:ready"
+            readyEntered.countDown()
+            releaseReady.await(2, TimeUnit.SECONDS)
+            error("stopped")
+        }
+
+        override fun startXray(assetDirectory: String, configJson: String) {
+            events += "xray:start"
+        }
+
+        override fun waitXrayReady(socksPort: Int, timeoutMillis: Int) = Unit
+
+        override fun isXrayRunning(): Boolean = running
+
+        override fun isOlcrtcRunning(): Boolean = running
+
+        override fun stopAll() {
+            events += "core:stop"
+            running = false
+            releaseReady.countDown()
         }
     }
 

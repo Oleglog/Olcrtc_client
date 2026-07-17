@@ -20,7 +20,7 @@ class VpnStateMachine(initialState: VpnState = VpnState.NO_PROFILE) {
 
         val allowedTransitions = mapOf(
             VpnState.NO_PROFILE to setOf(VpnState.DISCONNECTED, VpnState.ERROR),
-            VpnState.DISCONNECTED to setOf(VpnState.NO_PROFILE, VpnState.PREPARING),
+            VpnState.DISCONNECTED to setOf(VpnState.NO_PROFILE, VpnState.PREPARING, VpnState.ERROR),
             VpnState.PREPARING to setOf(
                 VpnState.CONNECTING,
                 VpnState.RECONNECTING,

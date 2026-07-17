@@ -11,18 +11,25 @@ import java.security.MessageDigest
 import javax.net.ssl.HttpsURLConnection
 
 internal class GeoAssetManager(private val context: Context) {
-    fun prepare(): Result<File> = runCatching {
-        val directory = assetDirectory()
-        FILES.forEach { asset ->
-            val target = File(directory, asset.name)
-            if (!target.isFile || sha256(target) != asset.sha256) {
-                copyBundled(asset, target)
+    @Volatile private var preparedDirectory: File? = null
+
+    @Synchronized
+    fun prepare(): Result<File> {
+        preparedDirectory?.let { return Result.success(it) }
+        return runCatching {
+            val directory = assetDirectory()
+            FILES.forEach { asset ->
+                val target = File(directory, asset.name)
+                if (!target.isFile || sha256(target) != asset.sha256) {
+                    copyBundled(asset, target)
+                }
             }
-        }
-        validate(directory)
-        directory
+            validate(directory)
+            directory
+        }.onSuccess { preparedDirectory = it }
     }
 
+    @Synchronized
     fun updateFromDefaultSources(): Result<File> = runCatching {
         val directory = assetDirectory()
         val backups = FILES.associate { asset ->
@@ -42,7 +49,7 @@ internal class GeoAssetManager(private val context: Context) {
             }
             throw error
         }
-    }
+    }.onSuccess { preparedDirectory = it }
 
     private fun assetDirectory(): File = File(context.noBackupFilesDir, DIRECTORY).apply { mkdirs() }
 

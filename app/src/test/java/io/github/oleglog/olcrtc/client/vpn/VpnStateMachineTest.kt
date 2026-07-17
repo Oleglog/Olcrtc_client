@@ -33,6 +33,7 @@ class VpnStateMachineTest {
     fun missingProfileCanFailBeforePreparation() {
         val machine = VpnStateMachine()
 
+        machine.transition(VpnState.DISCONNECTED)
         machine.transition(VpnState.ERROR)
 
         assertEquals(VpnState.ERROR, machine.state)

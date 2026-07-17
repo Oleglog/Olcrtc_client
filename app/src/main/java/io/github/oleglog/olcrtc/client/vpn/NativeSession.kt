@@ -1,18 +1,22 @@
 package io.github.oleglog.olcrtc.client.vpn
 
 import java.io.Closeable
+import java.util.concurrent.CancellationException
+import java.util.concurrent.TimeUnit
 
 internal class NativeSession(
     private val nativeCore: NativeCore,
     private val hevTunnel: NativeTunnel,
     private val establishTun: () -> TunDescriptor,
     private val verifyDatapath: () -> Unit,
-    private val reportStage: (String, Throwable?) -> Unit = { _, _ -> },
+    private val reportStage: (ConnectionStage, Long?, Throwable?) -> Unit = { _, _, _ -> },
+    private val reportStop: (routeReleasedMillis: Long, totalMillis: Long) -> Unit = { _, _ -> },
 ) : Closeable {
-    private var coreStarted = false
-    private var olcrtcStarted = false
-    private var tun: TunDescriptor? = null
-    private var closed = false
+    private val lifecycle = Any()
+    @Volatile private var coreStarted = false
+    @Volatile private var olcrtcStarted = false
+    @Volatile private var tun: TunDescriptor? = null
+    @Volatile private var closed = false
 
     fun start(
         socksPort: Int,
@@ -21,37 +25,56 @@ internal class NativeSession(
         hevConfig: ByteArray,
         olcrtcConfig: NativeOlcrtcConfig? = null,
     ) {
-        check(!closed && !coreStarted) { "native session already used" }
+        checkOpen()
         try {
-            val descriptor = establishTun()
-            tun = descriptor
-            coreStarted = true
+            val descriptor = stage(ConnectionStage.CREATE_TUN) {
+                synchronized(lifecycle) {
+                    checkOpen()
+                    establishTun().also { tun = it }
+                }
+            }
             if (olcrtcConfig != null) {
-                stage("olcRTC startup") {
-                    nativeCore.startOlcrtc(olcrtcConfig)
-                    olcrtcStarted = true
+                stage(ConnectionStage.START_CARRIER) {
+                    synchronized(lifecycle) {
+                        checkOpen()
+                        coreStarted = true
+                        nativeCore.startOlcrtc(olcrtcConfig)
+                        olcrtcStarted = true
+                    }
                     nativeCore.waitOlcrtcReady(olcrtcConfig.readyTimeoutMillis)
                 }
             }
-            stage("Xray startup") {
-                nativeCore.startXray(assetDirectory, xrayConfig)
+            stage(ConnectionStage.START_XRAY) {
+                synchronized(lifecycle) {
+                    checkOpen()
+                    coreStarted = true
+                    nativeCore.startXray(assetDirectory, xrayConfig)
+                }
                 nativeCore.waitXrayReady(socksPort, XRAY_READY_TIMEOUT_MILLIS)
             }
-            stage("HEV startup") {
-                hevTunnel.start(hevConfig, descriptor.fd)
-                check(hevTunnel.isRunning()) {
-                    "HEV tunnel exited during startup"
+            stage(ConnectionStage.START_HEV) {
+                synchronized(lifecycle) {
+                    checkOpen()
+                    hevTunnel.start(hevConfig, descriptor.fd)
+                    check(hevTunnel.isRunning()) {
+                        "HEV tunnel exited during startup"
+                    }
                 }
             }
-            stage("VPN datapath verification") {
+            stage(ConnectionStage.VERIFY_DATAPATH) {
                 verifyDatapath()
                 check(hevTunnel.isRunning()) {
                     "HEV tunnel exited during datapath verification"
                 }
             }
         } catch (error: Throwable) {
-            stop(error)
-            throw error
+            val failure = if (closed && error !is CancellationException) {
+                CancellationException("native session cancelled").apply { initCause(error) }
+            } else {
+                error
+            }
+            stop(failure)
+            throw failure
         }
     }
 
@@ -61,16 +84,20 @@ internal class NativeSession(
         !closed && coreStarted && tun != null && hevTunnel.isRunning() &&
             nativeCore.isXrayRunning() && (!olcrtcStarted || nativeCore.isOlcrtcRunning())
 
-    private inline fun stage(
-        name: String,
-        action: () -> Unit,
-    ) {
-        reportStage("$name started", null)
+    private inline fun <T> stage(
+        stage: ConnectionStage,
+        action: () -> T,
+    ): T {
+        checkOpen()
+        reportStage(stage, null, null)
+        val startedAt = System.nanoTime()
         try {
-            action()
-            reportStage("$name ready", null)
+            val result = action()
+            checkOpen()
+            reportStage(stage, elapsedMillis(startedAt), null)
+            return result
         } catch (error: Throwable) {
-            reportStage("$name failed", error)
+            reportStage(stage, elapsedMillis(startedAt), error)
             throw error
         }
     }
@@ -80,33 +107,57 @@ internal class NativeSession(
     }
 
     private fun stop(original: Throwable?) {
-        if (closed) return
-        closed = true
+        val resources = synchronized(lifecycle) {
+            if (closed) return
+            closed = true
+            StopResources(tun, coreStarted).also {
+                tun = null
+                coreStarted = false
+                olcrtcStarted = false
+            }
+        }
         var failure = original
+        val stopStartedAt = System.nanoTime()
+        var routeReleasedMillis = 0L
+        try {
+            resources.tun?.close()
+        } catch (error: Throwable) {
+            if (failure == null) failure = error else failure.addSuppressed(error)
+        } finally {
+            routeReleasedMillis = elapsedMillis(stopStartedAt)
+        }
         try {
             hevTunnel.close()
         } catch (error: Throwable) {
             if (failure == null) failure = error else failure.addSuppressed(error)
         }
         try {
-            tun?.close()
+            if (resources.stopCore) {
+                nativeCore.stopAll()
+            }
         } catch (error: Throwable) {
             if (failure == null) failure = error else failure.addSuppressed(error)
         } finally {
-            tun = null
-        }
-        if (coreStarted) {
-            try {
-                nativeCore.stopAll()
-            } catch (error: Throwable) {
-                if (failure == null) failure = error else failure.addSuppressed(error)
-            } finally {
-                coreStarted = false
-                olcrtcStarted = false
-            }
+            runCatching { reportStop(routeReleasedMillis, elapsedMillis(stopStartedAt)) }
+                .exceptionOrNull()
+                ?.let { error ->
+                    if (failure == null) failure = error else failure?.addSuppressed(error)
+                }
         }
         if (original == null && failure != null) throw failure
     }
+
+    private fun checkOpen() {
+        if (closed) throw CancellationException("native session cancelled")
+    }
+
+    private fun elapsedMillis(startedAt: Long): Long =
+        TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAt)
+
+    private data class StopResources(
+        val tun: TunDescriptor?,
+        val stopCore: Boolean,
+    )
 
     private companion object {
         const val XRAY_READY_TIMEOUT_MILLIS = 5_000

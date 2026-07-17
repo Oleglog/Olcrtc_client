@@ -33,6 +33,7 @@ import io.github.oleglog.olcrtc.client.profile.ImportedProfile
 import io.github.oleglog.olcrtc.client.profile.ProfileUri
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import io.github.oleglog.olcrtc.client.vpn.VpnState
+import io.github.oleglog.olcrtc.client.vpn.ConnectionStage
 import java.util.concurrent.Executors
 
 class ConnectionFragment : Fragment() {
@@ -160,9 +161,10 @@ class ConnectionFragment : Fragment() {
                         currentState in BUSY_STATES ||
                         selectedProfileId != null ||
                         selectedSubscriptionProfileId != null
-                    binding.testSelected.isEnabled = currentState == VpnState.CONNECTED ||
-                        selectedProfileId != null ||
-                        selectedSubscriptionProfileId != null
+                    binding.testSelected.isEnabled = currentState !in BUSY_STATES && (
+                        currentState == VpnState.CONNECTED || selectedProfileId != null ||
+                            selectedSubscriptionProfileId != null
+                        )
                 }.onFailure { binding.status.text = it.message }
             }
         }
@@ -403,7 +405,12 @@ class ConnectionFragment : Fragment() {
         setOnClickListener { action() }
     }
 
-    private fun showVpnState(state: VpnState, error: String?) {
+    private fun showVpnState(
+        state: VpnState,
+        error: String?,
+        stage: ConnectionStage,
+        reconnectAttempt: Int,
+    ) {
         if (_binding == null) return
         currentState = state
         when (state) {
@@ -420,24 +427,55 @@ class ConnectionFragment : Fragment() {
             }
             else -> {}
         }
-        binding.status.text = error ?: vpnStateText(state)
-        binding.connect.text = getString(
-            if (state == VpnState.CONNECTED || state in BUSY_STATES) R.string.disconnect else R.string.connect
+        binding.status.text = error ?: vpnStateText(state, stage, reconnectAttempt)
+        binding.testSelected.isEnabled = state !in BUSY_STATES && (
+            state == VpnState.CONNECTED || selectedProfileId != null || selectedSubscriptionProfileId != null
         )
-        binding.connect.isEnabled = state == VpnState.CONNECTED || state in BUSY_STATES || selectedProfileId != null || selectedSubscriptionProfileId != null
-        binding.testSelected.isEnabled = state == VpnState.CONNECTED || selectedProfileId != null || selectedSubscriptionProfileId != null
+        binding.connect.text = getString(
+            when (state) {
+                VpnState.PREPARING, VpnState.CONNECTING -> R.string.cancel_connection
+                VpnState.CONNECTED, VpnState.RECONNECTING -> R.string.disconnect
+                VpnState.STOPPING -> R.string.disconnecting
+                VpnState.ERROR -> R.string.retry
+                VpnState.NO_PROFILE, VpnState.DISCONNECTED -> R.string.connect
+            },
+        )
+        binding.connect.isEnabled = state != VpnState.STOPPING && (
+            state == VpnState.CONNECTED || state in BUSY_STATES || selectedProfileId != null ||
+                selectedSubscriptionProfileId != null
+        )
         refreshCardAppearance()
     }
 
-    private fun vpnStateText(state: VpnState): String = when (state) {
+    private fun vpnStateText(state: VpnState, stage: ConnectionStage, reconnectAttempt: Int): String = when (state) {
         VpnState.NO_PROFILE -> ""
         VpnState.DISCONNECTED -> getString(R.string.vpn_notification_disconnected)
-        VpnState.PREPARING, VpnState.CONNECTING -> getString(R.string.vpn_notification_connecting)
+        VpnState.PREPARING, VpnState.CONNECTING -> connectionStageText(stage)
         VpnState.CONNECTED -> getString(R.string.vpn_notification_connected)
-        VpnState.RECONNECTING -> getString(R.string.vpn_notification_reconnecting)
+        VpnState.RECONNECTING -> if (reconnectAttempt > 0) {
+            getString(R.string.vpn_reconnecting_attempt, reconnectAttempt)
+        } else {
+            connectionStageText(stage)
+        }
         VpnState.STOPPING -> getString(R.string.vpn_notification_stopping)
         VpnState.ERROR -> getString(R.string.vpn_notification_error)
     }
+
+    private fun connectionStageText(stage: ConnectionStage): String = getString(
+        when (stage) {
+            ConnectionStage.LOAD_PROFILE -> R.string.vpn_stage_load_profile
+            ConnectionStage.WAIT_NETWORK -> R.string.vpn_stage_wait_network
+            ConnectionStage.PREPARE_ASSETS -> R.string.vpn_stage_prepare_assets
+            ConnectionStage.CREATE_TUN -> R.string.vpn_stage_create_tun
+            ConnectionStage.START_CARRIER -> R.string.vpn_stage_start_carrier
+            ConnectionStage.START_XRAY -> R.string.vpn_stage_start_xray
+            ConnectionStage.START_HEV -> R.string.vpn_stage_start_hev
+            ConnectionStage.VERIFY_DATAPATH -> R.string.vpn_stage_verify_datapath
+            ConnectionStage.READY -> R.string.vpn_notification_connected
+            ConnectionStage.STOPPING -> R.string.vpn_notification_stopping
+            ConnectionStage.IDLE -> R.string.vpn_notification_connecting
+        },
+    )
 
     private fun requestScanner() {
         qrScanner.launch(

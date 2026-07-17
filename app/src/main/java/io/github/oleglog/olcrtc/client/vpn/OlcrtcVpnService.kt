@@ -20,6 +20,7 @@ import android.os.IBinder
 import android.os.PowerManager
 import android.os.RemoteCallbackList
 import android.os.RemoteException
+import android.os.SystemClock
 import android.os.UserManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -42,25 +43,33 @@ import java.net.Proxy
 import java.net.Socket
 import java.net.SocketTimeoutException
 import java.util.Locale
+import java.util.concurrent.CancellationException
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.ThreadLocalRandom
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 class OlcrtcVpnService : VpnService() {
     private val callbacks = RemoteCallbackList<IVpnStateCallback>()
     private val commands = Executors.newSingleThreadScheduledExecutor()
+    private val connectionStartup = Executors.newSingleThreadExecutor()
     private val subscriptionRefresh = Executors.newSingleThreadExecutor()
+    private val healthChecks = Executors.newSingleThreadExecutor()
     private val stateMachine = VpnStateMachine()
     private val reconnectBackoff = ReconnectBackoff()
 
     @Volatile
     private var publishedState = VpnState.NO_PROFILE
+    @Volatile private var publishedStage = ConnectionStage.IDLE
+    @Volatile private var publishedError: String? = null
     private lateinit var profiles: ProfileRepository
     private lateinit var routingSettings: RoutingSettings
     private lateinit var connectionSessions: ConnectionSessionRepository
     private lateinit var diagnostics: DiagnosticsLogStore
     private lateinit var connectivity: ConnectivityManager
+    private lateinit var geoAssets: GeoAssetManager
     @Volatile private var activeProfile: ProfileReference? = null
     private var activeProfileInfo: ProfileInfo? = null
     private var wakeLock: PowerManager.WakeLock? = null
@@ -71,11 +80,17 @@ class OlcrtcVpnService : VpnService() {
     private var notificationTicker: ScheduledFuture<*>? = null
     @Volatile private var activeSocksPort: Int? = null
     @Volatile private var activeDnsEndpoint: DnsEndpoint? = null
-    private var nativeSession: NativeSession? = null
+    @Volatile private var nativeSession: NativeSession? = null
+    private var connectionAttempt: ConnectionAttempt? = null
+    private var connectionFuture: Future<*>? = null
+    private var nextConnectionGeneration = 0L
+    private var activeSessionGeneration = 0L
     private var reconnectFuture: ScheduledFuture<*>? = null
     private var networkReconnectRequested = false
-    private var reconnectAttemptCount = 0
+    @Volatile private var reconnectAttemptCount = 0
     private var healthProbeInFlight = false
+    private var healthProbeFailures = 0
+    private var healthProbeToken = 0L
     private var lastHealthProbeAt = 0L
     @Volatile private var activeNetwork: Network? = null
 
@@ -152,7 +167,12 @@ class OlcrtcVpnService : VpnService() {
         override fun registerCallback(callback: IVpnStateCallback) {
             callbacks.register(callback)
             try {
-                callback.onStateChanged(publishedState.ordinal, null)
+                callback.onStateChanged(
+                    publishedState.ordinal,
+                    publishedError,
+                    publishedStage.ordinal,
+                    reconnectAttemptCount,
+                )
             } catch (_: RemoteException) {
                 callbacks.unregister(callback)
             }
@@ -169,6 +189,7 @@ class OlcrtcVpnService : VpnService() {
         routingSettings = RoutingSettings.open(this)
         connectionSessions = ConnectionSessionRepository.open(this)
         diagnostics = DiagnosticsLogStore.open(this)
+        geoAssets = GeoAssetManager(this)
         diagnostics.prune()
         connectivity = getSystemService(ConnectivityManager::class.java)
         GomobileCore.setProtector(::protect)
@@ -247,6 +268,7 @@ class OlcrtcVpnService : VpnService() {
         networkReconnectRequested = false
         reconnectFuture?.cancel(false)
         reconnectFuture = null
+        cancelConnectionAttempt("service destroyed")
         runCatching { connectivity.unregisterNetworkCallback(networkCallback) }
         runCatching { unregisterReceiver(userUnlockedReceiver) }
         activeNetwork = null
@@ -257,6 +279,8 @@ class OlcrtcVpnService : VpnService() {
         activeDnsEndpoint = null
         runCatching { nativeSession?.close() }
         nativeSession = null
+        connectionStartup.shutdownNow()
+        healthChecks.shutdownNow()
         commands.shutdownNow()
         subscriptionRefresh.shutdownNow()
         callbacks.kill()
@@ -321,44 +345,40 @@ class OlcrtcVpnService : VpnService() {
     }
 
     private fun startProfile(reference: ProfileReference) {
-        cancelAutomaticReconnect()
         if (publishedState == VpnState.NO_PROFILE) transition(VpnState.DISCONNECTED)
         if (!stateMachine.canStart()) return
+        cancelAutomaticReconnect()
+        cancelConnectionAttempt("new profile requested")
+        publishedError = null
 
+        publishStage(ConnectionStage.LOAD_PROFILE)
+        val loadStartedAt = SystemClock.elapsedRealtime()
         val profile = try {
             loadProfile(reference) ?: error("profile ${reference.displayId} not found")
         } catch (error: Throwable) {
+            logStageFailure(ConnectionStage.LOAD_PROFILE, loadStartedAt, error)
             activeProfile = null
             activeProfileInfo = null
             releaseWakeLock()
             persistVpnIntent(false, reference)
-            transitionToError(error.message ?: error.javaClass.simpleName)
+            transitionToError(userConnectionError(error))
             stopForeground(STOP_FOREGROUND_REMOVE)
             return
         }
+        logStageReady(ConnectionStage.LOAD_PROFILE, loadStartedAt)
 
         activeProfile = reference
         activeProfileInfo = ProfileInfo.from(profile)
         acquireWakeLock()
+        startForeground(NOTIFICATION_ID, notification())
+        transition(VpnState.PREPARING)
         if (activeNetwork == null) {
-            startForeground(NOTIFICATION_ID, notification())
-            transition(VpnState.PREPARING)
             networkReconnectRequested = true
+            publishStage(ConnectionStage.WAIT_NETWORK)
             transition(VpnState.RECONNECTING)
             return
         }
-        startForeground(NOTIFICATION_ID, notification())
-        transition(VpnState.PREPARING)
-        try {
-            transition(VpnState.CONNECTING)
-            nativeSession = startNativeSession(profile)
-            transition(VpnState.CONNECTED)
-            startConnectionSession(reference)
-            refreshStaleSubscriptions()
-        } catch (error: Throwable) {
-            diagnostics.append("error", "VPN start failed for ${reference.displayId}", error)
-            handleConnectionFailure(error)
-        }
+        launchConnectionAttempt(reference, profile, reconnecting = false)
     }
 
     private fun reconnectVpn() {
@@ -368,15 +388,19 @@ class OlcrtcVpnService : VpnService() {
                 cancelAutomaticReconnect()
                 transition(VpnState.RECONNECTING)
                 networkReconnectRequested = true
+                cancelConnectionAttempt("manual reconnect")
                 if (activeNetwork == null) {
                     runCatching { closeNativeSession() }
                 } else {
+                    runCatching { closeNativeSession() }
                     scheduleAutomaticReconnect(0)
                 }
             }
             VpnState.RECONNECTING -> {
                 cancelAutomaticReconnect()
                 networkReconnectRequested = true
+                cancelConnectionAttempt("manual reconnect")
+                runCatching { closeNativeSession() }
                 if (activeNetwork != null) scheduleAutomaticReconnect(0)
             }
             VpnState.DISCONNECTED, VpnState.ERROR -> startProfile(reference)
@@ -387,6 +411,92 @@ class OlcrtcVpnService : VpnService() {
     private fun loadProfile(reference: ProfileReference): ProfileConfig? = when (reference) {
         is ProfileReference.Local -> profiles.get(reference.value)
         is ProfileReference.Subscription -> profiles.getSubscriptionProfile(reference.value)
+    }
+
+    private fun launchConnectionAttempt(
+        reference: ProfileReference,
+        profile: ProfileConfig,
+        reconnecting: Boolean,
+    ) {
+        val network = activeNetwork ?: run {
+            networkReconnectRequested = true
+            publishStage(ConnectionStage.WAIT_NETWORK)
+            if (publishedState != VpnState.RECONNECTING) transition(VpnState.RECONNECTING)
+            return
+        }
+        cancelConnectionAttempt("superseded")
+        val attempt = ConnectionAttempt(
+            generation = ++nextConnectionGeneration,
+            reference = reference,
+            network = network,
+            startedAt = SystemClock.elapsedRealtime(),
+        )
+        connectionAttempt = attempt
+        if (!reconnecting) transition(VpnState.CONNECTING)
+        connectionFuture = connectionStartup.submit {
+            val result = runCatching {
+                attempt.requireActive()
+                startNativeSession(profile, attempt)
+            }
+            runCatching {
+                commands.execute { completeConnectionAttempt(attempt, result) }
+            }.onFailure {
+                result.getOrNull()?.session?.let { session -> runCatching { session.close() } }
+            }
+        }
+    }
+
+    private fun completeConnectionAttempt(
+        attempt: ConnectionAttempt,
+        result: Result<StartedSession>,
+    ) {
+        if (!shouldAcceptConnectionResult(connectionAttempt?.generation, attempt.generation, attempt.cancelled.get())) {
+            result.getOrNull()?.session?.let { session -> runCatching { session.close() } }
+            return
+        }
+        connectionAttempt = null
+        connectionFuture = null
+        if (activeNetwork != attempt.network) {
+            result.getOrNull()?.session?.let { session -> runCatching { session.close() } }
+            networkReconnectRequested = true
+            publishStage(ConnectionStage.WAIT_NETWORK)
+            if (publishedState != VpnState.RECONNECTING) transition(VpnState.RECONNECTING)
+            if (activeNetwork != null) scheduleAutomaticReconnect(NETWORK_CHANGE_DEBOUNCE_MILLIS)
+            return
+        }
+        result.onSuccess { started ->
+            nativeSession = started.session
+            activeSocksPort = started.socksPort
+            activeDnsEndpoint = started.dns
+            activeSessionGeneration = attempt.generation
+            publishStage(ConnectionStage.READY)
+            transition(VpnState.CONNECTED)
+            diagnostics.append(
+                "info",
+                "VPN connected attempt=${attempt.generation} total=${SystemClock.elapsedRealtime() - attempt.startedAt}ms",
+            )
+            startConnectionSession(attempt.reference)
+            cancelAutomaticReconnect()
+            refreshStaleSubscriptions()
+        }.onFailure { error ->
+            diagnostics.append("error", "VPN start failed for ${attempt.reference.displayId}", error)
+            handleConnectionFailure(error)
+        }
+    }
+
+    private fun cancelConnectionAttempt(reason: String) {
+        val attempt = connectionAttempt ?: return
+        connectionAttempt = null
+        connectionFuture?.cancel(true)
+        connectionFuture = null
+        val startedAt = SystemClock.elapsedRealtime()
+        attempt.cancelled.set(true)
+        runCatching { attempt.session?.close() }
+            .onFailure { diagnostics.append("error", "VPN startup cancellation failed", it) }
+        diagnostics.append(
+            "info",
+            "VPN startup cancelled attempt=${attempt.generation} reason=$reason cleanup=${SystemClock.elapsedRealtime() - startedAt}ms",
+        )
     }
 
     private fun refreshStaleSubscriptions() {
@@ -428,11 +538,10 @@ class OlcrtcVpnService : VpnService() {
             UnderlyingNetworkChange.REPLACE -> {
                 val previous = activeNetwork
                 activeNetwork = network
+                reconnectBackoff.reset()
+                reconnectAttemptCount = 0
                 diagnostics.append("info", "Underlying network changed")
-                requestNetworkReconnect(
-                    if (previous == null) 0
-                    else reconnectBackoff.nextDelayMillis(),
-                )
+                requestNetworkReconnect(networkReconnectDelay(previous != null))
             }
         }
     }
@@ -459,13 +568,13 @@ class OlcrtcVpnService : VpnService() {
 
     private fun requestNetworkReconnect(delayMillis: Long?) {
         if (activeProfile == null || publishedState !in RECONNECTABLE_STATES) return
-        // Ignore capability callbacks until the initial native session has started.
-        if (nativeSession == null && (publishedState == VpnState.PREPARING || publishedState == VpnState.CONNECTING)) return
         networkReconnectRequested = true
         reconnectFuture?.cancel(false)
         reconnectFuture = null
+        cancelConnectionAttempt("underlying network changed")
         runCatching { closeNativeSession() }
         if (publishedState != VpnState.RECONNECTING) transition(VpnState.RECONNECTING)
+        publishStage(if (activeNetwork == null) ConnectionStage.WAIT_NETWORK else ConnectionStage.LOAD_PROFILE)
         if (delayMillis != null) scheduleAutomaticReconnect(delayMillis)
     }
 
@@ -480,27 +589,26 @@ class OlcrtcVpnService : VpnService() {
     private fun automaticReconnect() {
         val reference = activeProfile ?: return cancelAutomaticReconnect()
         if (!networkReconnectRequested || activeNetwork == null) return
+        publishStage(ConnectionStage.LOAD_PROFILE)
+        val loadStartedAt = SystemClock.elapsedRealtime()
         try {
-            closeNativeSession()
             val profile = loadProfile(reference) ?: error("profile ${reference.displayId} not found")
-            nativeSession = startNativeSession(profile)
-            transition(VpnState.CONNECTED)
-            startConnectionSession(reference)
-            cancelAutomaticReconnect()
-            refreshStaleSubscriptions()
+            logStageReady(ConnectionStage.LOAD_PROFILE, loadStartedAt)
+            launchConnectionAttempt(reference, profile, reconnecting = true)
         } catch (error: Throwable) {
-            diagnostics.append("error", "Automatic reconnect failed for ${reference.displayId}", error)
-            runCatching { closeNativeSession() }
+            logStageFailure(ConnectionStage.LOAD_PROFILE, loadStartedAt, error)
             handleConnectionFailure(error)
         }
     }
 
     private fun handleConnectionFailure(error: Throwable) {
-        if (isFatalReconnectError(error) || reconnectAttemptCount >= MAX_RECONNECT_ATTEMPTS) {
+        if (error is CancellationException) return
+        if (isFatalReconnectError(error)) {
+            val userError = userConnectionError(error)
             cancelAutomaticReconnect()
             finishConnectionSession(error.message ?: error.javaClass.simpleName)
             persistVpnIntent(false, activeProfile ?: persistedProfileReference())
-            transition(VpnState.ERROR, error.message ?: error.javaClass.simpleName)
+            transition(VpnState.ERROR, userError)
             releaseWakeLock()
             stopForeground(STOP_FOREGROUND_REMOVE)
             return
@@ -508,6 +616,7 @@ class OlcrtcVpnService : VpnService() {
         networkReconnectRequested = true
         reconnectAttemptCount++
         if (publishedState != VpnState.RECONNECTING) transition(VpnState.RECONNECTING)
+        else notifyCallbacks()
         scheduleAutomaticReconnect()
     }
 
@@ -520,12 +629,26 @@ class OlcrtcVpnService : VpnService() {
     }
 
     private fun isFatalReconnectError(error: Throwable): Boolean =
-        error is IllegalArgumentException ||
-            error.message?.startsWith("profile ") == true ||
-            GomobileCore.isFatalError(error)
+        isFatalConnectionError(error, GomobileCore::isFatalError)
+
+    private fun userConnectionError(error: Throwable): String {
+        val message = error.message.orEmpty().lowercase(Locale.ROOT)
+        return when {
+            message.startsWith("profile ") || error is IllegalArgumentException ->
+                getString(R.string.vpn_error_invalid_profile)
+            "auth" in message || "authentication" in message ->
+                getString(R.string.vpn_error_authentication)
+            "timeout" in message || "timed out" in message ->
+                getString(R.string.vpn_error_timeout)
+            "no such host" in message || "network" in message || "unreachable" in message ->
+                getString(R.string.vpn_error_network)
+            else -> getString(R.string.vpn_error_generic)
+        }
+    }
 
     private fun stopVpn() {
         cancelAutomaticReconnect()
+        cancelConnectionAttempt("VPN stopped")
         when (publishedState) {
             VpnState.PREPARING,
             VpnState.CONNECTING,
@@ -533,13 +656,15 @@ class OlcrtcVpnService : VpnService() {
             VpnState.RECONNECTING,
             VpnState.ERROR,
             -> {
+                publishStage(ConnectionStage.STOPPING)
                 transition(VpnState.STOPPING)
                 try {
                     finishConnectionSession("user stopped")
                     closeNativeSession()
                     transition(if (activeProfile == null) VpnState.NO_PROFILE else VpnState.DISCONNECTED)
                 } catch (error: Throwable) {
-                    transition(VpnState.ERROR, error.message ?: error.javaClass.simpleName)
+                    diagnostics.append("error", "VPN stop failed", error)
+                    transition(VpnState.ERROR, userConnectionError(error))
                 }
             }
             else -> Unit
@@ -584,14 +709,14 @@ class OlcrtcVpnService : VpnService() {
         }
     }
 
-    private fun establishTun(): TunDescriptor {
+    private fun establishTun(network: Network): TunDescriptor {
         val builder = Builder()
             .setSession(getString(R.string.app_name))
             .setMtu(VPN_MTU)
             .addAddress(VPN_IPV4_ADDRESS, VPN_IPV4_PREFIX)
             .addRoute("0.0.0.0", 0)
             .addDnsServer(NativeConfig.VPN_DNS_ADDRESS)
-        activeNetwork?.let { builder.setUnderlyingNetworks(arrayOf(it)) }
+        builder.setUnderlyingNetworks(arrayOf(network))
         applyPerAppPolicy(builder, routingSettings.getPerAppPolicy())
         val descriptor = builder.establish()
             ?: error("failed to establish VPN interface")
@@ -625,12 +750,22 @@ class OlcrtcVpnService : VpnService() {
         }
     }
 
-    private fun startNativeSession(profile: ProfileConfig): NativeSession {
+    private fun startNativeSession(profile: ProfileConfig, attempt: ConnectionAttempt): StartedSession {
+        attempt.requireActive()
         val routingRules = profiles.getEnabledRoutingRules()
         val requestedRoutingPolicy = routingSettings.get()
-        val geoAssets = GeoAssetManager(this).prepare().getOrNull()
+        val preparedGeoAssets = if (requiresGeoAssets(requestedRoutingPolicy)) {
+            reportAttemptStage(attempt, ConnectionStage.PREPARE_ASSETS, null, null)
+            val startedAt = SystemClock.elapsedRealtime()
+            geoAssets.prepare()
+                .onSuccess { logStageReady(ConnectionStage.PREPARE_ASSETS, startedAt, attempt.generation) }
+                .onFailure { logStageFailure(ConnectionStage.PREPARE_ASSETS, startedAt, it, attempt.generation) }
+                .getOrNull()
+        } else {
+            null
+        }
         val routingPolicy = if (
-            requestedRoutingPolicy.preset == RoutingPolicy.Preset.RUSSIA_DIRECT && geoAssets == null
+            requestedRoutingPolicy.preset == RoutingPolicy.Preset.RUSSIA_DIRECT && preparedGeoAssets == null
         ) {
             requestedRoutingPolicy.copy(preset = RoutingPolicy.Preset.ALL_VPN)
         } else {
@@ -664,28 +799,34 @@ class OlcrtcVpnService : VpnService() {
                 )
             }
         }
-        return NativeSession(
+        val session = NativeSession(
             nativeCore = GomobileCore,
             hevTunnel = HevTunnel(),
-            establishTun = ::establishTun,
+            establishTun = { establishTun(attempt.network) },
             verifyDatapath = { verifyDatapath(xraySocksPort, dns.tunnel) },
-            reportStage = { message, error ->
+            reportStage = { stage, elapsed, error -> reportAttemptStage(attempt, stage, elapsed, error) },
+            reportStop = { routeReleased, total ->
                 diagnostics.append(
-                    if (error == null) "info" else "error",
-                    message,
-                    error,
+                    "info",
+                    "VPN stop attempt=${attempt.generation} routeReleased=${routeReleased}ms total=${total}ms",
                 )
             },
-        ).also { session ->
+        )
+        attempt.session = session
+        try {
+            attempt.requireActive()
             session.start(
                 socksPort = xraySocksPort,
-                assetDirectory = geoAssets?.absolutePath ?: noBackupFilesDir.absolutePath,
+                assetDirectory = preparedGeoAssets?.absolutePath ?: noBackupFilesDir.absolutePath,
                 xrayConfig = xrayConfig,
                 hevConfig = NativeConfig.hev(xraySocksPort),
                 olcrtcConfig = olcrtcConfig,
             )
-            activeSocksPort = xraySocksPort
-            activeDnsEndpoint = dns.tunnel
+            attempt.requireActive()
+            return StartedSession(session, xraySocksPort, dns.tunnel)
+        } catch (error: Throwable) {
+            runCatching { session.close() }
+            throw error
         }
     }
 
@@ -731,20 +872,83 @@ class OlcrtcVpnService : VpnService() {
     }
 
     private fun closeNativeSession() {
+        val startedAt = SystemClock.elapsedRealtime()
         activeSocksPort = null
         activeDnsEndpoint = null
+        activeSessionGeneration = 0L
+        healthProbeFailures = 0
+        healthProbeInFlight = false
+        healthProbeToken++
         val session = nativeSession
         nativeSession = null
         session?.close()
+        if (session != null) {
+            diagnostics.append("info", "VPN native session stopped in ${SystemClock.elapsedRealtime() - startedAt}ms")
+        }
     }
 
     private fun transitionToError(error: String) {
         transition(VpnState.ERROR, error)
     }
 
+    private fun publishStage(stage: ConnectionStage) {
+        publishedStage = stage
+        updateNotification()
+        notifyCallbacks()
+    }
+
+    private fun reportAttemptStage(
+        attempt: ConnectionAttempt,
+        stage: ConnectionStage,
+        elapsedMillis: Long?,
+        error: Throwable?,
+    ) {
+        when {
+            elapsedMillis == null -> {
+                diagnostics.append("info", "VPN stage $stage started attempt=${attempt.generation}")
+                runCatching {
+                    commands.execute {
+                        if (connectionAttempt === attempt && !attempt.cancelled.get()) publishStage(stage)
+                    }
+                }
+            }
+            error == null -> diagnostics.append(
+                "info",
+                "VPN stage $stage ready attempt=${attempt.generation} elapsed=${elapsedMillis}ms",
+            )
+            else -> diagnostics.append(
+                "error",
+                "VPN stage $stage failed attempt=${attempt.generation} elapsed=${elapsedMillis}ms",
+                error,
+            )
+        }
+    }
+
+    private fun logStageReady(stage: ConnectionStage, startedAt: Long, generation: Long? = null) {
+        diagnostics.append(
+            "info",
+            "VPN stage $stage ready${generation?.let { " attempt=$it" }.orEmpty()} elapsed=${SystemClock.elapsedRealtime() - startedAt}ms",
+        )
+    }
+
+    private fun logStageFailure(
+        stage: ConnectionStage,
+        startedAt: Long,
+        error: Throwable,
+        generation: Long? = null,
+    ) {
+        diagnostics.append(
+            "error",
+            "VPN stage $stage failed${generation?.let { " attempt=$it" }.orEmpty()} elapsed=${SystemClock.elapsedRealtime() - startedAt}ms",
+            error,
+        )
+    }
+
     private fun transition(state: VpnState, error: String? = null) {
         stateMachine.transition(state)
         publishedState = state
+        publishedError = error
+        if (state == VpnState.NO_PROFILE || state == VpnState.DISCONNECTED) publishedStage = ConnectionStage.IDLE
         if (::diagnostics.isInitialized) {
             diagnostics.append(
                 if (state == VpnState.ERROR) "error" else "info",
@@ -754,11 +958,20 @@ class OlcrtcVpnService : VpnService() {
         if (state == VpnState.CONNECTED) startNotificationTicker() else if (state != VpnState.RECONNECTING) stopNotificationTicker()
         updateNotification()
         VpnTileService.update(this, state)
+        notifyCallbacks()
+    }
+
+    private fun notifyCallbacks() {
         val count = callbacks.beginBroadcast()
         try {
             repeat(count) { index ->
                 try {
-                    callbacks.getBroadcastItem(index).onStateChanged(state.ordinal, error)
+                    callbacks.getBroadcastItem(index).onStateChanged(
+                        publishedState.ordinal,
+                        publishedError,
+                        publishedStage.ordinal,
+                        reconnectAttemptCount,
+                    )
                 } catch (_: RemoteException) {
                 }
             }
@@ -789,11 +1002,16 @@ class OlcrtcVpnService : VpnService() {
             return
         }
         val now = System.currentTimeMillis()
-        scheduleTunnelHealthProbe(now)
         val counters = runCatching { nativeSession?.trafficCounters() ?: lastTrafficCounters }.getOrDefault(lastTrafficCounters)
         val elapsedMillis = (now - lastTrafficSampleAt).coerceAtLeast(1)
-        val upPerSecond = ((counters.bytesUp - lastTrafficCounters.bytesUp).coerceAtLeast(0) * 1000) / elapsedMillis
-        val downPerSecond = ((counters.bytesDown - lastTrafficCounters.bytesDown).coerceAtLeast(0) * 1000) / elapsedMillis
+        val uploaded = (counters.bytesUp - lastTrafficCounters.bytesUp).coerceAtLeast(0)
+        val downloaded = (counters.bytesDown - lastTrafficCounters.bytesDown).coerceAtLeast(0)
+        val upPerSecond = (uploaded * 1000) / elapsedMillis
+        val downPerSecond = (downloaded * 1000) / elapsedMillis
+        if (uploaded > 0 || downloaded > 0) {
+            healthProbeFailures = 0
+            lastHealthProbeAt = now
+        }
         lastTrafficCounters = counters
         lastTrafficSampleAt = now
         trafficSpeedText = getString(
@@ -801,6 +1019,7 @@ class OlcrtcVpnService : VpnService() {
             formatBytesPerSecond(upPerSecond),
             formatBytesPerSecond(downPerSecond),
         )
+        scheduleTunnelHealthProbe(now)
         updateNotification()
     }
 
@@ -809,19 +1028,31 @@ class OlcrtcVpnService : VpnService() {
         val session = nativeSession ?: return
         val socksPort = activeSocksPort ?: return
         val dns = activeDnsEndpoint ?: return
+        val generation = activeSessionGeneration
+        val token = ++healthProbeToken
         healthProbeInFlight = true
         lastHealthProbeAt = now
-        subscriptionRefresh.execute {
+        healthChecks.execute {
             val failure = runCatching { probeTunnel(socksPort, dns) }.exceptionOrNull()
             runCatching {
-                commands.execute {
+                commands.execute healthResult@{
+                    if (token != healthProbeToken) return@healthResult
                     healthProbeInFlight = false
                     if (
-                        failure != null && publishedState == VpnState.CONNECTED &&
-                        nativeSession === session && activeSocksPort == socksPort
+                        publishedState == VpnState.CONNECTED && nativeSession === session &&
+                        activeSocksPort == socksPort && activeSessionGeneration == generation
                     ) {
-                        diagnostics.append("error", "VPN tunnel health probe failed", failure)
-                        requestNetworkReconnect(0)
+                        if (failure == null) {
+                            healthProbeFailures = 0
+                        } else {
+                            healthProbeFailures++
+                            diagnostics.append(
+                                "error",
+                                "VPN tunnel health probe failed ($healthProbeFailures/$HEALTH_FAILURES_BEFORE_RECONNECT)",
+                                failure,
+                            )
+                            if (shouldReconnectAfterHealthFailures(healthProbeFailures)) requestNetworkReconnect(0)
+                        }
                     }
                 }
             }
@@ -877,14 +1108,32 @@ class OlcrtcVpnService : VpnService() {
         return builder.build()
     }
 
-    private fun notificationStateText(): String = getString(
-        when (publishedState) {
-            VpnState.NO_PROFILE, VpnState.DISCONNECTED -> R.string.vpn_notification_disconnected
-            VpnState.PREPARING, VpnState.CONNECTING -> R.string.vpn_notification_connecting
-            VpnState.CONNECTED -> R.string.vpn_notification_connected
-            VpnState.RECONNECTING -> R.string.vpn_notification_reconnecting
-            VpnState.STOPPING -> R.string.vpn_notification_stopping
-            VpnState.ERROR -> R.string.vpn_notification_error
+    private fun notificationStateText(): String = when (publishedState) {
+        VpnState.NO_PROFILE, VpnState.DISCONNECTED -> getString(R.string.vpn_notification_disconnected)
+        VpnState.PREPARING, VpnState.CONNECTING -> connectionStageText()
+        VpnState.CONNECTED -> getString(R.string.vpn_notification_connected)
+        VpnState.RECONNECTING -> if (reconnectAttemptCount > 0) {
+            getString(R.string.vpn_reconnecting_attempt, reconnectAttemptCount)
+        } else {
+            connectionStageText()
+        }
+        VpnState.STOPPING -> getString(R.string.vpn_notification_stopping)
+        VpnState.ERROR -> getString(R.string.vpn_notification_error)
+    }
+
+    private fun connectionStageText(): String = getString(
+        when (publishedStage) {
+            ConnectionStage.LOAD_PROFILE -> R.string.vpn_stage_load_profile
+            ConnectionStage.WAIT_NETWORK -> R.string.vpn_stage_wait_network
+            ConnectionStage.PREPARE_ASSETS -> R.string.vpn_stage_prepare_assets
+            ConnectionStage.CREATE_TUN -> R.string.vpn_stage_create_tun
+            ConnectionStage.START_CARRIER -> R.string.vpn_stage_start_carrier
+            ConnectionStage.START_XRAY -> R.string.vpn_stage_start_xray
+            ConnectionStage.START_HEV -> R.string.vpn_stage_start_hev
+            ConnectionStage.VERIFY_DATAPATH -> R.string.vpn_stage_verify_datapath
+            ConnectionStage.READY -> R.string.vpn_notification_connected
+            ConnectionStage.STOPPING -> R.string.vpn_notification_stopping
+            ConnectionStage.IDLE -> R.string.vpn_notification_connecting
         },
     )
 
@@ -956,6 +1205,26 @@ class OlcrtcVpnService : VpnService() {
         }
     }
 
+    private data class StartedSession(
+        val session: NativeSession,
+        val socksPort: Int,
+        val dns: DnsEndpoint,
+    )
+
+    private class ConnectionAttempt(
+        val generation: Long,
+        val reference: ProfileReference,
+        val network: Network,
+        val startedAt: Long,
+    ) {
+        val cancelled = AtomicBoolean(false)
+        @Volatile var session: NativeSession? = null
+
+        fun requireActive() {
+            if (cancelled.get()) throw CancellationException("connection attempt cancelled")
+        }
+    }
+
     private sealed interface ProfileReference {
         val displayId: String
         val sessionId: String
@@ -987,7 +1256,6 @@ class OlcrtcVpnService : VpnService() {
         const val VPN_IPV4_PREFIX = 32
         const val DATAPATH_TIMEOUT_MILLIS = 10_000
         const val MAX_DNS_RESPONSE_BYTES = 65_535
-        const val MAX_RECONNECT_ATTEMPTS = 3
         private const val CONNECTION_TEST_URL = "https://www.google.com/generate_204"
         private const val CONNECTION_TEST_TIMEOUT_MILLIS = 5_000
         private const val TUNNEL_HEALTH_INTERVAL_MILLIS = 15_000L
@@ -1000,6 +1268,32 @@ class OlcrtcVpnService : VpnService() {
         )
     }
 }
+
+internal fun requiresGeoAssets(policy: RoutingPolicy): Boolean =
+    policy.preset == RoutingPolicy.Preset.RUSSIA_DIRECT
+
+internal fun shouldReconnectAfterHealthFailures(failures: Int): Boolean =
+    failures >= HEALTH_FAILURES_BEFORE_RECONNECT
+
+internal const val HEALTH_FAILURES_BEFORE_RECONNECT = 2
+
+internal fun networkReconnectDelay(replacingExistingNetwork: Boolean): Long =
+    if (replacingExistingNetwork) NETWORK_CHANGE_DEBOUNCE_MILLIS else 0L
+
+internal const val NETWORK_CHANGE_DEBOUNCE_MILLIS = 400L
+
+internal fun shouldAcceptConnectionResult(
+    currentGeneration: Long?,
+    resultGeneration: Long,
+    cancelled: Boolean,
+): Boolean = !cancelled && currentGeneration == resultGeneration
+
+internal fun isFatalConnectionError(
+    error: Throwable,
+    nativeFatal: (Throwable) -> Boolean,
+): Boolean = error is IllegalArgumentException ||
+    error.message?.startsWith("profile ") == true ||
+    nativeFatal(error)
 
 internal enum class UnderlyingNetworkChange {
     KEEP,

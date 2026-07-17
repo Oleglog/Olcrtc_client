@@ -16,6 +16,7 @@ import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import io.github.oleglog.olcrtc.client.databinding.ActivityMainBinding
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
+import io.github.oleglog.olcrtc.client.vpn.ConnectionStage
 import io.github.oleglog.olcrtc.client.vpn.IOlcrtcVpnService
 import io.github.oleglog.olcrtc.client.vpn.IVpnStateCallback
 import io.github.oleglog.olcrtc.client.vpn.OlcrtcVpnService
@@ -29,12 +30,22 @@ class MainActivity : AppCompatActivity() {
     private var pendingSubscriptionProfileId: String? = null
     private var pendingImport: String? = null
     private var importListener: ((String) -> Unit)? = null
-    private var stateListener: ((VpnState, String?) -> Unit)? = null
+    private var stateListener: ((VpnState, String?, ConnectionStage, Int) -> Unit)? = null
+    private var lastVpnState = VpnState.NO_PROFILE
+    private var lastVpnError: String? = null
+    private var lastConnectionStage = ConnectionStage.IDLE
+    private var lastReconnectAttempt = 0
+    private var hasVpnState = false
 
     private val callback = object : IVpnStateCallback.Stub() {
-        override fun onStateChanged(state: Int, error: String?) {
+        override fun onStateChanged(state: Int, error: String?, stage: Int, reconnectAttempt: Int) {
             runOnUiThread {
-                stateListener?.invoke(VpnState.entries.getOrNull(state) ?: VpnState.ERROR, error)
+                dispatchVpnState(
+                    VpnState.entries.getOrNull(state) ?: VpnState.ERROR,
+                    error,
+                    ConnectionStage.fromOrdinal(stage),
+                    reconnectAttempt,
+                )
             }
         }
     }
@@ -44,7 +55,6 @@ class MainActivity : AppCompatActivity() {
             val remote = IOlcrtcVpnService.Stub.asInterface(service)
             vpn = remote
             remote.registerCallback(callback)
-            stateListener?.invoke(VpnState.entries.getOrNull(remote.state) ?: VpnState.ERROR, null)
         }
 
         override fun onServiceDisconnected(name: ComponentName) {
@@ -59,7 +69,7 @@ class MainActivity : AppCompatActivity() {
         } else {
             pendingProfileId = null
             pendingSubscriptionProfileId = null
-            stateListener?.invoke(VpnState.ERROR, getString(R.string.vpn_permission_denied))
+            dispatchVpnState(VpnState.ERROR, getString(R.string.vpn_permission_denied), ConnectionStage.IDLE, 0)
         }
     }
 
@@ -107,13 +117,25 @@ class MainActivity : AppCompatActivity() {
         if (listener != null) consumeExternalImport()?.let(listener)
     }
 
-    fun setVpnStateListener(listener: ((VpnState, String?) -> Unit)?) {
+    fun setVpnStateListener(listener: ((VpnState, String?, ConnectionStage, Int) -> Unit)?) {
         stateListener = listener
-        if (listener != null) {
-            vpn?.let { remote ->
-                listener(VpnState.entries.getOrNull(remote.state) ?: VpnState.ERROR, null)
-            }
+        if (listener != null && hasVpnState) {
+            listener(lastVpnState, lastVpnError, lastConnectionStage, lastReconnectAttempt)
         }
+    }
+
+    private fun dispatchVpnState(
+        state: VpnState,
+        error: String?,
+        stage: ConnectionStage,
+        reconnectAttempt: Int,
+    ) {
+        lastVpnState = state
+        lastVpnError = error
+        lastConnectionStage = stage
+        lastReconnectAttempt = reconnectAttempt
+        hasVpnState = true
+        stateListener?.invoke(state, error, stage, reconnectAttempt)
     }
 
     fun stopVpn() {

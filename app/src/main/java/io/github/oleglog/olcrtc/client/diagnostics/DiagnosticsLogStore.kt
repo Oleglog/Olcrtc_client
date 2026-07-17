@@ -12,6 +12,7 @@ internal class DiagnosticsLogStore(
         directory.mkdirs()
     }
 
+    @Synchronized
     fun append(level: String, message: String, throwable: Throwable? = null) {
         val timestamp = clockMillis()
         val line = buildString {
@@ -29,6 +30,7 @@ internal class DiagnosticsLogStore(
         currentLogFile(timestamp).appendText(line)
     }
 
+    @Synchronized
     fun readRedacted(maxBytes: Int = DEFAULT_EXPORT_BYTES): String {
         val builder = StringBuilder()
         logFiles().forEach { file ->
@@ -40,6 +42,7 @@ internal class DiagnosticsLogStore(
         return builder.toString()
     }
 
+    @Synchronized
     fun prune(maxAgeMillis: Long = MAX_AGE_MILLIS, maxTotalBytes: Long = MAX_TOTAL_BYTES) {
         val oldestAllowed = clockMillis() - maxAgeMillis
         logFiles().forEach { file ->
