@@ -18,6 +18,10 @@
         android:id="@+id/bottom_navigation"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="?attr/colorSurface"
+        android:elevation="2dp"
+        app:itemIconSize="@dimen/icon_navigation_size"
+        app:labelVisibilityMode="labeled"
         app:menu="@menu/main_navigation" />
 
 </LinearLayout>

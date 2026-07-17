@@ -1,0 +1,15 @@
+<resources>
+    <color name="olcrtc_primary">#006B5E</color>
+    <color name="olcrtc_on_primary">#FFFFFF</color>
+    <color name="olcrtc_primary_container">#9EF2DD</color>
+    <color name="olcrtc_on_primary_container">#00201B</color>
+    <color name="olcrtc_secondary">#4A635D</color>
+    <color name="olcrtc_on_secondary">#FFFFFF</color>
+    <color name="olcrtc_surface">#F8FAF8</color>
+    <color name="olcrtc_on_surface">#191C1B</color>
+    <color name="olcrtc_surface_variant">#E0E7E4</color>
+    <color name="olcrtc_on_surface_variant">#404946</color>
+    <color name="olcrtc_outline">#707976</color>
+    <color name="olcrtc_error">#BA1A1A</color>
+    <color name="olcrtc_on_error">#FFFFFF</color>
+</resources>

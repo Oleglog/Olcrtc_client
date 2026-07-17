@@ -1,5 +1,21 @@
 <resources>
     <style name="Theme.OlcrtcClient" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:fontFamily">sans</item>
+        <item name="colorPrimary">@color/olcrtc_primary</item>
+        <item name="colorOnPrimary">@color/olcrtc_on_primary</item>
+        <item name="colorPrimaryContainer">@color/olcrtc_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/olcrtc_on_primary_container</item>
+        <item name="colorSecondary">@color/olcrtc_secondary</item>
+        <item name="colorOnSecondary">@color/olcrtc_on_secondary</item>
+        <item name="colorSurface">@color/olcrtc_surface</item>
+        <item name="colorOnSurface">@color/olcrtc_on_surface</item>
+        <item name="colorSurfaceVariant">@color/olcrtc_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/olcrtc_on_surface_variant</item>
+        <item name="colorOutline">@color/olcrtc_outline</item>
+        <item name="colorError">@color/olcrtc_error</item>
+        <item name="colorOnError">@color/olcrtc_on_error</item>
+        <item name="android:colorBackground">@color/olcrtc_surface</item>
+        <item name="android:navigationBarColor">@color/olcrtc_surface</item>
+        <item name="android:windowActionModeOverlay">true</item>
     </style>
 </resources>

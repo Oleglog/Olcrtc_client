@@ -2,18 +2,18 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
         android:id="@+id/connectionFragment"
-        android:icon="@android:drawable/ic_menu_send"
+        android:icon="@drawable/ic_nav_connection_24"
         android:title="@string/navigation_connection" />
     <item
         android:id="@+id/profilesFragment"
-        android:icon="@android:drawable/ic_menu_agenda"
+        android:icon="@drawable/ic_nav_subscriptions_24"
         android:title="@string/navigation_profiles" />
     <item
         android:id="@+id/statisticsFragment"
-        android:icon="@android:drawable/ic_menu_sort_by_size"
+        android:icon="@drawable/ic_nav_statistics_24"
         android:title="@string/navigation_statistics" />
     <item
         android:id="@+id/settingsFragment"
-        android:icon="@android:drawable/ic_menu_preferences"
+        android:icon="@drawable/ic_nav_settings_24"
         android:title="@string/navigation_settings" />
 </menu>
