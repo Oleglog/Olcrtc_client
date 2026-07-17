@@ -97,10 +97,11 @@ class AppSelectorActivity : AppCompatActivity() {
                 return@execute
             }
             if (!restoredSelection) selectedPackages.addAll(policy.packages)
+            val cached = runCatching { repository.cachedInstalled() }.getOrDefault(emptyList())
             runOnUiThread {
                 if (isDestroyed) return@runOnUiThread
                 binding.modeGroup.check(policy.mode.buttonId)
-                applyApps(repository.cachedInstalled())
+                applyApps(cached)
             }
             val refreshed = runCatching { repository.refreshInstalled(includeSystem = true) }
             runOnUiThread {

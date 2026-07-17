@@ -33,8 +33,9 @@ internal class AppRoutingRepository(
             .asSequence()
             .filter { includeSystem || !it.isSystemApp }
             .map { app ->
-                val label = app.loadLabel(packageManager)?.toString()?.takeIf(String::isNotBlank)
-                    ?: app.packageName
+                val label = runCatching {
+                    app.loadLabel(packageManager)?.toString()?.takeIf(String::isNotBlank)
+                }.getOrNull() ?: app.packageName
                 val existing = stored[app.packageName]
                 AppRoutingItem(
                     packageName = app.packageName,
