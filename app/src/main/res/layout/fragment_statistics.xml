@@ -136,11 +136,13 @@
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/clear_history"
-            style="?attr/materialButtonOutlinedStyle"
-            android:layout_width="match_parent"
+            style="?attr/materialButtonTextStyle"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_gravity="end"
             android:layout_marginTop="16dp"
-            android:text="@string/statistics_clear_history" />
+            android:text="@string/statistics_clear_history"
+            android:textColor="?attr/colorError" />
 
     </LinearLayout>
 </ScrollView>

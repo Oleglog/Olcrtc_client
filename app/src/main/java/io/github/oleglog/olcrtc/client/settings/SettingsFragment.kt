@@ -4,6 +4,8 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -11,25 +13,27 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ArrayAdapter
-import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import androidx.core.content.FileProvider
-import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.checkbox.MaterialCheckBox
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.materialswitch.MaterialSwitch
+import com.google.android.material.textfield.MaterialAutoCompleteTextView
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import io.github.oleglog.olcrtc.client.BuildConfig
+import io.github.oleglog.olcrtc.client.MainActivity
 import io.github.oleglog.olcrtc.client.R
 import io.github.oleglog.olcrtc.client.data.ProfileRepository
 import io.github.oleglog.olcrtc.client.databinding.FragmentSettingsBinding
 import io.github.oleglog.olcrtc.client.diagnostics.DiagnosticsLogStore
-import io.github.oleglog.olcrtc.client.routing.AppRoutingRepository
+import io.github.oleglog.olcrtc.client.diagnostics.DiagnosticsRedactor
 import io.github.oleglog.olcrtc.client.routing.GeoAssetManager
 import io.github.oleglog.olcrtc.client.routing.PerAppPolicy
 import io.github.oleglog.olcrtc.client.routing.RoutingPolicy
@@ -41,6 +45,7 @@ import io.github.oleglog.olcrtc.client.updater.ApkUpdateInstaller
 import io.github.oleglog.olcrtc.client.updater.GitHubUpdateClient
 import io.github.oleglog.olcrtc.client.updater.GitHubRelease
 import io.github.oleglog.olcrtc.client.vpn.GomobileCore
+import io.github.oleglog.olcrtc.client.vpn.VpnState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -50,7 +55,6 @@ class SettingsFragment : Fragment() {
     private var _binding: FragmentSettingsBinding? = null
     private val settings by lazy { RoutingSettings.open(requireContext().applicationContext) }
     private val diagnostics by lazy { DiagnosticsLogStore.open(requireContext().applicationContext) }
-    private val appRouting by lazy { AppRoutingRepository.open(requireContext().applicationContext) }
     private val profiles by lazy { ProfileRepository.open(requireContext().applicationContext) }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View {
@@ -60,47 +64,49 @@ class SettingsFragment : Fragment() {
 
     override fun onViewCreated(view: View, state: Bundle?) {
         val binding = requireNotNull(_binding)
-        val routingChoices = listOf(
-            RoutingPolicy.Preset.ALL_VPN to getString(R.string.routing_all_vpn),
-            RoutingPolicy.Preset.RUSSIA_DIRECT to getString(R.string.routing_russia_direct),
+        binding.settingsRoutingRow.setOnClickListener { showRoutingSettings() }
+        binding.settingsAppsRow.setOnClickListener { selectApps() }
+        binding.settingsDnsRow.setOnClickListener { showDnsSettings() }
+        binding.settingsSystemRow.setOnClickListener {
+            showActions(
+                R.string.settings_system_title,
+                intArrayOf(R.string.settings_language, R.string.settings_always_on, R.string.settings_battery_optimization),
+                arrayOf(
+                    ::changeLanguage,
+                    { openSystemSettings(Settings.ACTION_VPN_SETTINGS) },
+                    { openSystemSettings(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS) },
+                ),
+            )
+        }
+        binding.settingsUpdatesRow.setOnClickListener {
+            showActions(
+                R.string.settings_check_update,
+                intArrayOf(R.string.settings_check_update, R.string.settings_core_versions),
+                arrayOf(::checkUpdate, ::showCoreVersions),
+            )
+        }
+        binding.settingsDiagnosticsRow.setOnClickListener { showDiagnosticsMenu() }
+        binding.settingsAboutRow.setOnClickListener { showAbout() }
+        binding.settingsSystemRow.text = settingsRowText(
+            R.string.settings_system_title,
+            getString(R.string.settings_system_row_summary),
         )
-        binding.routingPreset.setAdapter(ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_list_item_1,
-            routingChoices.map { it.second },
-        ))
-        binding.routingPreset.setOnItemClickListener { _, _, position, _ ->
-            binding.routingPreset.tag = routingChoices[position].first
-        }
-        val perAppChoices = listOf(
-            PerAppPolicy.Mode.ALL to getString(R.string.settings_per_app_all),
-            PerAppPolicy.Mode.EXCLUDE_SELECTED to getString(R.string.settings_per_app_exclude),
-            PerAppPolicy.Mode.ONLY_SELECTED to getString(R.string.settings_per_app_only),
+        binding.settingsUpdatesRow.text = settingsRowText(
+            R.string.settings_check_update,
+            getString(R.string.settings_version_summary, BuildConfig.VERSION_NAME),
         )
-        binding.perAppMode.setAdapter(ArrayAdapter(
-            requireContext(),
-            android.R.layout.simple_list_item_1,
-            perAppChoices.map { it.second },
-        ))
-        binding.perAppMode.setOnItemClickListener { _, _, position, _ ->
-            binding.perAppMode.tag = perAppChoices[position].first
-        }
-        binding.save.setOnClickListener { save() }
-        binding.refreshAppList.setOnClickListener { refreshAppList() }
-        binding.selectApps.setOnClickListener { selectApps() }
-        binding.addRoutingRule.setOnClickListener { addRoutingRule() }
-        binding.updateGeoAssets.setOnClickListener { updateGeoAssets() }
-        binding.changeLanguage.setOnClickListener { changeLanguage() }
-        binding.openAlwaysOn.setOnClickListener { openSystemSettings(Settings.ACTION_VPN_SETTINGS) }
-        binding.openBatteryOptimization.setOnClickListener {
-            openSystemSettings(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-        }
-        binding.checkUpdate.setOnClickListener { checkUpdate() }
-        binding.showCoreVersions.setOnClickListener { showCoreVersions() }
-        binding.viewDiagnostics.setOnClickListener { showDiagnostics() }
-        binding.copyDiagnostics.setOnClickListener { copyDiagnostics() }
-        binding.exportDiagnostics.setOnClickListener { exportDiagnostics() }
-        binding.reportIssue.setOnClickListener { reportIssue() }
+        binding.settingsDiagnosticsRow.text = settingsRowText(
+            R.string.settings_diagnostics_title,
+            getString(R.string.settings_diagnostics_row_summary),
+        )
+        binding.settingsAboutRow.text = settingsRowText(
+            R.string.settings_about,
+            getString(R.string.settings_version_summary, BuildConfig.VERSION_NAME),
+        )
+    }
+
+    override fun onStart() {
+        super.onStart()
         load()
     }
 
@@ -150,213 +156,359 @@ class SettingsFragment : Fragment() {
                 )
             }
             val binding = _binding ?: return@launch
-            binding.routingPreset.tag = values.routingPolicy.preset
-            binding.routingPreset.setText(
-                getString(
-                    if (values.routingPolicy.preset == RoutingPolicy.Preset.ALL_VPN) {
-                        R.string.routing_all_vpn
-                    } else {
-                        R.string.routing_russia_direct
-                    },
-                ),
-                false,
+            val preset = getString(
+                if (values.routingPolicy.preset == RoutingPolicy.Preset.ALL_VPN) {
+                    R.string.routing_all_vpn
+                } else {
+                    R.string.routing_russia_direct
+                },
             )
-            binding.allowLan.isChecked = values.routingPolicy.allowLan
-            binding.dnsServer.setText(values.dnsServer.orEmpty())
-            binding.perAppMode.tag = values.perAppPolicy.mode
-            binding.perAppMode.setText(
+            binding.settingsRoutingRow.text = settingsRowText(
+                R.string.settings_routing_title,
+                "$preset · ${getString(R.string.settings_routing_rules_summary, values.routingRules)}",
+            )
+            binding.settingsAppsRow.text = settingsRowText(
+                R.string.settings_per_app_title,
                 getString(
-                    when (values.perAppPolicy.mode) {
+                    R.string.settings_apps_row_summary,
+                    getString(when (values.perAppPolicy.mode) {
                         PerAppPolicy.Mode.ALL -> R.string.settings_per_app_all
                         PerAppPolicy.Mode.EXCLUDE_SELECTED -> R.string.settings_per_app_exclude
                         PerAppPolicy.Mode.ONLY_SELECTED -> R.string.settings_per_app_only
-                    },
+                    }),
+                    values.perAppPolicy.packages.size,
                 ),
-                false,
             )
-            binding.appRoutingSummary.text = getString(
-                R.string.settings_app_routing_summary,
-                0,
-                values.perAppPolicy.packages.size,
+            binding.settingsDnsRow.text = settingsRowText(
+                R.string.dns_server,
+                values.dnsServer ?: "1.1.1.1:53",
             )
-            binding.routingRulesSummary.text = getString(
-                R.string.settings_routing_rules_summary,
-                values.routingRules,
-            )
-        }
-    }
-
-    private fun save() {
-        val binding = _binding ?: return
-        val policy = RoutingPolicy(
-            preset = binding.routingPreset.tag as? RoutingPolicy.Preset ?: RoutingPolicy.Preset.ALL_VPN,
-            allowLan = binding.allowLan.isChecked,
-        )
-        val dnsServer = binding.dnsServer.text?.toString()?.trim()?.takeIf(String::isNotEmpty)
-        val perAppMode = binding.perAppMode.tag as? PerAppPolicy.Mode ?: PerAppPolicy.Mode.ALL
-        viewLifecycleOwner.lifecycleScope.launch {
-            val result = runCatching {
-                withContext(Dispatchers.IO) {
-                    val currentPerApp = settings.getPerAppPolicy()
-                    settings.set(policy)
-                    settings.setDnsServer(dnsServer)
-                    settings.setPerAppPolicy(currentPerApp.copy(mode = perAppMode))
-                }
-            }
-            val current = _binding ?: return@launch
-            result.onSuccess { current.status.setText(R.string.settings_saved) }
-                .onFailure { current.status.text = it.message }
-        }
-    }
-
-    private fun refreshAppList() {
-        val includeSystem = _binding?.includeSystemApps?.isChecked ?: false
-        viewLifecycleOwner.lifecycleScope.launch {
-            val result = runCatching {
-                withContext(Dispatchers.IO) {
-                    val currentPolicy = settings.getPerAppPolicy()
-                    val apps = appRouting.refreshInstalled(includeSystem)
-                    appRouting.setSelected(currentPolicy.packages, true)
-                    apps.size to currentPolicy.packages.size
-                }
-            }
-            val binding = _binding ?: return@launch
-            result.onSuccess { (installed, selected) ->
-                binding.appRoutingSummary.text = getString(
-                    R.string.settings_app_routing_summary,
-                    installed,
-                    selected,
-                )
-            }.onFailure { binding.status.text = it.message }
         }
     }
 
     private fun selectApps() {
-        val includeSystem = _binding?.includeSystemApps?.isChecked ?: false
-        viewLifecycleOwner.lifecycleScope.launch {
-            val result = runCatching {
-                withContext(Dispatchers.IO) {
-                    val policy = settings.getPerAppPolicy()
-                    val apps = appRouting.cachedInstalled().ifEmpty { appRouting.refreshInstalled(includeSystem) }
-                    apps to policy.packages
+        startActivity(Intent(requireContext(), AppSelectorActivity::class.java))
+    }
+
+    private fun showRoutingSettings() {
+        val choices = listOf(
+            RoutingPolicy.Preset.ALL_VPN to getString(R.string.routing_all_vpn),
+            RoutingPolicy.Preset.RUSSIA_DIRECT to getString(R.string.routing_russia_direct),
+        )
+        val current = settings.get()
+        val presetInput = MaterialAutoCompleteTextView(requireContext()).apply {
+            inputType = android.text.InputType.TYPE_NULL
+            setAdapter(ArrayAdapter(requireContext(), android.R.layout.simple_list_item_1, choices.map { it.second }))
+            setText(choices.first { it.first == current.preset }.second, false)
+            tag = current.preset
+            setOnItemClickListener { _, _, position, _ -> tag = choices[position].first }
+        }
+        val allowLan = MaterialSwitch(requireContext()).apply {
+            setText(R.string.allow_lan)
+            isChecked = current.allowLan
+        }
+        val manageRules = com.google.android.material.button.MaterialButton(requireContext()).apply {
+            setText(R.string.settings_manage_rules)
+            setOnClickListener { showRoutingRules() }
+        }
+        val updateGeo = com.google.android.material.button.MaterialButton(requireContext()).apply {
+            setText(R.string.settings_update_geo_assets)
+            setOnClickListener { updateGeoAssets() }
+        }
+        val content = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24.dp, 8.dp, 24.dp, 0)
+            addView(TextInputLayout(requireContext()).apply {
+                hint = getString(R.string.settings_routing_preset)
+                endIconMode = TextInputLayout.END_ICON_DROPDOWN_MENU
+                addView(presetInput)
+            })
+            addView(allowLan)
+            addView(manageRules)
+            addView(updateGeo)
+        }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.settings_routing_title)
+            .setView(content)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.save_settings) { _, _ ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    withContext(Dispatchers.IO) {
+                        settings.set(RoutingPolicy(presetInput.tag as RoutingPolicy.Preset, allowLan.isChecked))
+                    }
+                    _binding?.status?.setText(R.string.settings_saved)
+                    load()
                 }
             }
-            result.onSuccess { (apps, selectedPackages) ->
-                val checked = apps.map { it.packageName in selectedPackages }.toBooleanArray()
-                val list = LinearLayout(requireContext()).apply { orientation = LinearLayout.VERTICAL }
-                val rows = apps.mapIndexed { index, app ->
-                    MaterialCheckBox(requireContext()).apply {
-                        text = "${app.label}\n${app.packageName}"
-                        isChecked = checked[index]
-                        setPadding(12.dp, 8.dp, 12.dp, 8.dp)
-                        setOnCheckedChangeListener { _, isChecked -> checked[index] = isChecked }
-                    }.also(list::addView)
+            .show()
+    }
+
+    private fun showRoutingRules() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val rules = withContext(Dispatchers.IO) { profiles.getAllRoutingRules() }
+            var parentDialog: AlertDialog? = null
+            val list = LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(24.dp, 8.dp, 24.dp, 8.dp)
+                addView(TextView(requireContext()).apply {
+                    setText(R.string.settings_routing_preview)
+                    setPadding(0, 0, 0, 8.dp)
+                })
+                if (rules.isEmpty()) {
+                    addView(TextView(requireContext()).apply {
+                        setText(R.string.settings_routing_rules_empty)
+                        setPadding(0, 12.dp, 0, 12.dp)
+                    })
                 }
-                val scroll = ScrollView(requireContext()).apply { addView(list) }
-                val searchInput = TextInputEditText(requireContext()).apply {
-                    setHint(R.string.settings_app_search)
-                    setSingleLine(true)
-                    doAfterTextChanged { text ->
-                        val query = text?.toString()?.trim().orEmpty()
-                        rows.forEachIndexed { index, row ->
-                            val app = apps[index]
-                            row.visibility = if (
-                                query.isEmpty() ||
-                                app.label.contains(query, ignoreCase = true) ||
-                                app.packageName.contains(query, ignoreCase = true)
-                            ) View.VISIBLE else View.GONE
+                rules.forEach { rule ->
+                    addView(routingRuleRow(rule, onEdit = {
+                        parentDialog?.dismiss()
+                        showRoutingRuleEditor(rule)
+                    }, onDelete = {
+                        confirmDeleteRoutingRule(rule) {
+                            parentDialog?.dismiss()
+                            showRoutingRules()
                         }
-                    }
+                    }))
                 }
-                val search = TextInputLayout(requireContext()).apply {
-                    hint = getString(R.string.settings_app_search)
-                    boxBackgroundMode = TextInputLayout.BOX_BACKGROUND_OUTLINE
-                    endIconMode = TextInputLayout.END_ICON_CLEAR_TEXT
-                    addView(searchInput)
-                }
-                val content = LinearLayout(requireContext()).apply {
-                    orientation = LinearLayout.VERTICAL
-                    setPadding(16.dp, 0, 16.dp, 0)
-                    addView(search)
-                    addView(scroll, LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        480.dp,
-                    ))
-                }
-                MaterialAlertDialogBuilder(requireContext())
-                    .setTitle(R.string.settings_select_apps)
-                    .setView(content)
-                    .setNegativeButton(R.string.cancel, null)
-                    .setPositiveButton(android.R.string.ok) { _, _ ->
-                        val selected = apps.filterIndexed { index, _ -> checked[index] }
-                            .mapTo(mutableSetOf()) { it.packageName }
-                        saveSelectedApps(apps.size, selected)
-                    }
-                    .show()
-            }.onFailure { _binding?.status?.text = it.message }
+            }
+            parentDialog = MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.settings_manage_rules)
+                .setView(ScrollView(requireContext()).apply { addView(list) })
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.settings_add_routing_rule) { _, _ -> showRoutingRuleEditor(null) }
+                .show()
         }
     }
 
-    private fun saveSelectedApps(installedCount: Int, selected: Set<String>) {
+    private fun routingRuleRow(
+        rule: RoutingRule,
+        onEdit: () -> Unit,
+        onDelete: () -> Unit,
+    ): View = LinearLayout(requireContext()).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(0, 10.dp, 0, 10.dp)
+        addView(TextView(requireContext()).apply {
+            text = "${routingActionLabel(rule.action)} · ${routingTypeLabel(rule.matchType)}"
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall)
+        })
+        addView(TextView(requireContext()).apply {
+            text = rule.value
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
+        })
+        addView(LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+            addView(MaterialSwitch(requireContext()).apply {
+                setText(R.string.settings_rule_enabled)
+                isChecked = rule.enabled
+                setOnCheckedChangeListener { button, checked ->
+                    if (button.tag == true) return@setOnCheckedChangeListener
+                    button.isEnabled = false
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        runCatching {
+                            withContext(Dispatchers.IO) { profiles.setRoutingRuleEnabled(rule.id, checked) }
+                        }.onSuccess {
+                            load()
+                        }.onFailure {
+                            button.tag = true
+                            button.isChecked = rule.enabled
+                            button.tag = false
+                            _binding?.status?.text = it.message
+                        }
+                        button.isEnabled = true
+                    }
+                }
+            }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            addView(com.google.android.material.button.MaterialButton(requireContext()).apply {
+                setText(R.string.edit)
+                setOnClickListener { onEdit() }
+            })
+            addView(com.google.android.material.button.MaterialButton(requireContext()).apply {
+                setText(R.string.delete)
+                setOnClickListener { onDelete() }
+            })
+        })
+    }
+
+    private fun confirmDeleteRoutingRule(rule: RoutingRule, onDeleted: () -> Unit) {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.settings_rule_delete_title)
+            .setMessage(getString(R.string.settings_rule_delete_message, rule.value))
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) { profiles.deleteRoutingRule(rule.id) }
+                    }.onSuccess {
+                        load()
+                        onDeleted()
+                    }.onFailure { _binding?.status?.text = it.message }
+                }
+            }
+            .show()
+    }
+
+    private fun showDnsSettings() {
+        val input = TextInputEditText(requireContext()).apply {
+            setText(settings.getDnsServer() ?: "1.1.1.1:53")
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or android.text.InputType.TYPE_TEXT_VARIATION_URI
+        }
+        val content = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24.dp, 8.dp, 24.dp, 0)
+            addView(TextInputLayout(requireContext()).apply {
+                hint = getString(R.string.dns_server)
+                addView(input)
+            })
+            addView(android.widget.TextView(requireContext()).apply {
+                setText(R.string.settings_dns_explanation)
+                setPadding(0, 8.dp, 0, 0)
+            })
+        }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.dns_server)
+            .setView(content)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.save_settings) { _, _ ->
+                viewLifecycleOwner.lifecycleScope.launch {
+                    runCatching {
+                        withContext(Dispatchers.IO) {
+                            settings.setDnsServer(input.text?.toString()?.trim()?.takeIf(String::isNotEmpty))
+                        }
+                    }.onSuccess {
+                        _binding?.status?.setText(R.string.settings_saved)
+                        load()
+                    }.onFailure { _binding?.status?.text = it.message }
+                }
+            }
+            .show()
+    }
+
+    private fun showActions(title: Int, labels: IntArray, actions: Array<() -> Unit>) {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(title)
+            .setItems(labels.map(::getString).toTypedArray()) { _, index -> actions[index]() }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showAbout() {
+        val versions = GomobileCore.coreVersions()
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.app_name)
+            .setMessage("${BuildConfig.VERSION_NAME}\nXray: ${versions.xray}\nolcRTC core: ${versions.olcrtc}")
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
+    }
+
+    private fun showRoutingRuleEditor(existing: RoutingRule?) {
+        val actions = RoutingRule.Action.entries
+        val types = RoutingRule.MatchType.entries
+        val action = MaterialAutoCompleteTextView(requireContext()).apply {
+            inputType = android.text.InputType.TYPE_NULL
+            setAdapter(ArrayAdapter(
+                requireContext(),
+                android.R.layout.simple_list_item_1,
+                actions.map(::routingActionLabel),
+            ))
+            setText(routingActionLabel(existing?.action ?: actions.first()), false)
+            tag = existing?.action ?: actions.first()
+            setOnItemClickListener { _, _, position, _ -> tag = actions[position] }
+        }
+        val type = MaterialAutoCompleteTextView(requireContext()).apply {
+            inputType = android.text.InputType.TYPE_NULL
+            setAdapter(ArrayAdapter(
+                requireContext(),
+                android.R.layout.simple_list_item_1,
+                types.map(::routingTypeLabel),
+            ))
+            setText(routingTypeLabel(existing?.matchType ?: types.first()), false)
+            tag = existing?.matchType ?: types.first()
+            setOnItemClickListener { _, _, position, _ -> tag = types[position] }
+        }
+        val value = TextInputEditText(requireContext()).apply { setText(existing?.value.orEmpty()) }
+        val valueLayout = TextInputLayout(requireContext()).apply {
+            hint = getString(R.string.settings_rule_value)
+            addView(value)
+        }
+        val content = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24.dp, 8.dp, 24.dp, 0)
+            addView(TextInputLayout(requireContext()).apply {
+                hint = getString(R.string.settings_rule_action)
+                endIconMode = TextInputLayout.END_ICON_DROPDOWN_MENU
+                addView(action)
+            })
+            addView(TextInputLayout(requireContext()).apply {
+                hint = getString(R.string.settings_rule_type)
+                endIconMode = TextInputLayout.END_ICON_DROPDOWN_MENU
+                addView(type)
+            })
+            addView(valueLayout)
+        }
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(if (existing == null) R.string.settings_add_routing_rule else R.string.settings_rule_edit_title)
+            .setView(content)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.save_settings, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val draft = runCatching {
+                    RoutingRule.create(
+                        id = existing?.id ?: 0,
+                        matchType = type.tag as RoutingRule.MatchType,
+                        value = value.text?.toString().orEmpty(),
+                        action = action.tag as RoutingRule.Action,
+                        enabled = existing?.enabled ?: true,
+                        sortOrder = existing?.sortOrder ?: 0,
+                    )
+                }.getOrElse {
+                    valueLayout.error = it.message ?: getString(R.string.invalid_profile)
+                    return@setOnClickListener
+                }
+                valueLayout.error = null
+                saveRoutingRule(draft, dialog)
+            }
+        }
+        dialog.show()
+    }
+
+    private fun saveRoutingRule(draft: RoutingRule, dialog: AlertDialog) {
         viewLifecycleOwner.lifecycleScope.launch {
             val result = runCatching {
                 withContext(Dispatchers.IO) {
-                    val current = settings.getPerAppPolicy()
-                    appRouting.setSelected(appRouting.selectedPackages(), false)
-                    appRouting.setSelected(selected, true)
-                    settings.setPerAppPolicy(current.copy(packages = selected))
+                    val rule = if (draft.id == 0L) {
+                        draft.copy(sortOrder = (profiles.getAllRoutingRules().maxOfOrNull(RoutingRule::sortOrder) ?: -1) + 1)
+                    } else {
+                        draft
+                    }
+                    profiles.saveRoutingRule(rule)
                 }
             }
             val binding = _binding ?: return@launch
             result.onSuccess {
-                binding.appRoutingSummary.text = getString(
-                    R.string.settings_app_routing_summary,
-                    installedCount,
-                    selected.size,
-                )
-            }.onFailure { binding.status.text = it.message }
-        }
-    }
-
-    private fun addRoutingRule() {
-        val input = EditText(requireContext()).apply {
-            hint = getString(R.string.settings_routing_rule_hint)
-            setSingleLine(false)
-            minLines = 2
-        }
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.settings_add_routing_rule)
-            .setView(input)
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(android.R.string.ok) { _, _ -> saveRoutingRule(input.text?.toString().orEmpty()) }
-            .show()
-    }
-
-    private fun saveRoutingRule(raw: String) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            val result = runCatching {
-                withContext(Dispatchers.IO) {
-                    val parts = raw.trim().split(Regex("\\s+"), limit = 3)
-                    require(parts.size == 3) { getString(R.string.settings_routing_rule_hint) }
-                    profiles.saveRoutingRule(
-                        RoutingRule.create(
-                            matchType = RoutingRule.MatchType.valueOf(parts[1].uppercase()),
-                            value = parts[2],
-                            action = RoutingRule.Action.valueOf(parts[0].uppercase()),
-                            enabled = true,
-                            sortOrder = profiles.getEnabledRoutingRules().size,
-                        ),
-                    )
-                    profiles.getEnabledRoutingRules().size
-                }
-            }
-            val binding = _binding ?: return@launch
-            result.onSuccess { count ->
-                binding.routingRulesSummary.text = getString(R.string.settings_routing_rules_summary, count)
+                dialog.dismiss()
                 binding.status.setText(R.string.settings_saved)
+                load()
+                showRoutingRules()
             }.onFailure { binding.status.text = it.message }
         }
     }
+
+    private fun routingActionLabel(action: RoutingRule.Action): String = getString(when (action) {
+        RoutingRule.Action.VPN -> R.string.settings_rule_action_vpn
+        RoutingRule.Action.DIRECT -> R.string.settings_rule_action_direct
+        RoutingRule.Action.BLOCK -> R.string.settings_rule_action_block
+    })
+
+    private fun routingTypeLabel(type: RoutingRule.MatchType): String = getString(when (type) {
+        RoutingRule.MatchType.DOMAIN -> R.string.settings_rule_type_domain
+        RoutingRule.MatchType.DOMAIN_SUFFIX -> R.string.settings_rule_type_domain_suffix
+        RoutingRule.MatchType.IP -> R.string.settings_rule_type_ip
+        RoutingRule.MatchType.CIDR -> R.string.settings_rule_type_cidr
+    })
 
     private fun openSystemSettings(action: String) {
         runCatching { startActivity(Intent(action)) }
@@ -433,7 +585,59 @@ class SettingsFragment : Fragment() {
         }
     }
 
-    private fun showDiagnostics() {
+    private fun showDiagnosticsMenu() {
+        val versions = GomobileCore.coreVersions()
+        val host = activity as? MainActivity
+        val state = host?.currentVpnState() ?: VpnState.DISCONNECTED
+        val activeProfileType = when (host?.activeProfileReference()?.substringBefore(':')) {
+            "local" -> getString(R.string.settings_diagnostics_profile_local)
+            "subscription" -> getString(R.string.settings_diagnostics_profile_subscription)
+            else -> getString(R.string.settings_diagnostics_profile_none)
+        }
+        val lastError = host?.currentVpnError()
+            ?.let(DiagnosticsRedactor::redact)
+            ?.lineSequence()
+            ?.firstOrNull()
+            ?.take(MAX_SAFE_ERROR_CHARS)
+            ?.takeIf(String::isNotBlank)
+            ?: getString(R.string.settings_diagnostics_no_error)
+        val summary = getString(
+            R.string.settings_diagnostics_summary,
+            BuildConfig.VERSION_NAME,
+            versions.xray,
+            versions.olcrtc,
+            vpnStateLabel(state),
+            activeProfileType,
+            currentNetworkType(),
+            lastError,
+        )
+        val content = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24.dp, 8.dp, 24.dp, 0)
+            addView(TextView(requireContext()).apply {
+                text = summary
+                setTextIsSelectable(true)
+            })
+            listOf(
+                R.string.settings_view_diagnostics to ::showDiagnosticsLog,
+                R.string.settings_copy_diagnostics to ::copyDiagnostics,
+                R.string.settings_export_diagnostics to ::exportDiagnostics,
+                R.string.settings_report_issue to ::reportIssue,
+            ).forEach { (label, action) ->
+                addView(com.google.android.material.button.MaterialButton(requireContext()).apply {
+                    setText(label)
+                    setOnClickListener { action() }
+                })
+            }
+        }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.settings_diagnostics_title)
+            .setView(content)
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun showDiagnosticsLog() {
         viewLifecycleOwner.lifecycleScope.launch {
             val text = withContext(Dispatchers.IO) { diagnostics.readRedacted() }
                 .ifBlank { getString(R.string.settings_no_diagnostics) }
@@ -442,8 +646,37 @@ class SettingsFragment : Fragment() {
                 .setMessage(text.takeLast(MAX_DIALOG_LOG_CHARS))
                 .setPositiveButton(android.R.string.ok, null)
                 .show()
-        }
+            }
     }
+
+    private fun currentNetworkType(): String {
+        val connectivity = requireContext().getSystemService(ConnectivityManager::class.java)
+        val capabilities = connectivity.allNetworks.asSequence()
+            .mapNotNull(connectivity::getNetworkCapabilities)
+            .firstOrNull {
+                it.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                    it.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+            }
+            ?: return getString(R.string.settings_diagnostics_network_unknown)
+        return getString(when {
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> R.string.settings_diagnostics_network_wifi
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> R.string.settings_diagnostics_network_mobile
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) -> R.string.settings_diagnostics_network_ethernet
+            else -> R.string.settings_diagnostics_network_other
+        })
+    }
+
+    private fun vpnStateLabel(state: VpnState): String = getString(when (state) {
+        VpnState.NO_PROFILE, VpnState.DISCONNECTED -> R.string.vpn_notification_disconnected
+        VpnState.PREPARING, VpnState.CONNECTING -> R.string.vpn_notification_connecting
+        VpnState.CONNECTED -> R.string.vpn_notification_connected
+        VpnState.RECONNECTING -> R.string.settings_diagnostics_reconnecting
+        VpnState.STOPPING -> R.string.vpn_notification_stopping
+        VpnState.ERROR -> R.string.vpn_notification_error
+    })
+
+    private fun settingsRowText(title: Int, summary: String): String =
+        getString(R.string.settings_row_summary, getString(title), summary)
 
     private fun copyDiagnostics() {
         viewLifecycleOwner.lifecycleScope.launch {
@@ -501,5 +734,6 @@ class SettingsFragment : Fragment() {
 
     private companion object {
         const val MAX_DIALOG_LOG_CHARS = 12_000
+        const val MAX_SAFE_ERROR_CHARS = 240
     }
 }

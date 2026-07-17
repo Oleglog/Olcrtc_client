@@ -1,13 +1,18 @@
 package io.github.oleglog.olcrtc.client.connection
 
 import android.text.InputType
+import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.CheckBox
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
+import androidx.core.widget.doAfterTextChanged
 import androidx.fragment.app.Fragment
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.textfield.MaterialAutoCompleteTextView
@@ -22,6 +27,7 @@ internal object ProfileEditorDialog {
     fun show(
         fragment: Fragment,
         profile: ProfileConfig,
+        isActive: Boolean = false,
         onSave: (ProfileConfig, AlertDialog) -> Unit,
         onError: (Throwable) -> Unit,
     ) {
@@ -30,10 +36,21 @@ internal object ProfileEditorDialog {
             orientation = LinearLayout.VERTICAL
             setPadding(24.dp(fragment), 8.dp(fragment), 24.dp(fragment), 0)
         }
+        if (isActive) {
+            TextView(context).apply {
+                setText(R.string.profile_active_edit_warning)
+                setPadding(0, 0, 0, 12.dp(fragment))
+            }.also(form::addView)
+        }
+        val error = TextView(context).apply {
+            setTextColor(androidx.core.content.ContextCompat.getColor(context, R.color.olcrtc_error))
+            visibility = View.GONE
+        }.also(form::addView)
         val build = when (profile) {
             is ProfileConfig.Olcrtc -> olcrtcForm(fragment, form, profile.value)
             is ProfileConfig.Standard -> standardForm(fragment, form, profile.value)
         }
+        val initialDraft = runCatching(build).getOrNull() ?: profile
         val title = when (profile) {
             is ProfileConfig.Olcrtc -> profile.value.name
             is ProfileConfig.Standard -> profile.value.name
@@ -42,12 +59,50 @@ internal object ProfileEditorDialog {
             .setTitle(fragment.getString(R.string.profile_edit_title, title))
             .setView(ScrollView(context).apply { addView(form) })
             .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(android.R.string.ok, null)
+            .setPositiveButton(R.string.save_settings, null)
             .create()
+        fun requestClose() {
+            if (!profileEditorIsDirty(initialDraft, runCatching(build).getOrNull())) {
+                dialog.dismiss()
+                return
+            }
+            MaterialAlertDialogBuilder(context)
+                .setTitle(R.string.profile_discard_title)
+                .setMessage(R.string.profile_discard_message)
+                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.profile_discard) { _, _ -> dialog.dismiss() }
+                .show()
+        }
         dialog.setOnShowListener {
             dialog.window?.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                runCatching(build).onSuccess { onSave(it, dialog) }.onFailure(onError)
+            dialog.setCanceledOnTouchOutside(false)
+            dialog.window?.setLayout(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+            )
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener { requestClose() }
+            val save = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+            form.inputFields().forEach { input ->
+                input.doAfterTextChanged {
+                    error.visibility = View.GONE
+                    save.isEnabled = runCatching(build).isSuccess
+                }
+            }
+            save.isEnabled = runCatching(build).isSuccess
+            save.setOnClickListener {
+                runCatching(build).onSuccess { onSave(it, dialog) }.onFailure {
+                    error.text = it.message ?: fragment.getString(R.string.invalid_profile)
+                    error.visibility = View.VISIBLE
+                    onError(it)
+                }
+            }
+        }
+        dialog.setOnKeyListener { _, keyCode, event ->
+            if (keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) {
+                requestClose()
+                true
+            } else {
+                false
             }
         }
         dialog.show()
@@ -67,11 +122,12 @@ internal object ProfileEditorDialog {
         val key = field(fragment, form, R.string.profile_field_key, profile.keyHex, secret = true)
         val auth = field(fragment, form, R.string.profile_field_auth_token, profile.authToken.orEmpty(), secret = true)
         val dns = field(fragment, form, R.string.profile_field_dns, profile.dnsServer.orEmpty())
-        val fps = field(fragment, form, R.string.profile_field_vp8_fps, profile.vp8Fps.toString(), numeric = true)
-        val batch = field(fragment, form, R.string.profile_field_vp8_batch, profile.vp8BatchSize.toString(), numeric = true)
+        val advanced = advancedSection(fragment, form)
+        val fps = field(fragment, advanced, R.string.profile_field_vp8_fps, profile.vp8Fps.toString(), numeric = true)
+        val batch = field(fragment, advanced, R.string.profile_field_vp8_batch, profile.vp8BatchSize.toString(), numeric = true)
         val keepalive = field(
             fragment,
-            form,
+            advanced,
             R.string.profile_field_keepalive,
             profile.keepaliveIntervalSeconds.toString(),
             numeric = true,
@@ -79,18 +135,20 @@ internal object ProfileEditorDialog {
         return {
             ProfileConfig.Olcrtc(
                 OlcrtcProfile(
-                    name = name.value(),
+                    name = name.requiredValue(fragment.getString(R.string.profile_value_required)),
                     provider = provider.selected,
                     transport = transport.selected,
-                    roomId = roomId.value(),
+                    roomId = roomId.requiredValue(fragment.getString(R.string.profile_value_required)),
                     roomPassword = roomPassword.optionalValue(),
-                    clientId = clientId.value(),
-                    keyHex = key.value(),
+                    clientId = clientId.requiredValue(fragment.getString(R.string.profile_value_required)),
+                    keyHex = key.validatedValue(fragment.getString(R.string.profile_key_invalid)) {
+                        it.length == 64 && it.all(Char::isHexDigit)
+                    },
                     authToken = auth.optionalValue(),
                     dnsServer = dns.optionalValue(),
-                    vp8Fps = fps.intValue(),
-                    vp8BatchSize = batch.intValue(),
-                    keepaliveIntervalSeconds = keepalive.intValue(),
+                    vp8Fps = fps.intValue(1..120, fragment.getString(R.string.profile_value_invalid)),
+                    vp8BatchSize = batch.intValue(1..64, fragment.getString(R.string.profile_value_invalid)),
+                    keepaliveIntervalSeconds = keepalive.intValue(0..3600, fragment.getString(R.string.profile_value_invalid)),
                 ),
             )
         }
@@ -107,39 +165,41 @@ internal object ProfileEditorDialog {
         val port = field(fragment, form, R.string.profile_field_port, profile.port.toString(), numeric = true)
         val uuid = field(fragment, form, R.string.profile_field_uuid, profile.uuid.orEmpty())
         val password = field(fragment, form, R.string.profile_field_password, profile.password.orEmpty(), secret = true)
-        val alterId = field(fragment, form, R.string.profile_field_alter_id, profile.alterId.toString(), numeric = true)
-        val cipher = field(fragment, form, R.string.profile_field_cipher, profile.cipher)
         val transport = choice(fragment, form, R.string.profile_field_transport, StandardProfile.Transport.entries, profile.transport)
         val security = choice(fragment, form, R.string.profile_field_security, StandardProfile.Security.entries, profile.security)
-        val flow = field(fragment, form, R.string.profile_field_flow, profile.flow.orEmpty())
-        val serverName = field(fragment, form, R.string.profile_field_server_name, profile.serverName.orEmpty())
-        val alpn = field(fragment, form, R.string.profile_field_alpn, profile.alpn.joinToString(","))
-        val fingerprint = field(fragment, form, R.string.profile_field_fingerprint, profile.fingerprint.orEmpty())
+        val advanced = advancedSection(fragment, form)
+        val alterId = field(fragment, advanced, R.string.profile_field_alter_id, profile.alterId.toString(), numeric = true)
+        val cipher = field(fragment, advanced, R.string.profile_field_cipher, profile.cipher)
+        val flow = field(fragment, advanced, R.string.profile_field_flow, profile.flow.orEmpty())
+        val serverName = field(fragment, advanced, R.string.profile_field_server_name, profile.serverName.orEmpty())
+        val alpn = field(fragment, advanced, R.string.profile_field_alpn, profile.alpn.joinToString(","))
+        val fingerprint = field(fragment, advanced, R.string.profile_field_fingerprint, profile.fingerprint.orEmpty())
         val allowInsecure = CheckBox(fragment.requireContext()).apply {
             setText(R.string.profile_field_allow_insecure)
             isChecked = profile.allowInsecure
-        }.also(form::addView)
-        val realityKey = field(fragment, form, R.string.profile_field_reality_key, profile.realityPublicKey.orEmpty())
-        val realityShortId = field(fragment, form, R.string.profile_field_reality_short_id, profile.realityShortId.orEmpty())
-        val realitySpiderX = field(fragment, form, R.string.profile_field_reality_spider_x, profile.realitySpiderX.orEmpty())
-        val wsHost = field(fragment, form, R.string.profile_field_ws_host, profile.webSocketHost.orEmpty())
-        val wsPath = field(fragment, form, R.string.profile_field_ws_path, profile.webSocketPath.orEmpty())
-        val grpcService = field(fragment, form, R.string.profile_field_grpc_service, profile.grpcServiceName.orEmpty())
-        val xhttpMode = field(fragment, form, R.string.profile_field_xhttp_mode, profile.xhttpMode.orEmpty())
-        val xhttpHost = field(fragment, form, R.string.profile_field_xhttp_host, profile.xhttpHost.orEmpty())
-        val xhttpPath = field(fragment, form, R.string.profile_field_xhttp_path, profile.xhttpPath.orEmpty())
-        val xhttpExtra = field(fragment, form, R.string.profile_field_xhttp_extra, profile.xhttpExtraJson.orEmpty())
-        val dns = field(fragment, form, R.string.profile_field_dns, profile.dnsServer.orEmpty())
+        }.also(advanced::addView)
+        val realityKey = field(fragment, advanced, R.string.profile_field_reality_key, profile.realityPublicKey.orEmpty())
+        val realityShortId = field(fragment, advanced, R.string.profile_field_reality_short_id, profile.realityShortId.orEmpty())
+        val realitySpiderX = field(fragment, advanced, R.string.profile_field_reality_spider_x, profile.realitySpiderX.orEmpty())
+        val wsHost = field(fragment, advanced, R.string.profile_field_ws_host, profile.webSocketHost.orEmpty())
+        val wsPath = field(fragment, advanced, R.string.profile_field_ws_path, profile.webSocketPath.orEmpty())
+        val grpcService = field(fragment, advanced, R.string.profile_field_grpc_service, profile.grpcServiceName.orEmpty())
+        val xhttpMode = field(fragment, advanced, R.string.profile_field_xhttp_mode, profile.xhttpMode.orEmpty())
+        val xhttpHost = field(fragment, advanced, R.string.profile_field_xhttp_host, profile.xhttpHost.orEmpty())
+        val xhttpPath = field(fragment, advanced, R.string.profile_field_xhttp_path, profile.xhttpPath.orEmpty())
+        val xhttpExtra = field(fragment, advanced, R.string.profile_field_xhttp_extra, profile.xhttpExtraJson.orEmpty())
+        val dns = field(fragment, advanced, R.string.profile_field_dns, profile.dnsServer.orEmpty())
         val conditional = listOf(
             uuid, password, alterId, cipher, flow, realityKey, realityShortId,
             realitySpiderX, wsHost, wsPath, grpcService, xhttpMode, xhttpHost,
             xhttpPath, xhttpExtra,
         )
         fun updateVisibility() {
-            conditional.forEach { it.layout.visibility = View.GONE }
+            conditional.forEach(FormField::hide)
             when (protocol.selected) {
                 StandardProfile.Protocol.VLESS -> uuid.show()
                 StandardProfile.Protocol.VMESS -> {
+                    advanced.visibility = View.VISIBLE
                     uuid.show()
                     alterId.show()
                     cipher.show()
@@ -161,6 +221,7 @@ internal object ProfileEditorDialog {
                 }
             }
             if (security.selected == StandardProfile.Security.REALITY) {
+                advanced.visibility = View.VISIBLE
                 realityKey.show()
                 realityShortId.show()
                 realitySpiderX.show()
@@ -169,6 +230,7 @@ internal object ProfileEditorDialog {
                     transport.selected == StandardProfile.Transport.TCP
                 ) flow.show()
             }
+            if (transport.selected != StandardProfile.Transport.TCP) advanced.visibility = View.VISIBLE
         }
         protocol.onSelectionChanged(::updateVisibility)
         transport.onSelectionChanged(::updateVisibility)
@@ -180,14 +242,24 @@ internal object ProfileEditorDialog {
             val selectedSecurity = security.selected
             ProfileConfig.Standard(
                 StandardProfile(
-                    name = name.value(),
+                    name = name.requiredValue(fragment.getString(R.string.profile_value_required)),
                     protocol = selectedProtocol,
-                    address = address.value(),
-                    port = port.intValue(),
-                    uuid = if (selectedProtocol == StandardProfile.Protocol.TROJAN) null else uuid.optionalValue(),
-                    password = if (selectedProtocol == StandardProfile.Protocol.TROJAN) password.optionalValue() else null,
-                    alterId = if (selectedProtocol == StandardProfile.Protocol.VMESS) alterId.intValue() else 0,
-                    cipher = if (selectedProtocol == StandardProfile.Protocol.VMESS) cipher.value() else "auto",
+                    address = address.requiredValue(fragment.getString(R.string.profile_value_required)),
+                    port = port.intValue(1..65535, fragment.getString(R.string.profile_value_invalid)),
+                    uuid = if (selectedProtocol == StandardProfile.Protocol.TROJAN) null else {
+                        uuid.validatedValue(fragment.getString(R.string.profile_uuid_invalid)) {
+                            runCatching { java.util.UUID.fromString(it) }.isSuccess
+                        }
+                    },
+                    password = if (selectedProtocol == StandardProfile.Protocol.TROJAN) {
+                        password.requiredValue(fragment.getString(R.string.profile_value_required))
+                    } else null,
+                    alterId = if (selectedProtocol == StandardProfile.Protocol.VMESS) {
+                        alterId.intValue(0..Int.MAX_VALUE, fragment.getString(R.string.profile_value_invalid))
+                    } else 0,
+                    cipher = if (selectedProtocol == StandardProfile.Protocol.VMESS) {
+                        cipher.requiredValue(fragment.getString(R.string.profile_value_required))
+                    } else "auto",
                     transport = selectedTransport,
                     security = selectedSecurity,
                     flow = if (
@@ -199,15 +271,27 @@ internal object ProfileEditorDialog {
                     alpn = alpn.value().split(',').map(String::trim).filter(String::isNotEmpty),
                     fingerprint = fingerprint.optionalValue(),
                     allowInsecure = allowInsecure.isChecked,
-                    realityPublicKey = if (selectedSecurity == StandardProfile.Security.REALITY) realityKey.optionalValue() else null,
-                    realityShortId = if (selectedSecurity == StandardProfile.Security.REALITY) realityShortId.optionalValue() else null,
+                    realityPublicKey = if (selectedSecurity == StandardProfile.Security.REALITY) {
+                        realityKey.requiredValue(fragment.getString(R.string.profile_value_required))
+                    } else null,
+                    realityShortId = if (selectedSecurity == StandardProfile.Security.REALITY) {
+                        realityShortId.requiredValue(fragment.getString(R.string.profile_value_required))
+                    } else null,
                     realitySpiderX = if (selectedSecurity == StandardProfile.Security.REALITY) realitySpiderX.optionalValue() else null,
                     webSocketHost = if (selectedTransport == StandardProfile.Transport.WS) wsHost.optionalValue() else null,
-                    webSocketPath = if (selectedTransport == StandardProfile.Transport.WS) wsPath.optionalValue() else null,
-                    grpcServiceName = if (selectedTransport == StandardProfile.Transport.GRPC) grpcService.optionalValue() else null,
-                    xhttpMode = if (selectedTransport == StandardProfile.Transport.XHTTP) xhttpMode.optionalValue() else null,
+                    webSocketPath = if (selectedTransport == StandardProfile.Transport.WS) {
+                        wsPath.requiredValue(fragment.getString(R.string.profile_value_required))
+                    } else null,
+                    grpcServiceName = if (selectedTransport == StandardProfile.Transport.GRPC) {
+                        grpcService.requiredValue(fragment.getString(R.string.profile_value_required))
+                    } else null,
+                    xhttpMode = if (selectedTransport == StandardProfile.Transport.XHTTP) {
+                        xhttpMode.requiredValue(fragment.getString(R.string.profile_value_required))
+                    } else null,
                     xhttpHost = if (selectedTransport == StandardProfile.Transport.XHTTP) xhttpHost.optionalValue() else null,
-                    xhttpPath = if (selectedTransport == StandardProfile.Transport.XHTTP) xhttpPath.optionalValue() else null,
+                    xhttpPath = if (selectedTransport == StandardProfile.Transport.XHTTP) {
+                        xhttpPath.requiredValue(fragment.getString(R.string.profile_value_required))
+                    } else null,
                     xhttpExtraJson = if (selectedTransport == StandardProfile.Transport.XHTTP) xhttpExtra.optionalValue() else null,
                     dnsServer = dns.optionalValue(),
                 ),
@@ -262,6 +346,21 @@ internal object ProfileEditorDialog {
         return ChoiceField(input, values, selected)
     }
 
+    private fun advancedSection(fragment: Fragment, form: LinearLayout): LinearLayout {
+        val content = LinearLayout(fragment.requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            visibility = View.GONE
+        }
+        form.addView(com.google.android.material.button.MaterialButton(fragment.requireContext()).apply {
+            setText(R.string.profile_advanced)
+            setOnClickListener {
+                content.visibility = if (content.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            }
+        })
+        form.addView(content)
+        return content
+    }
+
     private class ChoiceField<T>(
         input: MaterialAutoCompleteTextView,
         private val values: List<T>,
@@ -289,13 +388,48 @@ internal object ProfileEditorDialog {
     ) {
         fun value(): String = input.text?.toString()?.trim().orEmpty()
         fun optionalValue(): String? = value().takeIf(String::isNotEmpty)
-        fun intValue(): Int = value().toIntOrNull()
-            ?: throw IllegalArgumentException("${layout.hint} is invalid")
+        fun requiredValue(message: String): String {
+            val current = value()
+            layout.error = if (current.isEmpty()) message else null
+            require(current.isNotEmpty()) { message }
+            return current
+        }
+        fun validatedValue(message: String, predicate: (String) -> Boolean): String {
+            val current = value()
+            val valid = predicate(current)
+            layout.error = if (valid) null else message
+            require(valid) { message }
+            return current
+        }
+        fun intValue(range: IntRange? = null, message: String = "${layout.hint} is invalid"): Int {
+            val parsed = value().toIntOrNull()
+            val valid = parsed != null && (range == null || parsed in range)
+            layout.error = message.takeUnless { valid }
+            require(valid) { message }
+            return requireNotNull(parsed)
+        }
         fun show() {
             layout.visibility = View.VISIBLE
+        }
+        fun hide() {
+            layout.error = null
+            layout.visibility = View.GONE
         }
     }
 
     private fun Int.dp(fragment: Fragment): Int =
         (this * fragment.resources.displayMetrics.density).toInt()
+
+    private fun View.inputFields(): Sequence<EditText> = sequence {
+        if (this@inputFields is EditText) yield(this@inputFields)
+        if (this@inputFields is ViewGroup) {
+            for (index in 0 until childCount) yieldAll(getChildAt(index).inputFields())
+        }
+    }
 }
+
+internal fun profileEditorIsDirty(original: ProfileConfig, current: ProfileConfig?): Boolean =
+    current == null || current != original
+
+private fun Char.isHexDigit(): Boolean =
+    this in '0'..'9' || this in 'a'..'f' || this in 'A'..'F'

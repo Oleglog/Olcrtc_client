@@ -9,6 +9,7 @@ interface IOlcrtcVpnService {
     void reconnect();
     int[] refreshSubscription(long subscriptionId);
     long testConnectionLatency();
+    long[] getTrafficSnapshot();
     String getActiveProfileReference();
     int getState();
     void registerCallback(IVpnStateCallback callback);

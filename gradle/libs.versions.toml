@@ -16,6 +16,7 @@ camerax = "1.5.0"
 datastore = "1.2.1"
 navigation = "2.9.6"
 fragment = "1.8.9"
+recyclerview = "1.4.0"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
@@ -37,6 +38,7 @@ datastore-preferences = { module = "androidx.datastore:datastore-preferences", v
 navigation-fragment-ktx = { module = "androidx.navigation:navigation-fragment-ktx", version.ref = "navigation" }
 navigation-ui-ktx = { module = "androidx.navigation:navigation-ui-ktx", version.ref = "navigation" }
 fragment-ktx = { module = "androidx.fragment:fragment-ktx", version.ref = "fragment" }
+recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "recyclerview" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

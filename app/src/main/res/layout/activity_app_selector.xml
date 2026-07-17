@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?attr/colorSurface"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:padding="@dimen/page_padding">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/cancel"
+            style="?attr/materialButtonTextStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/icon_touch_target"
+            android:text="@string/cancel" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/space_2"
+            android:layout_weight="1"
+            android:text="@string/settings_select_apps"
+            android:textAppearance="?attr/textAppearanceTitleLarge" />
+
+        <TextView
+            android:id="@+id/selected_count"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textAppearance="?attr/textAppearanceLabelLarge"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+    </LinearLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/page_padding"
+        android:layout_marginEnd="@dimen/page_padding"
+        android:hint="@string/settings_app_search"
+        app:boxCornerRadiusBottomEnd="@dimen/corner_card"
+        app:boxCornerRadiusBottomStart="@dimen/corner_card"
+        app:boxCornerRadiusTopEnd="@dimen/corner_card"
+        app:boxCornerRadiusTopStart="@dimen/corner_card"
+        app:endIconMode="clear_text">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/search"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:inputType="text"
+            android:singleLine="true" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.button.MaterialButtonToggleGroup
+        android:id="@+id/mode_group"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/page_padding"
+        android:layout_marginTop="@dimen/space_3"
+        android:layout_marginEnd="@dimen/page_padding"
+        app:checkedButton="@id/mode_all"
+        app:selectionRequired="true"
+        app:singleSelection="true">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/mode_all"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:maxLines="2"
+            android:text="@string/settings_per_app_all" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/mode_exclude"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:maxLines="2"
+            android:text="@string/settings_per_app_exclude" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/mode_only"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:maxLines="2"
+            android:text="@string/settings_per_app_only" />
+    </com.google.android.material.button.MaterialButtonToggleGroup>
+
+    <com.google.android.material.button.MaterialButtonToggleGroup
+        android:id="@+id/type_filter"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/page_padding"
+        android:layout_marginTop="@dimen/space_3"
+        android:layout_marginEnd="@dimen/page_padding"
+        app:checkedButton="@id/filter_user"
+        app:selectionRequired="true"
+        app:singleSelection="true">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/filter_user"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/settings_apps_user" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/filter_system"
+            style="?attr/materialButtonOutlinedStyle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/settings_apps_system" />
+    </com.google.android.material.button.MaterialButtonToggleGroup>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/page_padding"
+        android:paddingEnd="@dimen/page_padding">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/select_all"
+            style="?attr/materialButtonTextStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/icon_touch_target"
+            android:text="@string/settings_apps_select_all" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/clear"
+            style="?attr/materialButtonTextStyle"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/icon_touch_target"
+            android:text="@string/settings_apps_clear" />
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/app_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingStart="@dimen/space_3"
+        android:paddingEnd="@dimen/space_3"
+        android:paddingBottom="@dimen/space_3" />
+
+    <TextView
+        android:id="@+id/error"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/page_padding"
+        android:layout_marginEnd="@dimen/page_padding"
+        android:textColor="?attr/colorError"
+        android:visibility="gone" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/save"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/page_padding"
+        android:layout_marginTop="@dimen/space_2"
+        android:layout_marginEnd="@dimen/page_padding"
+        android:layout_marginBottom="@dimen/space_4"
+        android:minHeight="@dimen/button_primary_height"
+        android:text="@string/save_settings"
+        app:cornerRadius="@dimen/corner_button" />
+</LinearLayout>

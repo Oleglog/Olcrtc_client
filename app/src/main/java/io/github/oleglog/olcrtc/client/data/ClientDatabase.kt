@@ -250,7 +250,7 @@ internal interface ConnectionSessionDao {
     @Query("SELECT * FROM connection_sessions ORDER BY startedAt DESC LIMIT :limit")
     fun getRecent(limit: Int): List<ConnectionSessionEntity>
 
-    @Query("DELETE FROM connection_sessions")
+    @Query("DELETE FROM connection_sessions WHERE endedAt IS NOT NULL")
     fun clear(): Int
 
     @Query(
@@ -452,6 +452,9 @@ internal data class RoutingRuleEntity(
 
 @Dao
 internal interface RoutingRuleDao {
+    @Query("SELECT * FROM routing_rules ORDER BY sortOrder, id")
+    fun getAll(): List<RoutingRuleEntity>
+
     @Query("SELECT * FROM routing_rules WHERE enabled = 1 ORDER BY sortOrder, id")
     fun getEnabled(): List<RoutingRuleEntity>
 
@@ -463,11 +466,19 @@ internal interface RoutingRuleDao {
 
     @Update
     fun update(rule: RoutingRuleEntity): Int
+
+    @Query("UPDATE routing_rules SET enabled = :enabled WHERE id = :id")
+    fun setEnabled(id: Long, enabled: Boolean): Int
+
+    @Query("DELETE FROM routing_rules WHERE id = :id")
+    fun delete(id: Long): Int
 }
 
 internal class RoutingRuleRepository(
     private val rules: RoutingRuleDao,
 ) {
+    fun getAll(): List<RoutingRule> = rules.getAll().map { it.toRule() }
+
     fun getEnabled(): List<RoutingRule> = rules.getEnabled()
         .map { it.toRule() }
         .sortedWith(
@@ -498,6 +509,14 @@ internal class RoutingRuleRepository(
             }
             else -> rules.insert(entity)
         }
+    }
+
+    fun setEnabled(id: Long, enabled: Boolean) {
+        require(rules.setEnabled(id, enabled) == 1) { "Routing rule not found" }
+    }
+
+    fun delete(id: Long) {
+        require(rules.delete(id) == 1) { "Routing rule not found" }
     }
 
     private val RoutingRule.specificity: Int

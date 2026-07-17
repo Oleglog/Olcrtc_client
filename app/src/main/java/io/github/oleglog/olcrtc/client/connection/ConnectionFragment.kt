@@ -768,7 +768,21 @@ class ConnectionFragment : Fragment() {
             .setTitle(if (result.success) R.string.subscription_updated else R.string.subscription_update_failed)
             .setMessage(
                 if (result.success) {
-                    getString(R.string.subscription_update_summary, result.added, result.removed, result.total)
+                    buildString {
+                        append(getString(R.string.subscription_update_summary, result.added, result.removed, result.total))
+                        result.source?.let {
+                            append('\n').append(getString(
+                                R.string.subscription_update_source,
+                                getString(
+                                    if (it == SubscriptionRefresher.Source.PRIMARY) {
+                                        R.string.subscription_source_primary
+                                    } else {
+                                        R.string.subscription_source_mirror
+                                    },
+                                ),
+                            ))
+                        }
+                    }
                 } else {
                     getString(R.string.subscription_update_preserved)
                 },
@@ -787,6 +801,7 @@ class ConnectionFragment : Fragment() {
                     ProfileEditorDialog.show(
                         fragment = this,
                         profile = profile,
+                        isActive = (activity as? MainActivity)?.activeProfileReference() == "local:$profileId",
                         onSave = { updated, dialog -> saveLocalProfile(profileId, updated, dialog) },
                         onError = { showStatus(it.message ?: getString(R.string.invalid_profile)) },
                     )
@@ -824,6 +839,7 @@ class ConnectionFragment : Fragment() {
                     ProfileEditorDialog.show(
                         fragment = this,
                         profile = profile,
+                        isActive = (activity as? MainActivity)?.activeProfileReference() == "subscription:$profileId",
                         onSave = { updated, dialog -> saveSubscriptionProfile(profileId, updated, dialog) },
                         onError = { showStatus(it.message ?: getString(R.string.invalid_profile)) },
                     )

@@ -2,7 +2,9 @@ package io.github.oleglog.olcrtc.client.profiles
 
 import android.app.Activity
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.os.Bundle
+import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -12,6 +14,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.widget.AppCompatImageButton
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.google.android.material.button.MaterialButton
@@ -96,7 +99,7 @@ class ProfilesFragment : Fragment() {
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT,
         ).apply { bottomMargin = 12.dp }
-        radius = 10.dp.toFloat()
+        radius = resources.getDimension(R.dimen.corner_card)
         addView(LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(14.dp, 12.dp, 8.dp, 12.dp)
@@ -138,27 +141,22 @@ class ProfilesFragment : Fragment() {
         })
     }
 
-    private fun iconButton(iconRes: Int, descriptionRes: Int, action: () -> Unit): MaterialButton =
-        MaterialButton(
-            requireContext(),
-            null,
-            com.google.android.material.R.attr.materialButtonOutlinedStyle,
-        ).apply {
-            icon = ContextCompat.getDrawable(requireContext(), iconRes)
-            text = ""
+    private fun iconButton(iconRes: Int, descriptionRes: Int, action: () -> Unit): AppCompatImageButton =
+        AppCompatImageButton(requireContext()).apply {
+            val backgroundValue = TypedValue()
+            requireContext().theme.resolveAttribute(
+                android.R.attr.selectableItemBackgroundBorderless,
+                backgroundValue,
+                true,
+            )
+            setBackgroundResource(backgroundValue.resourceId)
+            setImageResource(iconRes)
+            imageTintList = ColorStateList.valueOf(
+                ContextCompat.getColor(requireContext(), R.color.olcrtc_on_surface_variant),
+            )
             contentDescription = getString(descriptionRes)
-            layoutParams = LinearLayout.LayoutParams(40.dp, 40.dp).apply { marginStart = 2.dp }
-            minWidth = 0
-            minimumWidth = 0
-            minHeight = 0
-            minimumHeight = 0
-            iconSize = 20.dp
-            iconPadding = 0
-            iconGravity = MaterialButton.ICON_GRAVITY_TEXT_START
-            insetTop = 0
-            insetBottom = 0
-            cornerRadius = 8.dp
-            setPadding(0, 0, 0, 0)
+            layoutParams = LinearLayout.LayoutParams(48.dp, 48.dp)
+            setPadding(13.dp, 13.dp, 13.dp, 13.dp)
             setOnClickListener { action() }
         }
 
@@ -168,7 +166,10 @@ class ProfilesFragment : Fragment() {
         subscription.lastSuccessAt?.let {
             append(" · ").append(getString(R.string.subscription_last_success, formatTime(it)))
         }
-        subscription.lastErrorCode?.let { append(" · ").append(it) }
+        subscription.lastErrorCode?.let {
+            append(" · ").append(getString(R.string.subscription_last_error, it))
+        }
+        append(" · ").append(getString(R.string.subscription_primary_badge))
         if (subscription.mirrorAvailable) append(" · ").append(getString(R.string.subscription_mirror_badge))
         if (!subscription.enabled) append(" · ").append(getString(R.string.subscription_disabled_badge))
     }
@@ -235,11 +236,30 @@ class ProfilesFragment : Fragment() {
 
     private fun showSubscriptionRefreshResult(result: SubscriptionRefresher.Result) {
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.subscription_updated)
-            .setMessage(getString(R.string.subscription_update_summary, result.added, result.removed, result.total))
+            .setTitle(if (result.success) R.string.subscription_updated else R.string.subscription_update_failed)
+            .setMessage(
+                if (result.success) {
+                    buildString {
+                        append(getString(R.string.subscription_update_summary, result.added, result.removed, result.total))
+                        result.source?.let {
+                            append('\n').append(getString(R.string.subscription_update_source, subscriptionSourceLabel(it)))
+                        }
+                    }
+                } else {
+                    getString(R.string.subscription_update_preserved)
+                },
+            )
             .setPositiveButton(android.R.string.ok, null)
             .show()
     }
+
+    private fun subscriptionSourceLabel(source: SubscriptionRefresher.Source): String = getString(
+        if (source == SubscriptionRefresher.Source.PRIMARY) {
+            R.string.subscription_source_primary
+        } else {
+            R.string.subscription_source_mirror
+        },
+    )
 
     private fun refreshSubscription(subscriptionId: Long): SubscriptionRefresher.Result =
         (activity as? MainActivity)?.refreshSubscription(subscriptionId)

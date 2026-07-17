@@ -20,7 +20,18 @@ internal class SubscriptionRefresher(
         val added: Int,
         val removed: Int,
         val total: Int,
+        val source: Source? = null,
     )
+
+    enum class Source(val wireCode: Int) {
+        PRIMARY(1),
+        MIRROR(2),
+        ;
+
+        companion object {
+            fun fromWireCode(value: Int): Source? = entries.firstOrNull { it.wireCode == value }
+        }
+    }
 
     fun refreshStale(now: Long = System.currentTimeMillis()): Int =
         repository.getStaleSubscriptionIds(now).count { refresh(it, now) }
@@ -29,30 +40,45 @@ internal class SubscriptionRefresher(
         subscriptionId: Long,
         now: Long = System.currentTimeMillis(),
         force: Boolean = false,
-    ): Boolean {
+    ): Boolean = refreshSource(subscriptionId, now, force) != null
+
+    private fun refreshSource(
+        subscriptionId: Long,
+        now: Long,
+        force: Boolean,
+    ): Source? {
         val source = requireNotNull(repository.getSubscriptionSource(subscriptionId)) { "Subscription not found" }
-        return runCatching { refreshPrimary(subscriptionId, source, now, force) }
+        return runCatching {
+            refreshPrimary(subscriptionId, source, now, force)
+            Source.PRIMARY
+        }
             .recoverCatching { primaryError ->
                 if (source.mirrorUrl == null || source.mirrorKey == null) {
                     throw primaryError
                 }
                 refreshMirror(subscriptionId, source, now)
+                Source.MIRROR
             }
-            .getOrElse { error ->
-                repository.markSubscriptionRefresh(subscriptionId, errorCode(error), now)
-                false
-            }
+            .fold(
+                onSuccess = { it },
+                onFailure = { error ->
+                    repository.markSubscriptionRefresh(subscriptionId, errorCode(error), now)
+                    null
+                },
+            )
     }
 
     fun refreshWithChanges(subscriptionId: Long, now: Long = System.currentTimeMillis()): Result {
         val before = repository.getSubscriptionProfiles(subscriptionId).mapTo(mutableSetOf(), ::identity)
-        if (!refresh(subscriptionId, now, force = true)) return Result(false, 0, 0, before.size)
+        val source = refreshSource(subscriptionId, now, force = true)
+            ?: return Result(false, 0, 0, before.size)
         val after = repository.getSubscriptionProfiles(subscriptionId).mapTo(mutableSetOf(), ::identity)
         return Result(
             success = true,
             added = (after - before).size,
             removed = (before - after).size,
             total = after.size,
+            source = source,
         )
     }
 

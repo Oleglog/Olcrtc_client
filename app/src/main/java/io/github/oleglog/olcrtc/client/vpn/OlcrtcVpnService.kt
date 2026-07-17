@@ -74,8 +74,10 @@ class OlcrtcVpnService : VpnService() {
     private var activeProfileInfo: ProfileInfo? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var activeSessionId: Long? = null
-    private var lastTrafficCounters = TrafficCounters()
+    @Volatile private var lastTrafficCounters = TrafficCounters()
     private var lastTrafficSampleAt = 0L
+    @Volatile private var lastUploadBytesPerSecond = 0L
+    @Volatile private var lastDownloadBytesPerSecond = 0L
     private var trafficSpeedText = ""
     private var notificationTicker: ScheduledFuture<*>? = null
     @Volatile private var activeSocksPort: Int? = null
@@ -155,10 +157,23 @@ class OlcrtcVpnService : VpnService() {
         override fun refreshSubscription(subscriptionId: Long): IntArray {
             require(subscriptionId > 0) { "subscriptionId must be positive" }
             val result = subscriptionRefresher().refreshWithChanges(subscriptionId)
-            return intArrayOf(if (result.success) 1 else 0, result.added, result.removed, result.total)
+            return intArrayOf(
+                if (result.success) 1 else 0,
+                result.added,
+                result.removed,
+                result.total,
+                result.source?.wireCode ?: 0,
+            )
         }
 
         override fun testConnectionLatency(): Long = measureConnectionLatency()
+
+        override fun getTrafficSnapshot(): LongArray = longArrayOf(
+            lastTrafficCounters.bytesUp,
+            lastTrafficCounters.bytesDown,
+            lastUploadBytesPerSecond,
+            lastDownloadBytesPerSecond,
+        )
 
         override fun getActiveProfileReference(): String? = activeProfile?.sessionId
 
@@ -992,6 +1007,8 @@ class OlcrtcVpnService : VpnService() {
         notificationTicker?.cancel(false)
         notificationTicker = null
         trafficSpeedText = ""
+        lastUploadBytesPerSecond = 0
+        lastDownloadBytesPerSecond = 0
     }
 
     private fun sampleTrafficAndNotify() {
@@ -1008,6 +1025,8 @@ class OlcrtcVpnService : VpnService() {
         val downloaded = (counters.bytesDown - lastTrafficCounters.bytesDown).coerceAtLeast(0)
         val upPerSecond = (uploaded * 1000) / elapsedMillis
         val downPerSecond = (downloaded * 1000) / elapsedMillis
+        lastUploadBytesPerSecond = upPerSecond
+        lastDownloadBytesPerSecond = downPerSecond
         if (uploaded > 0 || downloaded > 0) {
             healthProbeFailures = 0
             lastHealthProbeAt = now

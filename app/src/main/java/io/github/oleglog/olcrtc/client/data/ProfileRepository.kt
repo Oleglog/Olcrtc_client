@@ -66,7 +66,14 @@ internal class ProfileRepository(
 ) {
     fun getEnabledRoutingRules(): List<RoutingRule> = RoutingRuleRepository(routingRules).getEnabled()
 
+    fun getAllRoutingRules(): List<RoutingRule> = RoutingRuleRepository(routingRules).getAll()
+
     fun saveRoutingRule(rule: RoutingRule): Long = RoutingRuleRepository(routingRules).save(rule)
+
+    fun setRoutingRuleEnabled(id: Long, enabled: Boolean) =
+        RoutingRuleRepository(routingRules).setEnabled(id, enabled)
+
+    fun deleteRoutingRule(id: Long) = RoutingRuleRepository(routingRules).delete(id)
 
     fun listLocal(): List<ProfileSummary> =
         olcrtcProfiles.getAll().map {

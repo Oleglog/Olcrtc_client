@@ -144,16 +144,25 @@ class MainActivity : AppCompatActivity() {
 
     fun activeProfileReference(): String? = runCatching { vpn?.activeProfileReference }.getOrNull()
 
+    fun currentVpnState(): VpnState = runCatching {
+        vpn?.state?.let { VpnState.entries.getOrNull(it) }
+    }.getOrNull() ?: lastVpnState
+
+    fun currentVpnError(): String? = lastVpnError
+
+    fun trafficSnapshot(): LongArray? = runCatching { vpn?.trafficSnapshot }.getOrNull()
+
     fun testConnectionLatency(): Long = requireNotNull(vpn) { "VPN service is not connected" }.testConnectionLatency()
 
     internal fun refreshSubscription(subscriptionId: Long): SubscriptionRefresher.Result? {
         val values = vpn?.refreshSubscription(subscriptionId) ?: return null
-        require(values.size == 4) { "Invalid subscription refresh result" }
+        require(values.size >= 4) { "Invalid subscription refresh result" }
         return SubscriptionRefresher.Result(
             success = values[0] == 1,
             added = values[1],
             removed = values[2],
             total = values[3],
+            source = values.getOrNull(4)?.let(SubscriptionRefresher.Source::fromWireCode),
         )
     }
 
