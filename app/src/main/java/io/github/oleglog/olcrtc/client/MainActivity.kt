@@ -249,7 +249,7 @@ class MainActivity : AppCompatActivity() {
     private fun lastPromptedUpdateTag(): String? =
         updatePreferences.getString(KEY_LAST_PROMPTED_UPDATE_TAG, null)
 
-    fun installUpdate(release: GitHubRelease, asset: GitHubRelease.ReleaseAsset) {
+    internal fun installUpdate(release: GitHubRelease, asset: GitHubRelease.ReleaseAsset) {
         if (updateInstallInProgress) {
             Toast.makeText(this, R.string.settings_update_downloading, Toast.LENGTH_SHORT).show()
             return
