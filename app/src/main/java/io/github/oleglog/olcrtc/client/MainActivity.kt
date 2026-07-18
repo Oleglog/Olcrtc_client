@@ -55,7 +55,9 @@ class MainActivity : AppCompatActivity() {
     private var pendingSubscriptionProfileId: String? = null
     private var pendingNotificationStart: (() -> Unit)? = null
     private var pendingImport: String? = null
+    private var pendingImportDestinationId: Int? = null
     private var importListener: ((String) -> Unit)? = null
+    private var importListenerDestinationId: Int? = null
     private var stateListener: ((VpnState, String?, ConnectionStage, Int) -> Unit)? = null
     private var lastVpnState = VpnState.NO_PROFILE
     private var lastVpnError: String? = null
@@ -169,9 +171,17 @@ class MainActivity : AppCompatActivity() {
         super.onSaveInstanceState(outState)
     }
 
-    fun setImportListener(listener: ((String) -> Unit)?) {
+    fun setImportListener(destinationId: Int, listener: ((String) -> Unit)?) {
+        if (listener == null) {
+            if (importListenerDestinationId == destinationId) {
+                importListener = null
+                importListenerDestinationId = null
+            }
+            return
+        }
         importListener = listener
-        if (listener != null) consumeExternalImport()?.let(listener)
+        importListenerDestinationId = destinationId
+        consumeExternalImport(destinationId)?.let(listener)
     }
 
     fun setVpnStateListener(listener: ((VpnState, String?, ConnectionStage, Int) -> Unit)?) {
@@ -398,7 +408,13 @@ class MainActivity : AppCompatActivity() {
         if (intent == null) startSubscriptionVpn(profileId) else vpnPermission.launch(intent)
     }
 
-    fun consumeExternalImport(): String? = pendingImport.also { pendingImport = null }
+    private fun consumeExternalImport(destinationId: Int): String? {
+        if (pendingImportDestinationId != destinationId) return null
+        return pendingImport.also {
+            pendingImport = null
+            pendingImportDestinationId = null
+        }
+    }
 
     private fun acceptExternalIntent(intent: Intent) {
         if (intent.action != Intent.ACTION_VIEW) return
@@ -412,15 +428,21 @@ class MainActivity : AppCompatActivity() {
         when {
             raw.length > MAX_EXTERNAL_IMPORT_CHARS -> Toast.makeText(this, R.string.external_import_too_large, Toast.LENGTH_LONG).show()
             subscriptionLink.getOrNull() != null -> {
-                pendingImport = raw
-                if (::binding.isInitialized) binding.bottomNavigation.selectedItemId = R.id.profilesFragment
+                routeExternalImport(raw, R.id.profilesFragment)
             }
             scheme !in EXTERNAL_PROFILE_SCHEMES -> Toast.makeText(this, R.string.invalid_profile, Toast.LENGTH_LONG).show()
             else -> {
-                pendingImport = raw
-                if (::binding.isInitialized) binding.bottomNavigation.selectedItemId = R.id.connectionFragment
-                importListener?.invoke(raw)?.also { pendingImport = null }
+                routeExternalImport(raw, R.id.connectionFragment)
             }
+        }
+    }
+
+    private fun routeExternalImport(raw: String, destinationId: Int) {
+        pendingImport = raw
+        pendingImportDestinationId = destinationId
+        if (::binding.isInitialized) binding.bottomNavigation.selectedItemId = destinationId
+        if (shouldDeliverExternalImportImmediately(destinationId, importListenerDestinationId, importListener != null)) {
+            consumeExternalImport(destinationId)?.let { importListener?.invoke(it) }
         }
     }
 
@@ -484,3 +506,9 @@ internal fun shouldShowBatteryOptimizationPrompt(
     ignoringOptimizations: Boolean,
     promptHandled: Boolean,
 ): Boolean = !ignoringOptimizations && !promptHandled
+
+internal fun shouldDeliverExternalImportImmediately(
+    destinationId: Int,
+    listenerDestinationId: Int?,
+    listenerAvailable: Boolean,
+): Boolean = listenerDestinationId == destinationId && listenerAvailable

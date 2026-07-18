@@ -19,6 +19,22 @@ class SubscriptionDeepLinkTest {
 
         assertEquals(source, link?.url)
         assertEquals("Example", link?.name)
+        assertNull(link?.mirrorUrl)
+    }
+
+    @Test
+    fun parsesEncryptedYandexMirrorBootstrap() {
+        val source = encode("https://myolcrtc.mooo.com/sub/example")
+        val mirror = encode("https://disk.yandex.ru/d/example")
+        val key = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+
+        val link = SubscriptionDeepLinkParser.parseOrNull(
+            "olcrtc://subscription?url=$source&name=Example&mirror_type=yandex_disk&mirror_url=$mirror&mirror_key=$key",
+        )
+
+        assertEquals("yandex_disk", link?.mirrorType)
+        assertEquals("https://disk.yandex.ru/d/example", link?.mirrorUrl)
+        assertEquals(key, link?.mirrorKey)
     }
 
     @Test
@@ -38,4 +54,18 @@ class SubscriptionDeepLinkTest {
             SubscriptionDeepLinkParser.parseOrNull("olcrtc://subscription?url=$credentials")
         }
     }
+
+    @Test
+    fun rejectsIncompleteMirrorBootstrap() {
+        val source = encode("https://example.com/sub/test")
+        val mirror = encode("https://disk.yandex.ru/d/example")
+
+        assertThrows(IllegalArgumentException::class.java) {
+            SubscriptionDeepLinkParser.parseOrNull(
+                "olcrtc://subscription?url=$source&mirror_type=yandex_disk&mirror_url=$mirror",
+            )
+        }
+    }
+
+    private fun encode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.name())
 }

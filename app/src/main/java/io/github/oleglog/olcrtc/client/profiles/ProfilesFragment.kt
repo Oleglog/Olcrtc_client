@@ -32,6 +32,8 @@ import io.github.oleglog.olcrtc.client.importer.BundleImportResult
 import io.github.oleglog.olcrtc.client.importer.DecodedImportPayload
 import io.github.oleglog.olcrtc.client.importer.ImportPayload
 import io.github.oleglog.olcrtc.client.importer.QrScannerActivity
+import io.github.oleglog.olcrtc.client.importer.SubscriptionBundle
+import io.github.oleglog.olcrtc.client.importer.SubscriptionDeepLink
 import io.github.oleglog.olcrtc.client.importer.SubscriptionDeepLinkParser
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import java.text.DateFormat
@@ -64,12 +66,12 @@ class ProfilesFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
-        (activity as? MainActivity)?.setImportListener(::confirmExternalSubscription)
+        (activity as? MainActivity)?.setImportListener(R.id.profilesFragment, ::confirmExternalSubscription)
         loadSubscriptions()
     }
 
     override fun onStop() {
-        (activity as? MainActivity)?.setImportListener(null)
+        (activity as? MainActivity)?.setImportListener(R.id.profilesFragment, null)
         super.onStop()
     }
 
@@ -187,7 +189,7 @@ class ProfilesFragment : Fragment() {
             val result = runCatching {
                 val deepLink = SubscriptionDeepLinkParser.parseOrNull(raw)
                 if (deepLink != null) {
-                    importSubscriptionSource(deepLink.url, deepLink.name)
+                    importSubscriptionDeepLink(deepLink)
                 } else when (val payload = ImportPayload.decode(raw)) {
                     is DecodedImportPayload.Bundle -> importSubscriptionBundle(payload.raw)
                     is DecodedImportPayload.Multipart -> importSubscriptionBundle(payload.raw)
@@ -224,6 +226,35 @@ class ProfilesFragment : Fragment() {
             name = name ?: host,
             url = validatedUrl,
             kind = "GENERIC",
+        )
+        return refreshSubscription(id)
+    }
+
+    private fun importSubscriptionDeepLink(link: SubscriptionDeepLink): SubscriptionRefresher.Result {
+        val host = requireNotNull(java.net.URI(link.url).host)
+        val mirrors = link.mirrorUrl?.let { mirrorUrl ->
+            listOf(
+                SubscriptionBundle.Mirror(
+                    type = link.mirrorType,
+                    url = mirrorUrl,
+                    encrypted = true,
+                    algorithm = "AES-256-GCM",
+                ),
+            )
+        }.orEmpty()
+        val id = profiles.insertSubscription(
+            SubscriptionBundle(
+                name = link.name ?: host,
+                slug = null,
+                url = link.url,
+                serverVersion = null,
+                mirrors = mirrors,
+                mirrorKey = link.mirrorKey,
+                deduplication = true,
+                updateWhenConnectedOnly = false,
+                profiles = emptyList(),
+                rejectedProfiles = emptyList(),
+            ),
         )
         return refreshSubscription(id)
     }

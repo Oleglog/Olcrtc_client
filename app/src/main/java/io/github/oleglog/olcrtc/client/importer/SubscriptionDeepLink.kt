@@ -3,10 +3,14 @@ package io.github.oleglog.olcrtc.client.importer
 import java.net.URI
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
+import java.util.Base64
 
 internal data class SubscriptionDeepLink(
     val url: String,
     val name: String?,
+    val mirrorType: String?,
+    val mirrorUrl: String?,
+    val mirrorKey: String?,
 )
 
 internal object SubscriptionDeepLinkParser {
@@ -23,13 +27,26 @@ internal object SubscriptionDeepLinkParser {
         require(uri.path.isNullOrEmpty() || uri.path == "/") { "invalid subscription link path" }
         require(uri.fragment == null) { "subscription link fragment is not allowed" }
         val query = parseQuery(uri.rawQuery)
-        val sourceUrl = query["url"]?.singleOrNull()
+        val sourceUrl = singleValue(query, "url")
             ?: throw IllegalArgumentException("subscription URL is required")
-        val name = query["name"]?.singleOrNull()
+        val name = singleValue(query, "name")
             ?.trim()
             ?.takeIf(String::isNotEmpty)
             ?.also { require(it.length <= MAX_NAME_CHARS) { "subscription name is too large" } }
-        return SubscriptionDeepLink(validateHttpsUrl(sourceUrl), name)
+        val mirrorTypeValue = singleValue(query, "mirror_type")
+        val mirrorUrlValue = singleValue(query, "mirror_url")
+        val mirrorKeyValue = singleValue(query, "mirror_key")
+        val mirrorFieldCount = listOf(mirrorTypeValue, mirrorUrlValue, mirrorKeyValue).count { it != null }
+        require(mirrorFieldCount == 0 || mirrorFieldCount == 3) { "subscription mirror fields are incomplete" }
+        val mirrorType = mirrorTypeValue?.trim()?.lowercase()
+        if (mirrorType != null) require(mirrorType == "yandex_disk") { "unsupported subscription mirror" }
+        return SubscriptionDeepLink(
+            url = validateHttpsUrl(sourceUrl),
+            name = name,
+            mirrorType = mirrorType,
+            mirrorUrl = mirrorUrlValue?.let(::validateHttpsUrl),
+            mirrorKey = mirrorKeyValue?.let(::validateMirrorKey),
+        )
     }
 
     fun validateHttpsUrl(raw: String): String {
@@ -54,4 +71,17 @@ internal object SubscriptionDeepLinkParser {
 
     private fun decode(value: String): String =
         URLDecoder.decode(value, StandardCharsets.UTF_8.name())
+
+    private fun singleValue(query: Map<String, List<String>>, name: String): String? {
+        val values = query[name] ?: return null
+        require(values.size == 1) { "$name must appear once" }
+        return values.single()
+    }
+
+    private fun validateMirrorKey(raw: String): String {
+        val value = raw.trim()
+        require(value.matches(Regex("[A-Za-z0-9_-]{43}"))) { "invalid subscription mirror key" }
+        require(Base64.getUrlDecoder().decode("$value=").size == 32) { "invalid subscription mirror key" }
+        return value
+    }
 }

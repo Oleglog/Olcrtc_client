@@ -107,12 +107,12 @@ class ConnectionFragment : Fragment() {
     override fun onStart() {
         super.onStart()
         activityHost.setVpnStateListener(::showVpnState)
-        activityHost.setImportListener { validatePreview(it, R.string.source_deep_link) }
+        activityHost.setImportListener(R.id.connectionFragment) { validatePreview(it, R.string.source_deep_link) }
         loadProfiles()
     }
 
     override fun onStop() {
-        activityHost.setImportListener(null)
+        activityHost.setImportListener(R.id.connectionFragment, null)
         activityHost.setVpnStateListener(null)
         super.onStop()
     }
