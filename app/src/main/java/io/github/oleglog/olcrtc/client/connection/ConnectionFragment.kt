@@ -11,6 +11,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
@@ -20,6 +21,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -42,7 +44,6 @@ import io.github.oleglog.olcrtc.client.importer.ImportPayload
 import io.github.oleglog.olcrtc.client.importer.QrScannerActivity
 import io.github.oleglog.olcrtc.client.profile.ImportedProfile
 import io.github.oleglog.olcrtc.client.profile.ProfileUri
-import io.github.oleglog.olcrtc.client.routing.RoutingSettings
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import io.github.oleglog.olcrtc.client.vpn.VpnState
 import io.github.oleglog.olcrtc.client.vpn.ConnectionStage
@@ -99,21 +100,16 @@ class ConnectionFragment : Fragment() {
         binding.testSelected.setOnClickListener { testSelectedProfile() }
     }
 
-    private var backgroundEffectsEnabled = false
-
     override fun onStart() {
         super.onStart()
         activityHost.setVpnStateListener(::showVpnState)
         activityHost.setImportListener { validatePreview(it, R.string.source_deep_link) }
-        backgroundEffectsEnabled = RoutingSettings.open(requireContext().applicationContext).getBackgroundEffects()
-        applyParticleDrift()
         loadProfiles()
     }
 
     override fun onStop() {
         activityHost.setImportListener(null)
         activityHost.setVpnStateListener(null)
-        _binding?.particleDrift?.setActive(false)
         super.onStop()
     }
 
@@ -268,8 +264,10 @@ class ConnectionFragment : Fragment() {
         val mark = View(requireContext()).apply {
             setBackgroundColor(resolveColor(com.google.android.material.R.attr.colorOutline))
         }
-        addView(mark, LinearLayout.LayoutParams(
-            dimen(R.dimen.card_status_mark_width), LinearLayout.LayoutParams.MATCH_PARENT,
+        addView(mark, FrameLayout.LayoutParams(
+            dimen(R.dimen.card_status_mark_width),
+            dimen(R.dimen.icon_touch_target),
+            Gravity.START or Gravity.CENTER_VERTICAL,
         ))
 
         val detail = TextView(requireContext()).apply {
@@ -544,8 +542,8 @@ class ConnectionFragment : Fragment() {
         }
         dialog.setContentView(content)
         dialog.setOnShowListener {
-            dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.background =
-                MaterialShapeDrawable(
+            dialog.findViewById<View>(com.google.android.material.R.id.design_bottom_sheet)?.let { sheet ->
+                sheet.background = MaterialShapeDrawable(
                     ShapeAppearanceModel.builder()
                         .setTopLeftCorner(CornerFamily.ROUNDED, dimen(R.dimen.corner_sheet).toFloat())
                         .setTopRightCorner(CornerFamily.ROUNDED, dimen(R.dimen.corner_sheet).toFloat())
@@ -553,6 +551,13 @@ class ConnectionFragment : Fragment() {
                 ).apply {
                     fillColor = ColorStateList.valueOf(resolveColor(com.google.android.material.R.attr.colorSurface))
                 }
+                sheet.layoutParams = sheet.layoutParams.apply { height = ViewGroup.LayoutParams.WRAP_CONTENT }
+                BottomSheetBehavior.from(sheet).apply {
+                    isFitToContents = true
+                    skipCollapsed = true
+                    state = BottomSheetBehavior.STATE_EXPANDED
+                }
+            }
         }
         dialog.show()
     }
@@ -622,7 +627,6 @@ class ConnectionFragment : Fragment() {
             latencyRequestId++
             latencyInProgress = false
         }
-        applyParticleDrift()
         when (state) {
             VpnState.CONNECTED -> {
                 val active = activityHost.activeProfileReference()
@@ -653,12 +657,6 @@ class ConnectionFragment : Fragment() {
         updateConnectPulse()
         updateActionAvailability()
         refreshCardAppearance()
-    }
-
-    private fun applyParticleDrift() {
-        val view = _binding?.particleDrift ?: return
-        view.visibility = if (backgroundEffectsEnabled) View.VISIBLE else View.GONE
-        view.setActive(backgroundEffectsEnabled && currentState == VpnState.CONNECTED)
     }
 
     private fun setConnectButtonText(text: CharSequence) {

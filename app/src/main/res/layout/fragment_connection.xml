@@ -35,22 +35,15 @@
             android:textColor="?attr/colorOnSurfaceVariant" />
     </LinearLayout>
 
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <io.github.oleglog.olcrtc.client.ui.ParticleDriftView
-            android:id="@+id/particle_drift"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
     <androidx.core.widget.NestedScrollView
         android:id="@+id/connection_scroll"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:background="@android:color/transparent"
-        android:fillViewport="true">
+        android:fillViewport="true"
+        android:overScrollMode="ifContentScrolls"
+        android:scrollbars="vertical">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -118,7 +111,6 @@
                 android:visibility="gone" />
         </LinearLayout>
     </androidx.core.widget.NestedScrollView>
-    </FrameLayout>
 
     <TextView
         android:id="@+id/status"

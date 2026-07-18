@@ -7,6 +7,8 @@ import android.os.SystemClock
 import android.util.AttributeSet
 import android.view.Choreographer
 import android.view.View
+import io.github.oleglog.olcrtc.client.routing.RoutingSettings
+import kotlin.random.Random
 
 internal class ParticleDriftView @JvmOverloads constructor(
     context: Context,
@@ -17,15 +19,17 @@ internal class ParticleDriftView @JvmOverloads constructor(
     private data class Particle(
         var x: Float,
         var y: Float,
-        val radius: Float,
+        val size: Float,
+        val length: Float,
         val speedX: Float,
         val speedY: Float,
         val alpha: Int,
     )
 
     private val accentColor: Int
-    private val particles = ArrayList<Particle>(MAX_PARTICLES)
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
+    private val particles = ArrayList<Particle>()
+    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var settings = RoutingSettings.BackgroundEffects()
     private var lastFrameMillis = 0L
     private var active = false
     private var running = false
@@ -44,11 +48,22 @@ internal class ParticleDriftView @JvmOverloads constructor(
     }
 
     init {
-        val a = context.obtainStyledAttributes(
+        val attributes = context.obtainStyledAttributes(
             attrs, intArrayOf(android.R.attr.colorPrimary), defStyleAttr, 0,
         )
-        accentColor = a.getColor(0, 0).also { a.recycle() }
+        accentColor = attributes.getColor(0, 0).also { attributes.recycle() }
+        importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
+        isClickable = false
+        isFocusable = false
         setLayerType(LAYER_TYPE_HARDWARE, null)
+    }
+
+    fun configure(value: RoutingSettings.BackgroundEffects) {
+        if (settings == value) return
+        settings = value
+        particles.clear()
+        seedParticles()
+        invalidate()
     }
 
     fun setActive(active: Boolean) {
@@ -66,12 +81,13 @@ internal class ParticleDriftView @JvmOverloads constructor(
         super.onSizeChanged(w, h, oldw, oldh)
         lastWidth = w
         lastHeight = h
+        particles.clear()
         seedParticles()
         updateRunning()
     }
 
     private fun updateRunning() {
-        val shouldRun = active && isShown && animationsEnabled() && width > 0
+        val shouldRun = active && isShown && animationsEnabled() && width > 0 && height > 0
         if (shouldRun == running) return
         running = shouldRun
         if (running) {
@@ -83,52 +99,90 @@ internal class ParticleDriftView @JvmOverloads constructor(
         }
     }
 
-    private fun animationsEnabled(): Boolean {
-        val scale = android.provider.Settings.Global.getFloat(
-            context.contentResolver,
-            android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
-            1f,
-        )
-        return scale != 0f
-    }
+    private fun animationsEnabled(): Boolean = android.provider.Settings.Global.getFloat(
+        context.contentResolver,
+        android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
+        1f,
+    ) != 0f
 
     private fun seedParticles() {
-        if (particles.isNotEmpty()) return
-        val w = lastWidth.coerceAtLeast(1)
-        val h = lastHeight.coerceAtLeast(1)
-        repeat(MAX_PARTICLES) {
-            particles.add(
-                Particle(
-                    x = (Math.random() * w).toFloat(),
-                    y = (Math.random() * h).toFloat(),
-                    radius = (1.5f + Math.random() * 2.5f).toFloat(),
-                    speedX = ((Math.random() - 0.5) * 18f).toFloat(),
-                    speedY = ((Math.random() - 0.5) * 18f).toFloat(),
-                    alpha = (38 + (Math.random() * 48)).toInt().coerceIn(38, 86),
-                ),
-            )
+        if (particles.isNotEmpty() || lastWidth <= 0 || lastHeight <= 0) return
+        val speedScale = when (settings.intensity) {
+            RoutingSettings.BackgroundEffects.Intensity.LOW -> 0.8f
+            RoutingSettings.BackgroundEffects.Intensity.MEDIUM -> 1f
+            RoutingSettings.BackgroundEffects.Intensity.HIGH -> 1.25f
+        }
+        repeat(particleCount(settings.intensity)) {
+            particles += when (settings.style) {
+                RoutingSettings.BackgroundEffects.Style.SNOW -> Particle(
+                    x = Random.nextFloat() * lastWidth,
+                    y = Random.nextFloat() * lastHeight,
+                    size = dp(1.4f + Random.nextFloat() * 2.4f),
+                    length = 0f,
+                    speedX = (-12f + Random.nextFloat() * 24f) * speedScale,
+                    speedY = (34f + Random.nextFloat() * 54f) * speedScale,
+                    alpha = Random.nextInt(72, 145),
+                )
+                RoutingSettings.BackgroundEffects.Style.RAIN -> Particle(
+                    x = Random.nextFloat() * lastWidth,
+                    y = Random.nextFloat() * lastHeight,
+                    size = dp(0.8f + Random.nextFloat() * 0.7f),
+                    length = dp(9f + Random.nextFloat() * 13f),
+                    speedX = (-32f - Random.nextFloat() * 24f) * speedScale,
+                    speedY = (360f + Random.nextFloat() * 300f) * speedScale,
+                    alpha = Random.nextInt(65, 125),
+                )
+            }
         }
     }
 
     private fun step(dt: Float) {
-        val w = lastWidth.toFloat()
-        val h = lastHeight.toFloat()
-        particles.forEach { p ->
-            p.x += p.speedX * dt
-            p.y += p.speedY * dt
-            if (p.x < -p.radius) p.x = w + p.radius
-            if (p.x > w + p.radius) p.x = -p.radius
-            if (p.y < -p.radius) p.y = h + p.radius
-            if (p.y > h + p.radius) p.y = -p.radius
+        val width = lastWidth.toFloat()
+        val height = lastHeight.toFloat()
+        particles.forEach { particle ->
+            particle.x += particle.speedX * dt
+            particle.y += particle.speedY * dt
+            when (settings.style) {
+                RoutingSettings.BackgroundEffects.Style.SNOW -> {
+                    if (particle.x < -particle.size) particle.x = width + particle.size
+                    if (particle.x > width + particle.size) particle.x = -particle.size
+                    if (particle.y > height + particle.size) {
+                        particle.y = -particle.size
+                        particle.x = Random.nextFloat() * width
+                    }
+                }
+                RoutingSettings.BackgroundEffects.Style.RAIN -> {
+                    if (particle.y > height + particle.length || particle.x < -particle.length) {
+                        particle.y = -particle.length
+                        particle.x = Random.nextFloat() * (width + particle.length)
+                    }
+                }
+            }
         }
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         if (!running) return
-        particles.forEach { p ->
-            paint.color = (p.alpha shl 24) or (accentColor and 0xFFFFFF)
-            canvas.drawCircle(p.x, p.y, p.radius, paint)
+        particles.forEach { particle ->
+            paint.color = (particle.alpha shl 24) or (accentColor and 0xFFFFFF)
+            when (settings.style) {
+                RoutingSettings.BackgroundEffects.Style.SNOW -> {
+                    paint.style = Paint.Style.FILL
+                    canvas.drawCircle(particle.x, particle.y, particle.size, paint)
+                }
+                RoutingSettings.BackgroundEffects.Style.RAIN -> {
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeWidth = particle.size
+                    canvas.drawLine(
+                        particle.x,
+                        particle.y,
+                        particle.x - particle.speedX / particle.speedY * particle.length,
+                        particle.y - particle.length,
+                        paint,
+                    )
+                }
+            }
         }
     }
 
@@ -138,7 +192,11 @@ internal class ParticleDriftView @JvmOverloads constructor(
         super.onDetachedFromWindow()
     }
 
-    private companion object {
-        const val MAX_PARTICLES = 18
-    }
+    private fun dp(value: Float): Float = value * resources.displayMetrics.density
+}
+
+internal fun particleCount(intensity: RoutingSettings.BackgroundEffects.Intensity): Int = when (intensity) {
+    RoutingSettings.BackgroundEffects.Intensity.LOW -> 28
+    RoutingSettings.BackgroundEffects.Intensity.MEDIUM -> 48
+    RoutingSettings.BackgroundEffects.Intensity.HIGH -> 72
 }

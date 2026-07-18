@@ -51,6 +51,9 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_2"
             android:background="@drawable/bg_settings_row"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
             android:minHeight="64dp"
             android:padding="@dimen/space_3">
 
@@ -58,7 +61,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_vertical"
-                android:orientation="vertical">
+                android:orientation="vertical"
+                android:paddingEnd="64dp">
 
                 <TextView
                     android:id="@+id/settings_effects_title"
@@ -81,9 +85,7 @@
                 android:id="@+id/settings_effects_switch"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_gravity="end|center_vertical"
-                android:clickable="false"
-                android:focusable="false" />
+                android:layout_gravity="end|center_vertical" />
         </FrameLayout>
 
         <com.google.android.material.button.MaterialButton

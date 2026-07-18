@@ -12,9 +12,11 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.isVisible
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import io.github.oleglog.olcrtc.client.databinding.ActivityMainBinding
+import io.github.oleglog.olcrtc.client.routing.RoutingSettings
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import io.github.oleglog.olcrtc.client.vpn.ConnectionStage
 import io.github.oleglog.olcrtc.client.vpn.IOlcrtcVpnService
@@ -36,6 +38,7 @@ class MainActivity : AppCompatActivity() {
     private var lastConnectionStage = ConnectionStage.IDLE
     private var lastReconnectAttempt = 0
     private var hasVpnState = false
+    private var backgroundEffects = RoutingSettings.BackgroundEffects()
 
     private val callback = object : IVpnStateCallback.Stub() {
         override fun onStateChanged(state: Int, error: String?, stage: Int, reconnectAttempt: Int) {
@@ -82,6 +85,7 @@ class MainActivity : AppCompatActivity() {
             ?.takeIf(String::isNotBlank)
         val navHost = supportFragmentManager.findFragmentById(R.id.nav_host) as NavHostFragment
         binding.bottomNavigation.setupWithNavController(navHost.navController)
+        refreshBackgroundEffects()
         acceptExternalIntent(intent)
     }
 
@@ -93,10 +97,12 @@ class MainActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
+        refreshBackgroundEffects()
         bound = bindService(Intent(this, OlcrtcVpnService::class.java), connection, Context.BIND_AUTO_CREATE)
     }
 
     override fun onStop() {
+        binding.backgroundEffects.setActive(false)
         if (bound) {
             runCatching { vpn?.unregisterCallback(callback) }
             unbindService(connection)
@@ -135,7 +141,20 @@ class MainActivity : AppCompatActivity() {
         lastConnectionStage = stage
         lastReconnectAttempt = reconnectAttempt
         hasVpnState = true
+        updateBackgroundEffects()
         stateListener?.invoke(state, error, stage, reconnectAttempt)
+    }
+
+    fun refreshBackgroundEffects() {
+        backgroundEffects = RoutingSettings.open(applicationContext).getBackgroundEffects()
+        binding.backgroundEffects.configure(backgroundEffects)
+        binding.backgroundEffects.isVisible = backgroundEffects.enabled
+        updateBackgroundEffects()
+    }
+
+    private fun updateBackgroundEffects() {
+        val vpnActive = lastVpnState == VpnState.CONNECTED || lastVpnState == VpnState.RECONNECTING
+        binding.backgroundEffects.setActive(backgroundEffectsActive(backgroundEffects, vpnActive))
     }
 
     fun stopVpn() {
@@ -226,3 +245,8 @@ class MainActivity : AppCompatActivity() {
         private val EXTERNAL_PROFILE_SCHEMES = setOf("olcrtc", "vless", "vmess", "trojan")
     }
 }
+
+internal fun backgroundEffectsActive(
+    settings: RoutingSettings.BackgroundEffects,
+    vpnActive: Boolean,
+): Boolean = settings.enabled && (settings.always || vpnActive)

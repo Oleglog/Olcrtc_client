@@ -2,6 +2,8 @@
 
 Статус: проект ТЗ для следующего релиза `Olcrtc_client`.
 
+> Follow-up: требования к частицам и layout главного экрана изменены после device acceptance `v1.0.31`; актуальное продолжение — `CLIENT_UI_HOTFIX_V1_0_32.md`.
+
 Базовая версия: `v1.0.28` (текущий HEAD `f21e676`, `versionCode=28`, `versionName=1.0.28`).
 `v1.0.29` (P3 из `CLIENT_IMPROVEMENT_SPECIFICATION.md`) откатан пользователем по итогу.
 
