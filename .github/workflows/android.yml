@@ -35,15 +35,14 @@ jobs:
             ~/go/bin/gomobile
             app/libs/mobilecore.aar
           key: mobilecore-${{ runner.os }}-android-all-${{ hashFiles('scripts/build_mobilecore.sh', 'native/mobilecore/go.mod', 'native/mobilecore/go.sum', 'native/mobilecore/**/*.go') }}
-      - name: Cache gomobile and HEV sources
-        uses: actions/cache@v4
+      - name: Restore HEV native cache
+        id: hev-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
-            ~/go/bin/gomobile
-            app/libs/mobilecore.aar
             app/src/main/jniLibs
             native/hev-socks5-tunnel/upstream
-          key: android-native-${{ runner.os }}-${{ hashFiles('scripts/build_mobilecore.sh', 'scripts/build_hev.sh', 'native/mobilecore/go.mod', 'native/mobilecore/**/*.go', 'app/src/main/jni/**') }}
+          key: hev-${{ runner.os }}-ndk-28.2.13676358-${{ hashFiles('scripts/build_hev.sh', 'app/src/main/jni/**') }}
       - uses: android-actions/setup-android@v3
       - run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
       - run: python scripts/verify_licenses.py
@@ -64,6 +63,14 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
       - run: test -f app/libs/mobilecore.aar && test -f app/src/main/jniLibs/arm64-v8a/libhev-socks5-tunnel.so && test -f app/src/main/jniLibs/armeabi-v7a/libhev-socks5-tunnel.so && test -f app/src/main/jniLibs/x86_64/libhev-socks5-tunnel.so
+      - name: Save HEV native cache
+        if: steps.hev-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            app/src/main/jniLibs
+            native/hev-socks5-tunnel/upstream
+          key: ${{ steps.hev-cache.outputs.cache-primary-key }}
       - run: ./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug
       - run: ./gradlew --no-daemon assembleRelease
       - run: ./gradlew --no-daemon :app:assembleDebugAndroidTest

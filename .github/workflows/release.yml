@@ -44,15 +44,13 @@ jobs:
           cache: true
           cache-dependency-path: native/mobilecore/go.mod
 
-      - name: Cache gomobile and HEV sources
+      - name: Restore HEV native cache
         uses: actions/cache/restore@v4
         with:
           path: |
-            ~/go/bin/gomobile
-            app/libs/mobilecore.aar
             app/src/main/jniLibs
             native/hev-socks5-tunnel/upstream
-          key: android-native-${{ runner.os }}-${{ hashFiles('scripts/build_mobilecore.sh', 'scripts/build_hev.sh', 'native/mobilecore/go.mod', 'native/mobilecore/**/*.go', 'app/src/main/jni/**') }}
+          key: hev-${{ runner.os }}-ndk-28.2.13676358-${{ hashFiles('scripts/build_hev.sh', 'app/src/main/jni/**') }}
 
       - uses: android-actions/setup-android@v3
 
