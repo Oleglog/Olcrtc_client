@@ -36,7 +36,7 @@ class ProfileChooserActivity : AppCompatActivity() {
         val repository = ProfileRepository.open(applicationContext)
         val local = repository.listLocal().map {
             Choice(
-                label = "${it.name}\n${getString(R.string.profile_group_local)} · ${it.protocol}",
+                label = "${it.name}\n${getString(R.string.profile_group_local)} · ${it.type}",
                 reference = "local:${it.id}",
                 localId = it.id,
             )
