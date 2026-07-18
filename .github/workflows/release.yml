@@ -87,8 +87,11 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
           HEV_APP_ABI: armeabi-v7a arm64-v8a
 
-      - name: Test and assemble signed release APK
-        run: ./gradlew --no-daemon --build-cache :app:testDebugUnitTest :app:assembleRelease
+      - name: Run unit tests
+        run: ./gradlew --no-daemon --build-cache :app:testDebugUnitTest
+
+      - name: Assemble signed release APK
+        run: ./gradlew --no-daemon --build-cache :app:assembleRelease
 
       - name: Package release artifacts
         shell: bash
