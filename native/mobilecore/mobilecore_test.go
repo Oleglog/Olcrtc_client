@@ -60,8 +60,9 @@ func TestWaitXrayReadyRejectsInvalidArguments(t *testing.T) {
 
 func TestURLTestUsesDedicatedInboundAndHead(t *testing.T) {
 	method := ""
-	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, request *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, request *http.Request) {
 		method = request.Method
+		response.WriteHeader(http.StatusNoContent)
 	}))
 	defer server.Close()
 
@@ -83,6 +84,20 @@ func TestURLTestUsesDedicatedInboundAndHead(t *testing.T) {
 	}
 	if inboundTag != latencyTestInboundTag {
 		t.Fatalf("inbound tag = %q, want %q", inboundTag, latencyTestInboundTag)
+	}
+}
+
+func TestURLTestRejectsNonNoContentResponse(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		response.WriteHeader(http.StatusBadGateway)
+	}))
+	defer server.Close()
+
+	_, err := runURLTest(server.URL, 1000, func(ctx context.Context, destination xraynet.Destination) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, "tcp", destination.NetAddr())
+	})
+	if err == nil {
+		t.Fatal("URL test accepted HTTP 502 as a successful latency result")
 	}
 }
 

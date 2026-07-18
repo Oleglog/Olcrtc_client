@@ -27,9 +27,11 @@ class NativeConfigTest {
         ))
 
         assertTrue(json.contains("\"protocol\": \"vless\""))
-        assertTrue(json.contains("\"flow\": \"xtls-rprx-vision\""))
+        assertTrue(json.contains("\"flow\": \"xtls-rprx-vision-udp443\""))
+        assertTrue(json.contains("\"packetEncoding\": \"xudp\""))
         assertTrue(json.contains("\"security\": \"reality\""))
         assertTrue(json.contains("\"publicKey\": \"key\""))
+        assertFalse(json.contains("\"protocol\": \"socks\",\n  \"tag\": \"proxy\""))
     }
 
     @Test

@@ -213,6 +213,23 @@ class NativeSessionTest {
     }
 
     @Test
+    fun standardRuntimeNeverStartsOlcrtcCarrier() {
+        val events = mutableListOf<String>()
+        val session = NativeSession(
+            RecordingCore(events),
+            RecordingTunnel(events),
+            establishTun = { RecordingTun(events) },
+            verifyDatapath = {},
+        )
+
+        session.start(1080, "/assets", "{}", byteArrayOf(1))
+
+        assertFalse(events.contains("olcrtc:start"))
+        assertFalse(events.contains("olcrtc:ready"))
+        session.close()
+    }
+
+    @Test
     fun reportsRuntimeTunnelExit() {
         val events = mutableListOf<String>()
         val tunnel = RecordingTunnel(events)
