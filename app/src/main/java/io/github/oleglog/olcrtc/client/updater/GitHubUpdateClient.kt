@@ -12,7 +12,6 @@ internal data class UpdateCheckResult(
 
 internal class GitHubUpdateClient(
     private val releaseEndpoint: String = LATEST_RELEASE_URL,
-    private val releasesEndpoint: String = RELEASES_URL,
     private val currentVersion: String,
     private val supportedAbis: List<String> = Build.SUPPORTED_ABIS.toList(),
 ) {
@@ -24,9 +23,6 @@ internal class GitHubUpdateClient(
             newerThanCurrent = VersionComparator.isNewer(release.tagName, currentVersion),
         )
     }
-
-    fun listReleases(): List<GitHubRelease> = GitHubReleaseParser.parseList(fetchText(releasesEndpoint))
-        .filterNot { it.prerelease }
 
     private fun fetchText(url: String): String {
         val connection = URL(url).openConnection() as HttpsURLConnection
@@ -50,7 +46,6 @@ internal class GitHubUpdateClient(
     companion object {
         private const val TIMEOUT_MILLIS = 15_000
         private const val LATEST_RELEASE_URL = "https://api.github.com/repos/Oleglog/Olcrtc_client/releases/latest"
-        private const val RELEASES_URL = "https://api.github.com/repos/Oleglog/Olcrtc_client/releases?per_page=5"
     }
 }
 

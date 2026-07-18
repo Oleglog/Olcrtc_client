@@ -9,6 +9,7 @@ import android.net.Uri
 import android.net.VpnService
 import android.os.Bundle
 import android.os.IBinder
+import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
 import android.widget.Toast
@@ -63,6 +64,7 @@ class MainActivity : AppCompatActivity() {
     private var updateCheckInProgress = false
     private var lastAutomaticUpdateCheckElapsed = 0L
     private val updatePreferences by lazy { getSharedPreferences(UPDATE_PREFERENCES, Context.MODE_PRIVATE) }
+    private val systemPreferences by lazy { getSharedPreferences(SYSTEM_PREFERENCES, Context.MODE_PRIVATE) }
 
     private val callback = object : IVpnStateCallback.Stub() {
         override fun onStateChanged(state: Int, error: String?, stage: Int, reconnectAttempt: Int) {
@@ -134,6 +136,7 @@ class MainActivity : AppCompatActivity() {
         super.onStart()
         refreshBackgroundEffects()
         bound = bindService(Intent(this, OlcrtcVpnService::class.java), connection, Context.BIND_AUTO_CREATE)
+        if (showBatteryOptimizationRecommendation()) return
         if (!showPendingUpdatePrompt()) checkForUpdateOnEntry()
     }
 
@@ -191,6 +194,45 @@ class MainActivity : AppCompatActivity() {
     private fun updateBackgroundEffects() {
         val vpnActive = lastVpnState == VpnState.CONNECTED || lastVpnState == VpnState.RECONNECTING
         binding.backgroundEffects.setActive(backgroundEffectsActive(backgroundEffects, vpnActive))
+    }
+
+    private fun showBatteryOptimizationRecommendation(): Boolean {
+        val ignoringOptimizations = getSystemService(PowerManager::class.java)
+            .isIgnoringBatteryOptimizations(packageName)
+        val promptHandled = systemPreferences.getBoolean(KEY_BATTERY_PROMPT_HANDLED, false)
+        if (!shouldShowBatteryOptimizationPrompt(ignoringOptimizations, promptHandled)) return false
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.battery_optimization_prompt_title)
+            .setMessage(R.string.battery_optimization_prompt_message)
+            .setNegativeButton(R.string.battery_optimization_prompt_never) { _, _ ->
+                markBatteryOptimizationPromptHandled()
+            }
+            .setPositiveButton(R.string.battery_optimization_prompt_open) { _, _ ->
+                markBatteryOptimizationPromptHandled()
+                openBatteryOptimizationSettings()
+            }
+            .show()
+        return true
+    }
+
+    private fun markBatteryOptimizationPromptHandled() {
+        systemPreferences.edit().putBoolean(KEY_BATTERY_PROMPT_HANDLED, true).apply()
+    }
+
+    internal fun openBatteryOptimizationSettings() {
+        val powerManager = getSystemService(PowerManager::class.java)
+        if (powerManager.isIgnoringBatteryOptimizations(packageName)) {
+            Toast.makeText(this, R.string.battery_optimization_already_disabled, Toast.LENGTH_LONG).show()
+            return
+        }
+        val packageUri = Uri.parse("package:$packageName")
+        runCatching {
+            startActivity(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS, packageUri))
+        }.recoverCatching {
+            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageUri))
+        }.onFailure {
+            Toast.makeText(this, R.string.settings_system_screen_unavailable, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun checkForUpdateOnEntry() {
@@ -396,6 +438,8 @@ class MainActivity : AppCompatActivity() {
         private const val AUTOMATIC_UPDATE_CHECK_INTERVAL_MILLIS = 5 * 60 * 1000L
         private const val UPDATE_PREFERENCES = "updates"
         private const val KEY_LAST_PROMPTED_UPDATE_TAG = "last_prompted_tag"
+        private const val SYSTEM_PREFERENCES = "system"
+        private const val KEY_BATTERY_PROMPT_HANDLED = "battery_prompt_handled"
         private val EXTERNAL_PROFILE_SCHEMES = setOf("olcrtc", "vless", "vmess", "trojan")
     }
 
@@ -409,3 +453,8 @@ internal fun backgroundEffectsActive(
     settings: RoutingSettings.BackgroundEffects,
     vpnActive: Boolean,
 ): Boolean = settings.enabled && (settings.always || vpnActive)
+
+internal fun shouldShowBatteryOptimizationPrompt(
+    ignoringOptimizations: Boolean,
+    promptHandled: Boolean,
+): Boolean = !ignoringOptimizations && !promptHandled

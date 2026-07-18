@@ -23,6 +23,8 @@ import androidx.core.os.LocaleListCompat
 import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.android.material.textfield.TextInputEditText
@@ -80,8 +82,9 @@ class SettingsFragment : Fragment() {
                 arrayOf(
                     ::changeLanguage,
                     { openSystemSettings(Settings.ACTION_VPN_SETTINGS) },
-                    { openSystemSettings(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS) },
+                    { (requireActivity() as MainActivity).openBatteryOptimizationSettings() },
                 ),
+                getString(R.string.settings_system_description),
             )
         }
         binding.settingsUpdatesRow.setOnClickListener {
@@ -90,9 +93,9 @@ class SettingsFragment : Fragment() {
                 intArrayOf(
                     R.string.settings_check_update,
                     R.string.settings_choose_release_apk,
-                    R.string.settings_core_versions,
                 ),
-                arrayOf(::checkUpdate, ::chooseReleaseAndApk, ::showCoreVersions),
+                arrayOf(::checkUpdate, ::chooseReleaseAndApk),
+                getString(R.string.settings_updates_description),
             )
         }
         binding.settingsDiagnosticsRow.setOnClickListener { showDiagnosticsMenu() }
@@ -340,28 +343,54 @@ class SettingsFragment : Fragment() {
 
     private fun showRoutingSettings() {
         val choices = listOf(
-            RoutingPolicy.Preset.ALL_VPN to getString(R.string.routing_all_vpn),
-            RoutingPolicy.Preset.RUSSIA_DIRECT to getString(R.string.routing_russia_direct),
+            RoutingPolicy.Preset.RUSSIA_DIRECT to R.string.routing_mode_russia,
+            RoutingPolicy.Preset.ALL_VPN to R.string.routing_mode_all_vpn,
         )
         val current = settings.get()
         var selectedPreset = current.preset
 
-        val presetButton = com.google.android.material.button.MaterialButton(requireContext()).apply {
-            text = choices.first { it.first == selectedPreset }.second
-            setOnClickListener {
-                val labels = choices.map { it.second }.toTypedArray()
-                val initial = choices.indexOfFirst { it.first == selectedPreset }
-                MaterialAlertDialogBuilder(requireContext())
-                    .setTitle(R.string.settings_routing_preset)
-                    .setSingleChoiceItems(labels, initial) { d, which ->
-                        selectedPreset = choices[which].first
-                        text = choices[which].second
-                        d.dismiss()
-                    }
-                    .setNegativeButton(R.string.cancel, null)
-                    .show()
+        val presetSummary = TextView(requireContext()).apply {
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+        }
+        fun updatePresetSummary() {
+            presetSummary.setText(
+                if (selectedPreset == RoutingPolicy.Preset.RUSSIA_DIRECT) {
+                    R.string.routing_mode_russia_description
+                } else {
+                    R.string.routing_mode_all_vpn_description
+                },
+            )
+        }
+        val presetButtons = mutableMapOf<Int, RoutingPolicy.Preset>()
+        val presetGroup = MaterialButtonToggleGroup(requireContext()).apply {
+            isSingleSelection = true
+            isSelectionRequired = true
+            choices.forEach { (preset, label) ->
+                val button = MaterialButton(
+                    requireContext(),
+                    null,
+                    com.google.android.material.R.attr.materialButtonOutlinedStyle,
+                ).apply {
+                    id = View.generateViewId()
+                    setText(label)
+                    maxLines = 2
+                    minHeight = 56.dp
+                }
+                presetButtons[button.id] = preset
+                addView(
+                    button,
+                    LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+                )
+            }
+            addOnButtonCheckedListener { _, checkedId, isChecked ->
+                if (isChecked) {
+                    selectedPreset = presetButtons.getValue(checkedId)
+                    updatePresetSummary()
+                }
             }
         }
+        presetGroup.check(presetButtons.entries.first { it.value == selectedPreset }.key)
+        updatePresetSummary()
         val allowLan = MaterialSwitch(requireContext()).apply {
             setText(R.string.allow_lan)
             isChecked = current.allowLan
@@ -369,16 +398,38 @@ class SettingsFragment : Fragment() {
         val content = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(24.dp, 8.dp, 24.dp, 0)
-            addView(presetButton)
-            addView(allowLan)
-            addView(com.google.android.material.button.MaterialButton(requireContext()).apply {
+            addView(TextView(requireContext()).apply {
+                setText(R.string.settings_routing_preset)
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall)
+                setPadding(0, 0, 0, 8.dp)
+            })
+            addView(presetGroup)
+            addView(presetSummary, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = 8.dp })
+            addView(allowLan, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = 12.dp })
+            addView(TextView(requireContext()).apply {
+                setText(R.string.allow_lan_description)
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+            })
+            addView(MaterialButton(requireContext()).apply {
                 setText(R.string.settings_manage_rules)
                 setOnClickListener { showRoutingRules() }
-            })
-            addView(com.google.android.material.button.MaterialButton(requireContext()).apply {
+            }, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = 12.dp })
+            addView(MaterialButton(requireContext()).apply {
                 setText(R.string.settings_update_geo_assets)
                 setOnClickListener { updateGeoAssets() }
-            })
+            }, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = 8.dp })
         }
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.settings_routing_title)
@@ -538,21 +589,57 @@ class SettingsFragment : Fragment() {
             .show()
     }
 
-    private fun showActions(title: Int, labels: IntArray, actions: Array<() -> Unit>) {
-        MaterialAlertDialogBuilder(requireContext())
+    private fun showActions(
+        title: Int,
+        labels: IntArray,
+        actions: Array<() -> Unit>,
+        message: CharSequence? = null,
+    ) {
+        require(labels.size == actions.size)
+        var dialog: AlertDialog? = null
+        val content = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24.dp, 8.dp, 24.dp, 0)
+            message?.let {
+                addView(TextView(requireContext()).apply {
+                    text = it
+                    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
+                    setPadding(0, 0, 0, 8.dp)
+                })
+            }
+            labels.forEachIndexed { index, label ->
+                addView(MaterialButton(requireContext()).apply {
+                    setText(label)
+                    minHeight = 52.dp
+                    setOnClickListener {
+                        dialog?.dismiss()
+                        actions[index]()
+                    }
+                }, LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { if (index > 0) topMargin = 8.dp })
+            }
+        }
+        val shownDialog = MaterialAlertDialogBuilder(requireContext())
             .setTitle(title)
-            .setItems(labels.map(::getString).toTypedArray()) { _, index -> actions[index]() }
+            .setView(content)
             .setNegativeButton(R.string.cancel, null)
-            .show()
+            .create()
+        dialog = shownDialog
+        shownDialog.show()
     }
 
     private fun showAbout() {
-        val versions = GomobileCore.coreVersions()
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.app_name)
-            .setMessage("${BuildConfig.VERSION_NAME}\nXray: ${versions.xray}\nolcRTC core: ${versions.olcrtc}")
-            .setPositiveButton(android.R.string.ok, null)
-            .show()
+        showActions(
+            R.string.settings_about,
+            intArrayOf(R.string.settings_about_repository, R.string.settings_about_telegram),
+            arrayOf(
+                { openUrl(REPOSITORY_URL) },
+                { openUrl(TELEGRAM_URL) },
+            ),
+            getString(R.string.settings_about_message, BuildConfig.VERSION_NAME, "@Linkloun"),
+        )
     }
 
     private fun showRoutingRuleEditor(existing: RoutingRule?) {
@@ -678,6 +765,11 @@ class SettingsFragment : Fragment() {
             .onFailure { _binding?.status?.setText(R.string.settings_system_screen_unavailable) }
     }
 
+    private fun openUrl(url: String) {
+        runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+            .onFailure { _binding?.status?.text = it.message }
+    }
+
     private fun updateGeoAssets() {
         val appContext = requireContext().applicationContext
         viewLifecycleOwner.lifecycleScope.launch {
@@ -687,15 +779,6 @@ class SettingsFragment : Fragment() {
             result.onSuccess { _binding?.status?.setText(R.string.settings_geo_assets_updated) }
                 .onFailure { _binding?.status?.text = it.message }
         }
-    }
-
-    private fun showCoreVersions() {
-        val versions = GomobileCore.coreVersions()
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.settings_core_versions)
-            .setMessage(getString(R.string.settings_core_versions_message, versions.xray, versions.olcrtc))
-            .setPositiveButton(android.R.string.ok, null)
-            .show()
     }
 
     private fun checkUpdate() {
@@ -731,11 +814,11 @@ class SettingsFragment : Fragment() {
     }
 
     private fun chooseReleaseAndApk() {
-        _binding?.status?.setText(R.string.settings_update_loading_releases)
+        _binding?.status?.setText(R.string.settings_update_loading_latest)
         viewLifecycleOwner.lifecycleScope.launch {
-            val releases = try {
+            val release = try {
                 withContext(Dispatchers.IO) {
-                    GitHubUpdateClient(currentVersion = BuildConfig.VERSION_NAME).listReleases()
+                    GitHubUpdateClient(currentVersion = BuildConfig.VERSION_NAME).check().release
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -744,18 +827,7 @@ class SettingsFragment : Fragment() {
                 return@launch
             }
             if (_binding == null || !isAdded) return@launch
-            if (releases.isEmpty()) {
-                _binding?.status?.setText(R.string.settings_update_no_releases)
-                return@launch
-            }
-            val labels = releases.map { release ->
-                if (release.name == release.tagName) release.tagName else "${release.tagName} · ${release.name}"
-            }.toTypedArray()
-            MaterialAlertDialogBuilder(requireContext())
-                .setTitle(R.string.settings_choose_release)
-                .setItems(labels) { _, index -> showApkPicker(releases[index]) }
-                .setNegativeButton(R.string.cancel, null)
-                .show()
+            showApkPicker(release)
         }
     }
 
@@ -768,19 +840,74 @@ class SettingsFragment : Fragment() {
             _binding?.status?.setText(R.string.settings_update_no_asset)
             return
         }
-        val labels = assets.map { asset ->
-            getString(
+        var selectedAsset = recommended ?: assets.first()
+        val summary = TextView(requireContext()).apply {
+            text = getString(
                 R.string.settings_update_apk_option,
-                asset.name,
-                Formatter.formatShortFileSize(requireContext(), asset.size),
-                if (asset == recommended) getString(R.string.settings_update_recommended_suffix) else "",
+                selectedAsset.name,
+                Formatter.formatShortFileSize(requireContext(), selectedAsset.size),
+                if (selectedAsset == recommended) getString(R.string.settings_update_recommended_suffix) else "",
             )
-        }.toTypedArray()
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+        }
+        val buttonAssets = mutableMapOf<Int, GitHubRelease.ReleaseAsset>()
+        val tabs = MaterialButtonToggleGroup(requireContext()).apply {
+            isSingleSelection = true
+            isSelectionRequired = true
+            assets.forEach { asset ->
+                val button = MaterialButton(
+                    requireContext(),
+                    null,
+                    com.google.android.material.R.attr.materialButtonOutlinedStyle,
+                ).apply {
+                    id = View.generateViewId()
+                    text = apkTabLabel(asset)
+                    maxLines = 1
+                }
+                buttonAssets[button.id] = asset
+                addView(button, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            }
+            addOnButtonCheckedListener { _, checkedId, isChecked ->
+                if (isChecked) {
+                    selectedAsset = buttonAssets.getValue(checkedId)
+                    summary.text = getString(
+                        R.string.settings_update_apk_option,
+                        selectedAsset.name,
+                        Formatter.formatShortFileSize(requireContext(), selectedAsset.size),
+                        if (selectedAsset == recommended) {
+                            getString(R.string.settings_update_recommended_suffix)
+                        } else {
+                            ""
+                        },
+                    )
+                }
+            }
+        }
+        tabs.check(buttonAssets.entries.first { it.value == selectedAsset }.key)
+        val content = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24.dp, 8.dp, 24.dp, 0)
+            addView(tabs)
+            addView(summary, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = 12.dp })
+        }
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(getString(R.string.settings_choose_apk, release.tagName))
-            .setItems(labels) { _, index -> confirmSelectedUpdate(release, assets[index], supportedAbis) }
+            .setView(content)
             .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.settings_update_download_install) { _, _ ->
+                confirmSelectedUpdate(release, selectedAsset, supportedAbis)
+            }
             .show()
+    }
+
+    private fun apkTabLabel(asset: GitHubRelease.ReleaseAsset): String = when {
+        asset.name.contains("-arm64-v8a.apk", ignoreCase = true) -> "ARM64"
+        asset.name.contains("-armeabi-v7a.apk", ignoreCase = true) -> "ARMv7"
+        asset.name.contains("-universal.apk", ignoreCase = true) -> getString(R.string.settings_update_apk_universal)
+        else -> asset.name.removeSuffix(".apk")
     }
 
     private fun confirmSelectedUpdate(
@@ -972,5 +1099,7 @@ class SettingsFragment : Fragment() {
     private companion object {
         const val MAX_DIALOG_LOG_CHARS = 12_000
         const val MAX_SAFE_ERROR_CHARS = 240
+        const val REPOSITORY_URL = "https://github.com/Oleglog/Olcrtc_client"
+        const val TELEGRAM_URL = "https://t.me/Linkloun"
     }
 }

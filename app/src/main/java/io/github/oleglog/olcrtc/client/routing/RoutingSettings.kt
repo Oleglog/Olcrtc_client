@@ -22,7 +22,7 @@ internal class RoutingSettings private constructor(
         RoutingPolicy(
             preset = preferences[PRESET]
                 ?.let { runCatching { RoutingPolicy.Preset.valueOf(it) }.getOrNull() }
-                ?: RoutingPolicy.Preset.ALL_VPN,
+                ?: RoutingPolicy.Preset.RUSSIA_DIRECT,
             allowLan = preferences[ALLOW_LAN] ?: false,
         )
     }

@@ -21,10 +21,6 @@ internal data class GitHubRelease(
 internal object GitHubReleaseParser {
     fun parse(rawJson: String): GitHubRelease = parse(JSONObject(rawJson))
 
-    fun parseList(rawJson: String): List<GitHubRelease> = JSONArray(rawJson).asSequence()
-        .map { value -> parse(value as JSONObject) }
-        .toList()
-
     private fun parse(root: JSONObject): GitHubRelease {
         val assets = root.getJSONArray("assets").asSequence()
             .map { value -> value as JSONObject }

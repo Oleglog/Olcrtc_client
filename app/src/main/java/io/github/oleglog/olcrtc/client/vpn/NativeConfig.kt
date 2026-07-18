@@ -211,6 +211,8 @@ internal object NativeConfig {
         "fe80::/10",
     )
     private val RUSSIA_GEOSITES = listOf(
+        "domain:ru",
+        "domain:xn--p1ai",
         "geosite:category-ru",
         "geosite:ru-available-only-inside",
     )

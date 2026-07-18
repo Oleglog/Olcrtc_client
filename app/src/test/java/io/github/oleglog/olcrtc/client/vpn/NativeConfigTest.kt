@@ -169,11 +169,15 @@ class NativeConfigTest {
         val user = json.indexOf("full:blocked.example")
         val lan = json.indexOf("10.0.0.0/8")
         val geoIp = json.indexOf("geoip:ru")
+        val ruDomains = json.indexOf("domain:ru")
+        val rfDomains = json.indexOf("domain:xn--p1ai")
         val geoSite = json.indexOf("geosite:category-ru")
         val default = json.lastIndexOf("\"network\": \"tcp,udp\"")
         assertTrue(user in 0..<lan)
         assertTrue(lan < geoIp)
-        assertTrue(geoIp < geoSite)
+        assertTrue(geoIp < ruDomains)
+        assertTrue(ruDomains < rfDomains)
+        assertTrue(rfDomains < geoSite)
         assertTrue(geoSite < default)
     }
 

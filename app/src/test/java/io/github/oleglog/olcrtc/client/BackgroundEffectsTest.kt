@@ -24,4 +24,11 @@ class BackgroundEffectsTest {
         assertTrue(particleCount(Intensity.LOW) < particleCount(Intensity.MEDIUM))
         assertTrue(particleCount(Intensity.MEDIUM) < particleCount(Intensity.HIGH))
     }
+
+    @Test
+    fun batteryRecommendationAppearsOnlyUntilHandledOrOptimizationDisabled() {
+        assertTrue(shouldShowBatteryOptimizationPrompt(ignoringOptimizations = false, promptHandled = false))
+        assertFalse(shouldShowBatteryOptimizationPrompt(ignoringOptimizations = true, promptHandled = false))
+        assertFalse(shouldShowBatteryOptimizationPrompt(ignoringOptimizations = false, promptHandled = true))
+    }
 }
