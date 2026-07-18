@@ -7,16 +7,16 @@ import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.text.format.Formatter
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
@@ -41,15 +41,14 @@ import io.github.oleglog.olcrtc.client.routing.RoutingRule
 import io.github.oleglog.olcrtc.client.routing.RoutingSettings
 import io.github.oleglog.olcrtc.client.support.IssueReportBuilder
 import io.github.oleglog.olcrtc.client.support.IssueReportInfo
-import io.github.oleglog.olcrtc.client.updater.ApkUpdateInstaller
 import io.github.oleglog.olcrtc.client.updater.GitHubUpdateClient
 import io.github.oleglog.olcrtc.client.updater.GitHubRelease
-import io.github.oleglog.olcrtc.client.updater.UpdateInstallAction
-import io.github.oleglog.olcrtc.client.updater.updateInstallAction
+import io.github.oleglog.olcrtc.client.updater.UpdateAssetSelector
+import io.github.oleglog.olcrtc.client.updater.VersionComparator
 import io.github.oleglog.olcrtc.client.vpn.GomobileCore
 import io.github.oleglog.olcrtc.client.vpn.VpnState
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -59,20 +58,6 @@ class SettingsFragment : Fragment() {
     private val settings by lazy { RoutingSettings.open(requireContext().applicationContext) }
     private val diagnostics by lazy { DiagnosticsLogStore.open(requireContext().applicationContext) }
     private val profiles by lazy { ProfileRepository.open(requireContext().applicationContext) }
-    private var pendingUpdate: PendingUpdate? = null
-    private var updateInProgress = false
-
-    private val installPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
-        val pending = pendingUpdate ?: return@registerForActivityResult
-        val context = context ?: return@registerForActivityResult
-        if (ApkUpdateInstaller(context.applicationContext).canRequestPackageInstalls()) {
-            pendingUpdate = null
-            installUpdate(pending.release, pending.asset)
-        } else {
-            pendingUpdate = null
-            _binding?.status?.setText(R.string.settings_update_install_permission)
-        }
-    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View {
         _binding = FragmentSettingsBinding.inflate(inflater, container, false)
@@ -101,9 +86,13 @@ class SettingsFragment : Fragment() {
         }
         binding.settingsUpdatesRow.setOnClickListener {
             showActions(
-                R.string.settings_check_update,
-                intArrayOf(R.string.settings_check_update, R.string.settings_core_versions),
-                arrayOf(::checkUpdate, ::showCoreVersions),
+                R.string.settings_updates_title,
+                intArrayOf(
+                    R.string.settings_check_update,
+                    R.string.settings_choose_release_apk,
+                    R.string.settings_core_versions,
+                ),
+                arrayOf(::checkUpdate, ::chooseReleaseAndApk, ::showCoreVersions),
             )
         }
         binding.settingsDiagnosticsRow.setOnClickListener { showDiagnosticsMenu() }
@@ -113,7 +102,7 @@ class SettingsFragment : Fragment() {
             getString(R.string.settings_system_row_summary),
         )
         binding.settingsUpdatesRow.text = settingsRowText(
-            R.string.settings_check_update,
+            R.string.settings_updates_title,
             getString(R.string.settings_version_summary, BuildConfig.VERSION_NAME),
         )
         binding.settingsDiagnosticsRow.text = settingsRowText(
@@ -729,7 +718,7 @@ class SettingsFragment : Fragment() {
                 }
                 if (update.newerThanCurrent && update.selectedAsset != null) {
                     MaterialAlertDialogBuilder(requireContext())
-                        .setTitle(R.string.settings_check_update)
+                        .setTitle(R.string.settings_update_available_title)
                         .setMessage(binding.status.text)
                         .setNegativeButton(R.string.cancel, null)
                         .setPositiveButton(R.string.settings_update_download_install) { _, _ ->
@@ -741,66 +730,95 @@ class SettingsFragment : Fragment() {
         }
     }
 
-    private fun installUpdate(release: GitHubRelease, asset: GitHubRelease.ReleaseAsset) {
-        if (updateInProgress) {
-            _binding?.status?.setText(R.string.settings_update_downloading)
-            return
-        }
-        val host = requireActivity()
-        val installer = ApkUpdateInstaller(host.applicationContext)
-        if (updateInstallAction(installer.canRequestPackageInstalls()) == UpdateInstallAction.REQUEST_PERMISSION) {
-            pendingUpdate = PendingUpdate(release, asset)
-            _binding?.status?.setText(R.string.settings_update_install_permission)
-            runCatching {
-                installPermission.launch(
-                    Intent(
-                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
-                        Uri.parse("package:${host.packageName}"),
-                    ),
-                )
-            }.onFailure {
-                pendingUpdate = null
-                showUpdateFailure(host, it)
-            }
-            return
-        }
-
-        updateInProgress = true
-        _binding?.status?.setText(R.string.settings_update_downloading)
-        val progress = MaterialAlertDialogBuilder(host)
-            .setTitle(R.string.settings_check_update)
-            .setMessage(R.string.settings_update_downloading)
-            .setCancelable(false)
-            .create()
-            .also { it.show() }
-        host.lifecycleScope.launch {
-            val update = try {
-                withContext(Dispatchers.IO) { installer.downloadAndVerify(release, asset) }
+    private fun chooseReleaseAndApk() {
+        _binding?.status?.setText(R.string.settings_update_loading_releases)
+        viewLifecycleOwner.lifecycleScope.launch {
+            val releases = try {
+                withContext(Dispatchers.IO) {
+                    GitHubUpdateClient(currentVersion = BuildConfig.VERSION_NAME).listReleases()
+                }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
-                showUpdateFailure(host, error)
+                _binding?.status?.text = error.message
                 return@launch
-            } finally {
-                updateInProgress = false
-                progress.dismiss()
             }
-            (host as? MainActivity)?.stopVpn()
-            runCatching { host.startActivity(installer.installIntent(update)) }
-                .onFailure { showUpdateFailure(host, it) }
+            if (_binding == null || !isAdded) return@launch
+            if (releases.isEmpty()) {
+                _binding?.status?.setText(R.string.settings_update_no_releases)
+                return@launch
+            }
+            val labels = releases.map { release ->
+                if (release.name == release.tagName) release.tagName else "${release.tagName} · ${release.name}"
+            }.toTypedArray()
+            MaterialAlertDialogBuilder(requireContext())
+                .setTitle(R.string.settings_choose_release)
+                .setItems(labels) { _, index -> showApkPicker(releases[index]) }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
         }
     }
 
-    private fun showUpdateFailure(host: Context, error: Throwable) {
-        val message = error.message ?: host.getString(R.string.settings_update_install_failed)
-        _binding?.status?.text = message
-        Toast.makeText(host, message, Toast.LENGTH_LONG).show()
-        if (!isAdded) return
+    private fun showApkPicker(release: GitHubRelease) {
+        val supportedAbis = Build.SUPPORTED_ABIS.toList()
+        val recommended = UpdateAssetSelector.selectApk(release, supportedAbis)
+        val assets = UpdateAssetSelector.apkAssets(release)
+            .sortedBy { if (it == recommended) 0 else 1 }
+        if (assets.isEmpty()) {
+            _binding?.status?.setText(R.string.settings_update_no_asset)
+            return
+        }
+        val labels = assets.map { asset ->
+            getString(
+                R.string.settings_update_apk_option,
+                asset.name,
+                Formatter.formatShortFileSize(requireContext(), asset.size),
+                if (asset == recommended) getString(R.string.settings_update_recommended_suffix) else "",
+            )
+        }.toTypedArray()
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.settings_check_update)
-            .setMessage(message)
-            .setPositiveButton(android.R.string.ok, null)
+            .setTitle(getString(R.string.settings_choose_apk, release.tagName))
+            .setItems(labels) { _, index -> confirmSelectedUpdate(release, assets[index], supportedAbis) }
+            .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    private fun confirmSelectedUpdate(
+        release: GitHubRelease,
+        asset: GitHubRelease.ReleaseAsset,
+        supportedAbis: List<String>,
+    ) {
+        when {
+            VersionComparator.isNewer(BuildConfig.VERSION_NAME, release.tagName) -> {
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(R.string.settings_update_downgrade_title)
+                    .setMessage(
+                        getString(
+                            R.string.settings_update_downgrade_message,
+                            release.tagName,
+                            BuildConfig.VERSION_NAME,
+                        ),
+                    )
+                    .setPositiveButton(android.R.string.ok, null)
+                    .show()
+            }
+            !UpdateAssetSelector.isCompatibleApk(asset, supportedAbis) -> {
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(R.string.settings_update_incompatible_title)
+                    .setMessage(getString(R.string.settings_update_incompatible_message, asset.name))
+                    .setNegativeButton(R.string.cancel, null)
+                    .setPositiveButton(R.string.settings_update_download_install) { _, _ ->
+                        installUpdate(release, asset)
+                    }
+                    .show()
+            }
+            else -> installUpdate(release, asset)
+        }
+    }
+
+    private fun installUpdate(release: GitHubRelease, asset: GitHubRelease.ReleaseAsset) {
+        _binding?.status?.setText(R.string.settings_update_downloading)
+        (requireActivity() as MainActivity).installUpdate(release, asset)
     }
 
     private fun showDiagnosticsMenu() {
@@ -949,11 +967,6 @@ class SettingsFragment : Fragment() {
         val perAppPolicy: PerAppPolicy,
         val routingRules: Int,
         val backgroundEffects: RoutingSettings.BackgroundEffects,
-    )
-
-    private data class PendingUpdate(
-        val release: GitHubRelease,
-        val asset: GitHubRelease.ReleaseAsset,
     )
 
     private companion object {

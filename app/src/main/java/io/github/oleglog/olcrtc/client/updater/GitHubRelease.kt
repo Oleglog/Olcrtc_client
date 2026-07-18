@@ -19,8 +19,13 @@ internal data class GitHubRelease(
 }
 
 internal object GitHubReleaseParser {
-    fun parse(rawJson: String): GitHubRelease {
-        val root = JSONObject(rawJson)
+    fun parse(rawJson: String): GitHubRelease = parse(JSONObject(rawJson))
+
+    fun parseList(rawJson: String): List<GitHubRelease> = JSONArray(rawJson).asSequence()
+        .map { value -> parse(value as JSONObject) }
+        .toList()
+
+    private fun parse(root: JSONObject): GitHubRelease {
         val assets = root.getJSONArray("assets").asSequence()
             .map { value -> value as JSONObject }
             .map { asset ->
@@ -47,13 +52,20 @@ internal object GitHubReleaseParser {
 
 internal object UpdateAssetSelector {
     fun selectApk(release: GitHubRelease, supportedAbis: List<String>): GitHubRelease.ReleaseAsset? {
-        val apkAssets = release.assets.filter { it.name.endsWith(".apk", ignoreCase = true) }
+        val apkAssets = apkAssets(release)
         supportedAbis.forEach { abi ->
             apkAssets.firstOrNull { asset -> asset.name.contains("-$abi.apk", ignoreCase = true) }
                 ?.let { return it }
         }
         return apkAssets.firstOrNull { it.name.contains("-universal.apk", ignoreCase = true) }
     }
+
+    fun apkAssets(release: GitHubRelease): List<GitHubRelease.ReleaseAsset> =
+        release.assets.filter { it.name.endsWith(".apk", ignoreCase = true) }
+
+    fun isCompatibleApk(asset: GitHubRelease.ReleaseAsset, supportedAbis: List<String>): Boolean =
+        asset.name.contains("-universal.apk", ignoreCase = true) ||
+            supportedAbis.any { abi -> asset.name.contains("-$abi.apk", ignoreCase = true) }
 
     fun parseSha256Sums(value: String): Map<String, String> = value
         .lineSequence()

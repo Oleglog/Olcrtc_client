@@ -5,24 +5,42 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.net.Uri
 import android.net.VpnService
 import android.os.Bundle
 import android.os.IBinder
+import android.os.SystemClock
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.github.oleglog.olcrtc.client.databinding.ActivityMainBinding
 import io.github.oleglog.olcrtc.client.routing.RoutingSettings
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
+import io.github.oleglog.olcrtc.client.updater.ApkUpdateInstaller
+import io.github.oleglog.olcrtc.client.updater.GitHubRelease
+import io.github.oleglog.olcrtc.client.updater.GitHubUpdateClient
+import io.github.oleglog.olcrtc.client.updater.UpdateCheckResult
+import io.github.oleglog.olcrtc.client.updater.UpdateInstallAction
+import io.github.oleglog.olcrtc.client.updater.shouldRunAutomaticUpdateCheck
+import io.github.oleglog.olcrtc.client.updater.shouldShowUpdatePrompt
+import io.github.oleglog.olcrtc.client.updater.updateInstallAction
 import io.github.oleglog.olcrtc.client.vpn.ConnectionStage
 import io.github.oleglog.olcrtc.client.vpn.IOlcrtcVpnService
 import io.github.oleglog.olcrtc.client.vpn.IVpnStateCallback
 import io.github.oleglog.olcrtc.client.vpn.OlcrtcVpnService
 import io.github.oleglog.olcrtc.client.vpn.VpnState
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -39,6 +57,12 @@ class MainActivity : AppCompatActivity() {
     private var lastReconnectAttempt = 0
     private var hasVpnState = false
     private var backgroundEffects = RoutingSettings.BackgroundEffects()
+    private var pendingInstall: PendingInstall? = null
+    private var pendingUpdatePrompt: UpdateCheckResult? = null
+    private var updateInstallInProgress = false
+    private var updateCheckInProgress = false
+    private var lastAutomaticUpdateCheckElapsed = 0L
+    private val updatePreferences by lazy { getSharedPreferences(UPDATE_PREFERENCES, Context.MODE_PRIVATE) }
 
     private val callback = object : IVpnStateCallback.Stub() {
         override fun onStateChanged(state: Int, error: String?, stage: Int, reconnectAttempt: Int) {
@@ -76,6 +100,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val installPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        val pending = pendingInstall ?: return@registerForActivityResult
+        if (ApkUpdateInstaller(applicationContext).canRequestPackageInstalls()) {
+            pendingInstall = null
+            installUpdate(pending.release, pending.asset)
+        } else {
+            pendingInstall = null
+            Toast.makeText(this, R.string.settings_update_install_permission, Toast.LENGTH_LONG).show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -99,6 +134,7 @@ class MainActivity : AppCompatActivity() {
         super.onStart()
         refreshBackgroundEffects()
         bound = bindService(Intent(this, OlcrtcVpnService::class.java), connection, Context.BIND_AUTO_CREATE)
+        if (!showPendingUpdatePrompt()) checkForUpdateOnEntry()
     }
 
     override fun onStop() {
@@ -155,6 +191,121 @@ class MainActivity : AppCompatActivity() {
     private fun updateBackgroundEffects() {
         val vpnActive = lastVpnState == VpnState.CONNECTED || lastVpnState == VpnState.RECONNECTING
         binding.backgroundEffects.setActive(backgroundEffectsActive(backgroundEffects, vpnActive))
+    }
+
+    private fun checkForUpdateOnEntry() {
+        val now = SystemClock.elapsedRealtime()
+        if (!shouldRunAutomaticUpdateCheck(
+                checkInProgress = updateCheckInProgress,
+                lastCheckElapsedMillis = lastAutomaticUpdateCheckElapsed,
+                nowElapsedMillis = now,
+                minimumIntervalMillis = AUTOMATIC_UPDATE_CHECK_INTERVAL_MILLIS,
+            )
+        ) return
+        updateCheckInProgress = true
+        lastAutomaticUpdateCheckElapsed = now
+        lifecycleScope.launch {
+            val update = try {
+                withContext(Dispatchers.IO) {
+                    GitHubUpdateClient(currentVersion = BuildConfig.VERSION_NAME).check()
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Throwable) {
+                null
+            } finally {
+                updateCheckInProgress = false
+            } ?: return@launch
+            if (!shouldShowUpdatePrompt(update, lastPromptedUpdateTag())) return@launch
+            if (lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                showUpdatePrompt(update)
+            } else {
+                pendingUpdatePrompt = update
+            }
+        }
+    }
+
+    private fun showPendingUpdatePrompt(): Boolean {
+        val update = pendingUpdatePrompt ?: return false
+        pendingUpdatePrompt = null
+        return showUpdatePrompt(update)
+    }
+
+    private fun showUpdatePrompt(update: UpdateCheckResult): Boolean {
+        val asset = update.selectedAsset ?: return false
+        if (!shouldShowUpdatePrompt(update, lastPromptedUpdateTag())) return false
+        updatePreferences.edit().putString(KEY_LAST_PROMPTED_UPDATE_TAG, update.release.tagName).apply()
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.settings_update_available_title)
+            .setMessage(getString(R.string.settings_update_available, update.release.tagName, asset.name))
+            .setNegativeButton(R.string.settings_update_later, null)
+            .setPositiveButton(R.string.settings_update_download_install) { _, _ ->
+                installUpdate(update.release, asset)
+            }
+            .show()
+        return true
+    }
+
+    private fun lastPromptedUpdateTag(): String? =
+        updatePreferences.getString(KEY_LAST_PROMPTED_UPDATE_TAG, null)
+
+    fun installUpdate(release: GitHubRelease, asset: GitHubRelease.ReleaseAsset) {
+        if (updateInstallInProgress) {
+            Toast.makeText(this, R.string.settings_update_downloading, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val installer = ApkUpdateInstaller(applicationContext)
+        if (updateInstallAction(installer.canRequestPackageInstalls()) == UpdateInstallAction.REQUEST_PERMISSION) {
+            pendingInstall = PendingInstall(release, asset)
+            Toast.makeText(this, R.string.settings_update_install_permission, Toast.LENGTH_LONG).show()
+            runCatching {
+                installPermission.launch(
+                    Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:$packageName"),
+                    ),
+                )
+            }.onFailure {
+                pendingInstall = null
+                showUpdateFailure(it)
+            }
+            return
+        }
+
+        updateInstallInProgress = true
+        val progress = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.settings_check_update)
+            .setMessage(R.string.settings_update_downloading)
+            .setCancelable(false)
+            .create()
+            .also { it.show() }
+        lifecycleScope.launch {
+            val update = try {
+                withContext(Dispatchers.IO) { installer.downloadAndVerify(release, asset) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                showUpdateFailure(error)
+                return@launch
+            } finally {
+                updateInstallInProgress = false
+                runCatching { progress.dismiss() }
+            }
+            stopVpn()
+            runCatching { startActivity(installer.installIntent(update)) }
+                .onFailure(::showUpdateFailure)
+        }
+    }
+
+    private fun showUpdateFailure(error: Throwable) {
+        val message = error.message ?: getString(R.string.settings_update_install_failed)
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        if (!lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) return
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.settings_check_update)
+            .setMessage(message)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     fun stopVpn() {
@@ -242,8 +393,16 @@ class MainActivity : AppCompatActivity() {
         private const val KEY_PENDING_PROFILE_ID = "pending_profile_id"
         private const val KEY_PENDING_SUBSCRIPTION_PROFILE_ID = "pending_subscription_profile_id"
         private const val MAX_EXTERNAL_IMPORT_CHARS = 16 * 1024
+        private const val AUTOMATIC_UPDATE_CHECK_INTERVAL_MILLIS = 5 * 60 * 1000L
+        private const val UPDATE_PREFERENCES = "updates"
+        private const val KEY_LAST_PROMPTED_UPDATE_TAG = "last_prompted_tag"
         private val EXTERNAL_PROFILE_SCHEMES = setOf("olcrtc", "vless", "vmess", "trojan")
     }
+
+    private data class PendingInstall(
+        val release: GitHubRelease,
+        val asset: GitHubRelease.ReleaseAsset,
+    )
 }
 
 internal fun backgroundEffectsActive(
