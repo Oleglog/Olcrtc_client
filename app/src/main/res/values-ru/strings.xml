@@ -276,7 +276,6 @@
     <string name="no_profile">Профиль не выбран</string>
     <string name="profile_select_required">Сначала выберите подключение</string>
     <string name="connect">Подключить</string>
-    <string name="switch_connection">Переключить</string>
     <string name="add_connection">Добавить подключение</string>
     <string name="connection_manual_profiles">Мои подключения</string>
     <string name="connection_subscription_profiles">Из подписок</string>

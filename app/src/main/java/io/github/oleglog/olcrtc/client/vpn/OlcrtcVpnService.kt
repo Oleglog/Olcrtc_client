@@ -84,7 +84,6 @@ class OlcrtcVpnService : VpnService() {
     @Volatile private var activeSocksPort: Int? = null
     @Volatile private var activeDnsEndpoint: DnsEndpoint? = null
     @Volatile private var nativeSession: NativeSession? = null
-    private var activeOlcrtcRuntime: OlcrtcRuntime? = null
     private var connectionAttempt: ConnectionAttempt? = null
     private var connectionFuture: Future<*>? = null
     private var nextConnectionGeneration = 0L
@@ -295,7 +294,6 @@ class OlcrtcVpnService : VpnService() {
         finishConnectionSession("service destroyed")
         activeSocksPort = null
         activeDnsEndpoint = null
-        activeOlcrtcRuntime = null
         runCatching { nativeSession?.close() }
         nativeSession = null
         connectionStartup.shutdownNow()
@@ -369,7 +367,6 @@ class OlcrtcVpnService : VpnService() {
         val switchingProfile = publishedState == VpnState.CONNECTED
         if (!switchingProfile && !stateMachine.canStart()) return
         val previousReference = activeProfile
-        val previousProfileInfo = activeProfileInfo
         cancelAutomaticReconnect()
         cancelConnectionAttempt("new profile requested")
         publishedError = null
@@ -402,21 +399,14 @@ class OlcrtcVpnService : VpnService() {
         startForeground(NOTIFICATION_ID, notification())
         if (switchingProfile) {
             finishConnectionSession("profile switched")
-            val fastSwitch = shouldReuseTunForProfileSwitch(
-                previousIsOlcrtc = previousProfileInfo?.isOlcrtc == true,
-                nextIsOlcrtc = profile is ProfileConfig.Olcrtc,
-            ) && nativeSession?.isRunning() == true && activeOlcrtcRuntime != null
             transition(VpnState.RECONNECTING)
-            val reusableSession = if (fastSwitch) detachNativeSession() else {
-                runCatching { closeNativeSession() }
-                    .onFailure { diagnostics.append("error", "Full profile switch cleanup failed", it) }
-                null
-            }
+            runCatching { closeNativeSession() }
+                .onFailure { diagnostics.append("error", "Full profile switch cleanup failed", it) }
             diagnostics.append(
                 "info",
-                "VPN profile switch ${previousReference?.displayId} -> ${reference.displayId} mode=${if (fastSwitch) "fast" else "full"}",
+                "VPN profile switch ${previousReference?.displayId} -> ${reference.displayId} mode=full",
             )
-            launchConnectionAttempt(reference, profile, reconnecting = true, reusableSession = reusableSession)
+            launchConnectionAttempt(reference, profile, reconnecting = true)
             return
         }
         transition(VpnState.PREPARING)
@@ -477,11 +467,8 @@ class OlcrtcVpnService : VpnService() {
         reference: ProfileReference,
         profile: ProfileConfig,
         reconnecting: Boolean,
-        reusableSession: ReusableOlcrtcSession? = null,
     ) {
         val network = activeNetwork ?: run {
-            runCatching { reusableSession?.session?.close() }
-                .onFailure { diagnostics.append("error", "Reusable VPN session cleanup failed", it) }
             networkReconnectRequested = true
             publishStage(ConnectionStage.WAIT_NETWORK)
             if (publishedState != VpnState.RECONNECTING) transition(VpnState.RECONNECTING)
@@ -494,13 +481,12 @@ class OlcrtcVpnService : VpnService() {
             network = network,
             startedAt = SystemClock.elapsedRealtime(),
         )
-        attempt.session = reusableSession?.session
         connectionAttempt = attempt
         if (!reconnecting) transition(VpnState.CONNECTING)
         connectionFuture = connectionStartup.submit {
             val result = runCatching {
                 attempt.requireActive()
-                startNativeSession(profile, attempt, reusableSession)
+                startNativeSession(profile, attempt)
             }
             runCatching {
                 commands.execute { completeConnectionAttempt(attempt, result) }
@@ -532,7 +518,6 @@ class OlcrtcVpnService : VpnService() {
             nativeSession = started.session
             activeSocksPort = started.socksPort
             activeDnsEndpoint = started.dns
-            activeOlcrtcRuntime = started.olcrtcRuntime
             activeSessionGeneration = attempt.generation
             publishStage(ConnectionStage.READY)
             transition(VpnState.CONNECTED)
@@ -725,8 +710,9 @@ class OlcrtcVpnService : VpnService() {
                 transition(VpnState.STOPPING)
                 try {
                     finishConnectionSession("user stopped")
-                    closeNativeSession()
+                    nativeSession?.releaseTun()
                     transition(if (activeProfile == null) VpnState.NO_PROFILE else VpnState.DISCONNECTED)
+                    closeNativeSession()
                 } catch (error: Throwable) {
                     diagnostics.append("error", "VPN stop failed", error)
                     transition(VpnState.ERROR, userConnectionError(error))
@@ -823,7 +809,6 @@ class OlcrtcVpnService : VpnService() {
     private fun startNativeSession(
         profile: ProfileConfig,
         attempt: ConnectionAttempt,
-        reusableSession: ReusableOlcrtcSession? = null,
     ): StartedSession {
         attempt.requireActive()
         val routingRules = profiles.getEnabledRoutingRules()
@@ -855,49 +840,6 @@ class OlcrtcVpnService : VpnService() {
                 "info",
                 "VPN stop attempt=${attempt.generation} routeReleased=${routeReleased}ms total=${total}ms",
             )
-        }
-
-        if (profile is ProfileConfig.Olcrtc && reusableSession != null) {
-            val runtime = reusableSession.runtime
-            val olcrtcConfig = NativeOlcrtcConfig.from(
-                profile.value,
-                runtime.olcrtcSocksPort,
-                checkNotNull(dns.carrier),
-            )
-            val xrayConfig = NativeConfig.xray(
-                socksPort = runtime.xraySocksPort,
-                olcrtcSocksPort = runtime.olcrtcSocksPort,
-                dns = dns.tunnel,
-                routingRules = routingRules,
-                routingPolicy = routingPolicy,
-            )
-            val verifyDatapath = { verifyDatapath(runtime.xraySocksPort, dns.tunnel) }
-            if (
-                reusableSession.session.isRunning() && runtime.assetDirectory == assetDirectory &&
-                runtime.xrayConfig == xrayConfig
-            ) {
-                attempt.session = reusableSession.session
-                try {
-                    attempt.requireActive()
-                    reusableSession.session.restartOlcrtc(
-                        olcrtcConfig = olcrtcConfig,
-                        verifyDatapath = verifyDatapath,
-                        reportStage = reportStage,
-                        reportStop = reportStop,
-                    )
-                    attempt.requireActive()
-                    return StartedSession(reusableSession.session, runtime.xraySocksPort, dns.tunnel, runtime)
-                } catch (error: Throwable) {
-                    runCatching { reusableSession.session.close() }
-                    throw error
-                }
-            }
-            diagnostics.append("info", "Fast profile switch fell back to full restart: Xray runtime changed")
-            runCatching { reusableSession.session.close() }
-            attempt.session = null
-        } else if (reusableSession != null) {
-            runCatching { reusableSession.session.close() }
-            attempt.session = null
         }
 
         val xraySocksPort: Int
@@ -947,28 +889,11 @@ class OlcrtcVpnService : VpnService() {
                 olcrtcConfig = olcrtcConfig,
             )
             attempt.requireActive()
-            val runtime = olcrtcConfig?.let {
-                OlcrtcRuntime(xraySocksPort, it.socksPort, assetDirectory, xrayConfig)
-            }
-            return StartedSession(session, xraySocksPort, dns.tunnel, runtime)
+            return StartedSession(session, xraySocksPort, dns.tunnel)
         } catch (error: Throwable) {
             runCatching { session.close() }
             throw error
         }
-    }
-
-    private fun detachNativeSession(): ReusableOlcrtcSession? {
-        val session = nativeSession ?: return null
-        val runtime = activeOlcrtcRuntime ?: return null
-        activeSocksPort = null
-        activeDnsEndpoint = null
-        activeOlcrtcRuntime = null
-        activeSessionGeneration = 0L
-        healthProbeFailures = 0
-        healthProbeInFlight = false
-        healthProbeToken++
-        nativeSession = null
-        return ReusableOlcrtcSession(session, runtime)
     }
 
     private fun verifyDatapath(socksPort: Int, dns: DnsEndpoint) {
@@ -1016,7 +941,6 @@ class OlcrtcVpnService : VpnService() {
         val startedAt = SystemClock.elapsedRealtime()
         activeSocksPort = null
         activeDnsEndpoint = null
-        activeOlcrtcRuntime = null
         activeSessionGeneration = 0L
         healthProbeFailures = 0
         healthProbeInFlight = false
@@ -1364,19 +1288,16 @@ class OlcrtcVpnService : VpnService() {
     private data class ProfileInfo(
         val name: String,
         val protocol: String,
-        val isOlcrtc: Boolean,
     ) {
         companion object {
             fun from(profile: ProfileConfig): ProfileInfo = when (profile) {
                 is ProfileConfig.Olcrtc -> ProfileInfo(
                     name = profile.value.name,
                     protocol = "olcRTC · ${profile.value.provider.value}",
-                    isOlcrtc = true,
                 )
                 is ProfileConfig.Standard -> ProfileInfo(
                     name = profile.value.name,
                     protocol = profile.value.protocol.name,
-                    isOlcrtc = false,
                 )
             }
         }
@@ -1386,19 +1307,6 @@ class OlcrtcVpnService : VpnService() {
         val session: NativeSession,
         val socksPort: Int,
         val dns: DnsEndpoint,
-        val olcrtcRuntime: OlcrtcRuntime?,
-    )
-
-    private data class ReusableOlcrtcSession(
-        val session: NativeSession,
-        val runtime: OlcrtcRuntime,
-    )
-
-    private data class OlcrtcRuntime(
-        val xraySocksPort: Int,
-        val olcrtcSocksPort: Int,
-        val assetDirectory: String,
-        val xrayConfig: String,
     )
 
     private class ConnectionAttempt(
@@ -1465,9 +1373,6 @@ class OlcrtcVpnService : VpnService() {
 
 internal fun requiresGeoAssets(policy: RoutingPolicy): Boolean =
     policy.preset == RoutingPolicy.Preset.RUSSIA_DIRECT
-
-internal fun shouldReuseTunForProfileSwitch(previousIsOlcrtc: Boolean, nextIsOlcrtc: Boolean): Boolean =
-    previousIsOlcrtc && nextIsOlcrtc
 
 internal fun shouldReconnectAfterHealthFailures(failures: Int): Boolean =
     failures >= HEALTH_FAILURES_BEFORE_RECONNECT

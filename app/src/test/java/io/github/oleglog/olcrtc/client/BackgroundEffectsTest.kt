@@ -5,6 +5,7 @@ import io.github.oleglog.olcrtc.client.routing.RoutingSettings.BackgroundEffects
 import io.github.oleglog.olcrtc.client.routing.RoutingSettings.BackgroundEffects.Style
 import io.github.oleglog.olcrtc.client.routing.parseBackgroundEffectStyle
 import io.github.oleglog.olcrtc.client.ui.particleCount
+import io.github.oleglog.olcrtc.client.ui.particleFrameIntervalMillis
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -38,5 +39,12 @@ class BackgroundEffectsTest {
         assertTrue(shouldShowBatteryOptimizationPrompt(ignoringOptimizations = false, promptHandled = false))
         assertFalse(shouldShowBatteryOptimizationPrompt(ignoringOptimizations = true, promptHandled = false))
         assertFalse(shouldShowBatteryOptimizationPrompt(ignoringOptimizations = false, promptHandled = true))
+    }
+
+    @Test
+    fun slowParticlesUseFewerAnimationWakeups() {
+        assertEquals(33L, particleFrameIntervalMillis(Style.DRIFT))
+        assertEquals(50L, particleFrameIntervalMillis(Style.SNOW))
+        assertEquals(50L, particleFrameIntervalMillis(Style.RAIN))
     }
 }

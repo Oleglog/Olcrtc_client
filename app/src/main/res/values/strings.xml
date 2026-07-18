@@ -275,7 +275,6 @@
     <string name="no_profile">No profile imported</string>
     <string name="profile_select_required">Select a connection first</string>
     <string name="connect">Connect</string>
-    <string name="switch_connection">Switch</string>
     <string name="add_connection">Add connection</string>
     <string name="connection_manual_profiles">My connections</string>
     <string name="connection_subscription_profiles">From subscriptions</string>

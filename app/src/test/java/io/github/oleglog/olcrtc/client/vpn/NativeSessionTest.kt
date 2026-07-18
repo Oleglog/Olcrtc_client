@@ -155,41 +155,6 @@ class NativeSessionTest {
     }
 
     @Test
-    fun olcrtcRestartKeepsTunHevAndXray() {
-        val events = mutableListOf<String>()
-        val session = NativeSession(
-            RecordingCore(events),
-            RecordingTunnel(events),
-            establishTun = {
-                events += "tun:establish"
-                RecordingTun(events)
-            },
-            verifyDatapath = { events += "datapath:verify" },
-        )
-        session.start(1080, "/assets", "{}", byteArrayOf(1), olcrtcConfig())
-        events.clear()
-
-        session.restartOlcrtc(
-            olcrtcConfig = olcrtcConfig().copy(socksPort = 2081),
-            verifyDatapath = { events += "datapath:verify:new" },
-            reportStage = { _, _, _ -> },
-            reportStop = { _, _ -> },
-        )
-
-        assertEquals(
-            listOf(
-                "olcrtc:stop",
-                "olcrtc:start",
-                "olcrtc:ready",
-                "datapath:verify:new",
-            ),
-            events,
-        )
-        assertTrue(session.isRunning())
-        session.close()
-    }
-
-    @Test
     fun preservesOlcrtcStartFailureDuringRollback() {
         val events = mutableListOf<String>()
         val session = NativeSession(
@@ -390,6 +355,25 @@ class NativeSessionTest {
     }
 
     @Test
+    fun routeCanBeReleasedBeforeSlowNativeCleanup() {
+        val events = mutableListOf<String>()
+        val session = NativeSession(
+            RecordingCore(events),
+            RecordingTunnel(events),
+            establishTun = { RecordingTun(events) },
+            verifyDatapath = {},
+        )
+        session.start(1080, "/assets", "{}", byteArrayOf(1))
+        events.clear()
+
+        session.releaseTun()
+        assertEquals(listOf("tun:close"), events)
+
+        session.close()
+        assertEquals(listOf("tun:close", "tunnel:close", "core:stop"), events)
+    }
+
+    @Test
     fun configRoutesUdpThroughLocalSocks() {
         val xray = NativeConfig.xray(1080)
         val hev = NativeConfig.hev(1080).decodeToString()
@@ -435,11 +419,6 @@ class NativeSessionTest {
             olcrtcRunning = true
         }
 
-        override fun stopOlcrtc() {
-            events += "olcrtc:stop"
-            olcrtcRunning = false
-        }
-
         override fun waitOlcrtcReady(timeoutMillis: Int) {
             olcrtcReadyTimeoutMillis = timeoutMillis
             events += "olcrtc:ready"
@@ -480,11 +459,6 @@ class NativeSessionTest {
         override fun startOlcrtc(config: NativeOlcrtcConfig) {
             events += "olcrtc:start"
             running = true
-        }
-
-        override fun stopOlcrtc() {
-            events += "olcrtc:stop"
-            running = false
         }
 
         override fun waitOlcrtcReady(timeoutMillis: Int) {

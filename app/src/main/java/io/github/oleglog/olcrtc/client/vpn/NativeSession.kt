@@ -13,9 +13,9 @@ internal class NativeSession(
     reportStop: (routeReleasedMillis: Long, totalMillis: Long) -> Unit = { _, _ -> },
 ) : Closeable {
     private val lifecycle = Any()
-    @Volatile private var verifyDatapath = verifyDatapath
-    @Volatile private var reportStage = reportStage
-    @Volatile private var reportStop = reportStop
+    private val verifyDatapath = verifyDatapath
+    private val reportStage = reportStage
+    private val reportStop = reportStop
     @Volatile private var coreStarted = false
     @Volatile private var olcrtcStarted = false
     @Volatile private var tun: TunDescriptor? = null
@@ -37,39 +37,6 @@ internal class NativeSession(
                 }
             }
             startRuntime(descriptor, socksPort, assetDirectory, xrayConfig, hevConfig, olcrtcConfig)
-        }
-    }
-
-    fun restartOlcrtc(
-        olcrtcConfig: NativeOlcrtcConfig,
-        verifyDatapath: () -> Unit,
-        reportStage: (ConnectionStage, Long?, Throwable?) -> Unit,
-        reportStop: (routeReleasedMillis: Long, totalMillis: Long) -> Unit,
-    ) {
-        synchronized(lifecycle) {
-            checkOpen()
-            check(olcrtcStarted) { "fast switch requires an active olcRTC session" }
-            this.verifyDatapath = verifyDatapath
-            this.reportStage = reportStage
-            this.reportStop = reportStop
-        }
-        startSafely {
-            stage(ConnectionStage.START_CARRIER) {
-                synchronized(lifecycle) {
-                    checkOpen()
-                    nativeCore.stopOlcrtc()
-                    olcrtcStarted = false
-                    nativeCore.startOlcrtc(olcrtcConfig)
-                    olcrtcStarted = true
-                }
-                nativeCore.waitOlcrtcReady(olcrtcConfig.readyTimeoutMillis)
-            }
-            stage(ConnectionStage.VERIFY_DATAPATH) {
-                verifyDatapath()
-                check(hevTunnel.isRunning() && nativeCore.isXrayRunning()) {
-                    "reused VPN runtime exited during datapath verification"
-                }
-            }
         }
     }
 
@@ -136,6 +103,14 @@ internal class NativeSession(
     fun isRunning(): Boolean =
         !closed && coreStarted && tun != null && hevTunnel.isRunning() &&
             nativeCore.isXrayRunning() && (!olcrtcStarted || nativeCore.isOlcrtcRunning())
+
+    fun releaseTun() {
+        val descriptor = synchronized(lifecycle) {
+            if (closed) return
+            tun.also { tun = null }
+        }
+        descriptor?.close()
+    }
 
     private inline fun <T> stage(
         stage: ConnectionStage,

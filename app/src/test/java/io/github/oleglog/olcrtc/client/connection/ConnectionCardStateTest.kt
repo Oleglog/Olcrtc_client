@@ -1,6 +1,9 @@
 package io.github.oleglog.olcrtc.client.connection
 
+import io.github.oleglog.olcrtc.client.vpn.VpnState
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ConnectionCardStateTest {
@@ -22,6 +25,13 @@ class ConnectionCardStateTest {
             ConnectionCardState.SELECTED,
             connectionCardState(selected = true, connected = false),
         )
+    }
+
+    @Test
+    fun selectingAnotherProfileWhileConnectedStartsImmediately() {
+        assertTrue(shouldAutoConnectSelectedProfile(VpnState.CONNECTED, targetAlreadyConnected = false))
+        assertFalse(shouldAutoConnectSelectedProfile(VpnState.CONNECTED, targetAlreadyConnected = true))
+        assertFalse(shouldAutoConnectSelectedProfile(VpnState.DISCONNECTED, targetAlreadyConnected = false))
     }
 
     @Test

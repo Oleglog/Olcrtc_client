@@ -93,7 +93,7 @@ class ConnectionFragment : Fragment() {
         binding.testSelected.isEnabled = false
         renderContentState(ConnectionContentState.LOADING)
         binding.connect.setOnClickListener {
-            if (currentState in BUSY_STATES || currentState == VpnState.CONNECTED && !hasPendingProfileSwitch()) {
+            if (currentState in BUSY_STATES || currentState == VpnState.CONNECTED) {
                 activityHost.stopVpn()
             } else {
                 connectSelected()
@@ -455,22 +455,26 @@ class ConnectionFragment : Fragment() {
 
     private fun selectSubscriptionProfile(id: String) {
         if (currentState in BUSY_STATES) return
+        val autoConnect = shouldAutoConnectSelectedProfile(currentState, connectedSubscriptionProfileId == id)
         selectedProfileId = null
         selectedSubscriptionProfileId = id
         showStatus(null)
         updateConnectButtonText()
         updateActionAvailability()
         refreshCardAppearance()
+        if (autoConnect) connectSelected()
     }
 
     private fun selectProfile(id: Long) {
         if (currentState in BUSY_STATES) return
+        val autoConnect = shouldAutoConnectSelectedProfile(currentState, connectedProfileId == id)
         selectedSubscriptionProfileId = null
         selectedProfileId = id
         showStatus(null)
         updateConnectButtonText()
         updateActionAvailability()
         refreshCardAppearance()
+        if (autoConnect) connectSelected()
     }
 
     private fun connectSelected() {
@@ -678,7 +682,6 @@ class ConnectionFragment : Fragment() {
     private fun updateConnectButtonText() {
         val text = getString(
             when {
-                currentState == VpnState.CONNECTED && hasPendingProfileSwitch() -> R.string.switch_connection
                 currentState == VpnState.PREPARING || currentState == VpnState.CONNECTING -> R.string.cancel_connection
                 currentState == VpnState.CONNECTED || currentState == VpnState.RECONNECTING -> R.string.disconnect
                 currentState == VpnState.STOPPING -> R.string.disconnecting
@@ -1122,6 +1125,9 @@ internal fun connectionCardState(
     selected -> ConnectionCardState.SELECTED
     else -> ConnectionCardState.INACTIVE
 }
+
+internal fun shouldAutoConnectSelectedProfile(state: VpnState, targetAlreadyConnected: Boolean): Boolean =
+    state == VpnState.CONNECTED && !targetAlreadyConnected
 
 internal enum class ConnectionContentState {
     LOADING,

@@ -1,12 +1,15 @@
 package io.github.oleglog.olcrtc.client
 
+import android.Manifest
 import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.net.VpnService
+import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.os.PowerManager
@@ -50,6 +53,7 @@ class MainActivity : AppCompatActivity() {
     private var bound = false
     private var pendingProfileId: Long? = null
     private var pendingSubscriptionProfileId: String? = null
+    private var pendingNotificationStart: (() -> Unit)? = null
     private var pendingImport: String? = null
     private var importListener: ((String) -> Unit)? = null
     private var stateListener: ((VpnState, String?, ConnectionStage, Int) -> Unit)? = null
@@ -111,6 +115,13 @@ class MainActivity : AppCompatActivity() {
         } else {
             pendingInstall = null
             Toast.makeText(this, R.string.settings_update_install_permission, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {
+        pendingNotificationStart?.also { start ->
+            pendingNotificationStart = null
+            start()
         }
     }
 
@@ -415,24 +426,40 @@ class MainActivity : AppCompatActivity() {
 
     private fun startVpn(profileId: Long) {
         pendingProfileId = null
-        val service = Intent(this, OlcrtcVpnService::class.java)
-        ContextCompat.startForegroundService(
-            this,
-            Intent(service)
-                .setAction(OlcrtcVpnService.ACTION_START)
-                .putExtra(OlcrtcVpnService.EXTRA_PROFILE_ID, profileId),
-        )
+        startForegroundVpn {
+            val service = Intent(this, OlcrtcVpnService::class.java)
+            ContextCompat.startForegroundService(
+                this,
+                Intent(service)
+                    .setAction(OlcrtcVpnService.ACTION_START)
+                    .putExtra(OlcrtcVpnService.EXTRA_PROFILE_ID, profileId),
+            )
+        }
     }
 
     private fun startSubscriptionVpn(profileId: String) {
         pendingSubscriptionProfileId = null
-        val service = Intent(this, OlcrtcVpnService::class.java)
-        ContextCompat.startForegroundService(
-            this,
-            Intent(service)
-                .setAction(OlcrtcVpnService.ACTION_START)
-                .putExtra(OlcrtcVpnService.EXTRA_SUBSCRIPTION_PROFILE_ID, profileId),
-        )
+        startForegroundVpn {
+            val service = Intent(this, OlcrtcVpnService::class.java)
+            ContextCompat.startForegroundService(
+                this,
+                Intent(service)
+                    .setAction(OlcrtcVpnService.ACTION_START)
+                    .putExtra(OlcrtcVpnService.EXTRA_SUBSCRIPTION_PROFILE_ID, profileId),
+            )
+        }
+    }
+
+    private fun startForegroundVpn(start: () -> Unit) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            start()
+            return
+        }
+        pendingNotificationStart = start
+        notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
     }
 
     companion object {

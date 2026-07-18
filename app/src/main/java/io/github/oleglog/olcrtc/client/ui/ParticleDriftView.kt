@@ -43,7 +43,10 @@ internal class ParticleDriftView @JvmOverloads constructor(
             lastFrameMillis = now
             step(dt / 1000f)
             invalidate()
-            Choreographer.getInstance().postFrameCallbackDelayed(this, FRAME_INTERVAL_MILLIS)
+            Choreographer.getInstance().postFrameCallbackDelayed(
+                this,
+                particleFrameIntervalMillis(settings.style),
+            )
         }
     }
 
@@ -145,7 +148,7 @@ internal class ParticleDriftView @JvmOverloads constructor(
                 RoutingSettings.BackgroundEffects.Style.DRIFT -> Particle(
                     x = Random.nextFloat() * lastWidth,
                     y = Random.nextFloat() * lastHeight,
-                    size = dp(0.7f + Random.nextFloat() * 0.8f),
+                    size = dp(1.1f + Random.nextFloat()),
                     length = 0f,
                     speedX = (-4f + Random.nextFloat() * 8f) * speedScale,
                     speedY = (4f + Random.nextFloat() * 8f) * speedScale,
@@ -223,9 +226,6 @@ internal class ParticleDriftView @JvmOverloads constructor(
 
     private fun dp(value: Float): Float = value * resources.displayMetrics.density
 
-    private companion object {
-        const val FRAME_INTERVAL_MILLIS = 33L
-    }
 }
 
 internal fun particleCount(intensity: RoutingSettings.BackgroundEffects.Intensity): Int = when (intensity) {
@@ -245,4 +245,11 @@ internal fun particleCount(
     }
 } else {
     particleCount(intensity)
+}
+
+internal fun particleFrameIntervalMillis(style: RoutingSettings.BackgroundEffects.Style): Long = when (style) {
+    RoutingSettings.BackgroundEffects.Style.DRIFT -> 33L
+    RoutingSettings.BackgroundEffects.Style.SNOW,
+    RoutingSettings.BackgroundEffects.Style.RAIN,
+    -> 50L
 }
