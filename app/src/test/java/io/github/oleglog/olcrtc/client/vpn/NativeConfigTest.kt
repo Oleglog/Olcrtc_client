@@ -80,6 +80,23 @@ class NativeConfigTest {
     }
 
     @Test
+    fun buildsShadowsocksOutboundWithoutStreamSettings() {
+        val json = NativeConfig.xray(1080, StandardProfile(
+            name = "SS",
+            protocol = StandardProfile.Protocol.SHADOWSOCKS,
+            address = "ss.example.com",
+            port = 8388,
+            password = "secret",
+            cipher = "aes-256-gcm",
+        ))
+
+        assertTrue(json.contains("\"protocol\": \"shadowsocks\""))
+        assertTrue(json.contains("\"method\": \"aes-256-gcm\""))
+        assertTrue(json.contains("\"password\": \"secret\""))
+        assertFalse(json.contains("streamSettings"))
+    }
+
+    @Test
     fun routesConfiguredDnsThroughProxyBeforeUserRules() {
         val userRule = routingRule(
             RoutingRule.MatchType.DOMAIN,

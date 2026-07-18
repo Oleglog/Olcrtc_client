@@ -43,6 +43,10 @@ data class StandardProfile(
                 require(cipher in VMESS_CIPHERS) { "unsupported VMess cipher: $cipher" }
             }
             Protocol.TROJAN -> require(!password.isNullOrEmpty()) { "password is required" }
+            Protocol.SHADOWSOCKS -> {
+                require(!password.isNullOrEmpty()) { "password is required" }
+                require(cipher in SHADOWSOCKS_CIPHERS) { "unsupported Shadowsocks cipher: $cipher" }
+            }
         }
         dnsServer?.let(DnsEndpoint::parse)
         require(!(transport == Transport.XHTTP && protocol != Protocol.VLESS)) {
@@ -53,6 +57,9 @@ data class StandardProfile(
         }
         require(!(protocol == Protocol.VMESS && security == Security.REALITY)) {
             "VMess does not support REALITY"
+        }
+        require(!(protocol == Protocol.SHADOWSOCKS && (transport != Transport.TCP || security != Security.NONE))) {
+            "Shadowsocks plugins and stream security are not supported"
         }
         require(flow == null || flow == VISION_FLOW) { "unsupported VLESS flow: $flow" }
         require(flow == null || protocol == Protocol.VLESS) { "flow is supported only for VLESS" }
@@ -85,7 +92,7 @@ data class StandardProfile(
         require(runCatching { UUID.fromString(uuid) }.isSuccess) { "UUID is invalid" }
     }
 
-    enum class Protocol { VLESS, VMESS, TROJAN }
+    enum class Protocol { VLESS, VMESS, TROJAN, SHADOWSOCKS }
 
     enum class Transport { TCP, WS, GRPC, XHTTP }
 
@@ -95,6 +102,16 @@ data class StandardProfile(
         const val VISION_FLOW = "xtls-rprx-vision"
         private const val MAX_XHTTP_EXTRA_LENGTH = 16 * 1024
         private val VMESS_CIPHERS = setOf("auto", "aes-128-gcm", "chacha20-poly1305", "none")
+        private val SHADOWSOCKS_CIPHERS = setOf(
+            "aes-128-gcm",
+            "aes-256-gcm",
+            "chacha20-poly1305",
+            "chacha20-ietf-poly1305",
+            "xchacha20-poly1305",
+            "2022-blake3-aes-128-gcm",
+            "2022-blake3-aes-256-gcm",
+            "2022-blake3-chacha20-poly1305",
+        )
         private val XHTTP_EXTRA_FIELDS = setOf(
             "headers", "xPaddingBytes", "xPaddingObfsMode", "xPaddingKey", "xPaddingHeader",
             "xPaddingPlacement", "xPaddingMethod", "uplinkHTTPMethod", "sessionPlacement",

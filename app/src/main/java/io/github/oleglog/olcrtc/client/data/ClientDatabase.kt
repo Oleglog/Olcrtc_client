@@ -327,6 +327,9 @@ internal abstract class SubscriptionDao {
     @Query("UPDATE subscription_profiles SET lastLatencyMs = :latencyMs, lastCheckedAt = :checkedAt WHERE id = :id")
     abstract fun updateProfileLatency(id: String, latencyMs: Long?, checkedAt: Long): Int
 
+    @Query("UPDATE subscription_profiles SET favorite = :favorite WHERE id = :id")
+    abstract fun updateProfileFavorite(id: String, favorite: Boolean): Int
+
     @Update
     abstract fun updateProfile(profile: SubscriptionProfileEntity)
 

@@ -493,7 +493,7 @@ class MainActivity : AppCompatActivity() {
         private const val KEY_LAST_PROMPTED_UPDATE_TAG = "last_prompted_tag"
         private const val SYSTEM_PREFERENCES = "system"
         private const val KEY_BATTERY_PROMPT_HANDLED = "battery_prompt_handled"
-        private val EXTERNAL_PROFILE_SCHEMES = setOf("olcrtc", "vless", "vmess", "trojan")
+        private val EXTERNAL_PROFILE_SCHEMES = setOf("olcrtc", "vless", "vmess", "trojan", "ss")
     }
 
     private data class PendingInstall(

@@ -207,6 +207,11 @@ internal object ProfileEditorDialog {
                     cipher.show()
                 }
                 StandardProfile.Protocol.TROJAN -> password.show()
+                StandardProfile.Protocol.SHADOWSOCKS -> {
+                    advanced.visibility = View.VISIBLE
+                    password.show()
+                    cipher.show()
+                }
             }
             when (transport.selected) {
                 StandardProfile.Transport.TCP -> Unit
@@ -248,18 +253,27 @@ internal object ProfileEditorDialog {
                     protocol = selectedProtocol,
                     address = address.requiredValue(fragment.getString(R.string.profile_value_required)),
                     port = port.intValue(1..65535, fragment.getString(R.string.profile_value_invalid)),
-                    uuid = if (selectedProtocol == StandardProfile.Protocol.TROJAN) null else {
+                    uuid = if (selectedProtocol in setOf(
+                            StandardProfile.Protocol.VLESS,
+                            StandardProfile.Protocol.VMESS,
+                        )) {
                         uuid.validatedValue(fragment.getString(R.string.profile_uuid_invalid)) {
                             runCatching { java.util.UUID.fromString(it) }.isSuccess
                         }
-                    },
-                    password = if (selectedProtocol == StandardProfile.Protocol.TROJAN) {
+                    } else null,
+                    password = if (selectedProtocol in setOf(
+                            StandardProfile.Protocol.TROJAN,
+                            StandardProfile.Protocol.SHADOWSOCKS,
+                        )) {
                         password.requiredValue(fragment.getString(R.string.profile_value_required))
                     } else null,
                     alterId = if (selectedProtocol == StandardProfile.Protocol.VMESS) {
                         alterId.intValue(0..Int.MAX_VALUE, fragment.getString(R.string.profile_value_invalid))
                     } else 0,
-                    cipher = if (selectedProtocol == StandardProfile.Protocol.VMESS) {
+                    cipher = if (selectedProtocol in setOf(
+                            StandardProfile.Protocol.VMESS,
+                            StandardProfile.Protocol.SHADOWSOCKS,
+                        )) {
                         cipher.requiredValue(fragment.getString(R.string.profile_value_required))
                     } else "auto",
                     transport = selectedTransport,

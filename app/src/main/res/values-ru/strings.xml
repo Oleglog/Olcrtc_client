@@ -279,6 +279,10 @@
     <string name="add_connection">Добавить подключение</string>
     <string name="connection_manual_profiles">Мои подключения</string>
     <string name="connection_subscription_profiles">Из подписок</string>
+    <string name="connection_favorite_profiles">Избранное</string>
+    <string name="connection_last_successful">Последнее успешное</string>
+    <string name="profile_add_favorite">Добавить в избранное</string>
+    <string name="profile_remove_favorite">Убрать из избранного</string>
     <string name="connection_card_connected">Подключено</string>
     <string name="connection_card_selected">Выбрано</string>
     <string name="connection_card_detail_status">%1$s · %2$s</string>
@@ -297,7 +301,7 @@
     <string name="manual_standard">Вставить ссылку вручную</string>
     <string name="manual_profile_title">Ручная настройка профиля</string>
     <string name="manual_olcrtc_hint">name=olcRTC\nprovider=wbstream\ntransport=vp8channel\nroom=room\nclient=client\nkey=64-hex\nauth=необязательно\ndns=77.88.8.8:53</string>
-    <string name="manual_standard_hint">Вставьте ссылку vless://, vmess:// или trojan://</string>
+    <string name="manual_standard_hint">Вставьте ссылку vless://, vmess://, trojan:// или ss://</string>
     <string name="import_preview">Проверьте данные, затем нажмите «Импортировать и подключить»</string>
     <string name="profile_saved">Подключение сохранено</string>
     <string name="subscription_imported">Подписка импортирована</string>

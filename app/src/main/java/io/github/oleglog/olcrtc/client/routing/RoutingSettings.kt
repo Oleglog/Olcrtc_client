@@ -63,6 +63,16 @@ internal class RoutingSettings private constructor(
         )
     }
 
+    fun getFavoriteLocalProfileIds(): Set<Long> = runBlocking {
+        store.data.first()[FAVORITE_LOCAL_PROFILES]
+            .orEmpty()
+            .mapNotNullTo(mutableSetOf(), String::toLongOrNull)
+    }
+
+    fun getLastSuccessfulProfileReference(): String? = runBlocking {
+        store.data.first()[LAST_SUCCESSFUL_PROFILE]?.takeIf(String::isNotBlank)
+    }
+
     suspend fun setDnsServer(value: String?) {
         val normalized = value?.let { DnsEndpoint.parse(it).toString() }
         store.edit { preferences ->
@@ -108,6 +118,22 @@ internal class RoutingSettings private constructor(
         }
     }
 
+    fun setLocalProfileFavorite(id: Long, favorite: Boolean) = runBlocking {
+        require(id > 0) { "Profile ID must be positive" }
+        store.edit { preferences ->
+            val values = preferences[FAVORITE_LOCAL_PROFILES].orEmpty().toMutableSet()
+            if (favorite) values += id.toString() else values -= id.toString()
+            preferences[FAVORITE_LOCAL_PROFILES] = values
+        }
+    }
+
+    fun setLastSuccessfulProfileReference(reference: String) = runBlocking {
+        require(reference.startsWith("local:") || reference.startsWith("subscription:")) {
+            "Invalid profile reference"
+        }
+        store.edit { preferences -> preferences[LAST_SUCCESSFUL_PROFILE] = reference }
+    }
+
     data class VpnIntent(
         val desiredConnected: Boolean,
         val localProfileId: Long? = null,
@@ -146,6 +172,8 @@ internal class RoutingSettings private constructor(
         private val VPN_DESIRED_CONNECTED = booleanPreferencesKey("vpn_desired_connected")
         private val VPN_LOCAL_PROFILE_ID = longPreferencesKey("vpn_local_profile_id")
         private val VPN_SUBSCRIPTION_PROFILE_ID = stringPreferencesKey("vpn_subscription_profile_id")
+        private val FAVORITE_LOCAL_PROFILES = stringSetPreferencesKey("favorite_local_profiles")
+        private val LAST_SUCCESSFUL_PROFILE = stringPreferencesKey("last_successful_profile")
 
         @Volatile
         private var instance: RoutingSettings? = null

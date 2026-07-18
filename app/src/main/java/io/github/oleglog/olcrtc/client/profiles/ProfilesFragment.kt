@@ -49,7 +49,7 @@ class ProfilesFragment : Fragment() {
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
-            result.data?.getStringExtra(QrScannerActivity.EXTRA_RESULT)?.let(::saveNewSubscription)
+            result.data?.getStringExtra(QrScannerActivity.EXTRA_RESULT)?.let(::confirmExternalSubscription)
         } else {
             result.data?.getStringExtra(QrScannerActivity.EXTRA_ERROR)
                 ?.let { showError(IllegalStateException(it)) }
@@ -193,7 +193,8 @@ class ProfilesFragment : Fragment() {
                 } else when (val payload = ImportPayload.decode(raw)) {
                     is DecodedImportPayload.Bundle -> importSubscriptionBundle(payload.raw)
                     is DecodedImportPayload.Multipart -> importSubscriptionBundle(payload.raw)
-                    is DecodedImportPayload.Profile -> importSubscriptionSource(payload.uri, null)
+                    is DecodedImportPayload.Subscription -> importSubscriptionSource(payload.url, null)
+                    is DecodedImportPayload.Profile -> error(getString(R.string.invalid_subscription_link))
                 }
             }
             activity?.runOnUiThread {
@@ -205,15 +206,28 @@ class ProfilesFragment : Fragment() {
     }
 
     private fun confirmExternalSubscription(raw: String) {
-        val link = runCatching { requireNotNull(SubscriptionDeepLinkParser.parseOrNull(raw)) }
+        val source = runCatching {
+            SubscriptionDeepLinkParser.parseOrNull(raw)?.let { it.url to it.name }
+                ?: when (val payload = ImportPayload.decode(raw)) {
+                    is DecodedImportPayload.Subscription -> payload.url to null
+                    is DecodedImportPayload.Bundle,
+                    is DecodedImportPayload.Multipart,
+                    is DecodedImportPayload.Profile,
+                    -> null
+                }
+        }
             .getOrElse {
                 showError(it)
                 return
             }
-        val host = requireNotNull(java.net.URI(link.url).host)
+        if (source == null) {
+            saveNewSubscription(raw)
+            return
+        }
+        val host = requireNotNull(java.net.URI(source.first).host)
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.subscription_link_confirm_title)
-            .setMessage(getString(R.string.subscription_link_confirm_message, link.name ?: host, host))
+            .setMessage(getString(R.string.subscription_link_confirm_message, source.second ?: host, host))
             .setNegativeButton(R.string.cancel, null)
             .setPositiveButton(R.string.subscription_link_confirm_action) { _, _ -> saveNewSubscription(raw) }
             .show()

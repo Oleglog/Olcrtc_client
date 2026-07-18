@@ -127,13 +127,18 @@ internal object NativeConfig {
             StandardProfile.Protocol.TROJAN -> """
                 "servers": [{ "address": "${profile.json(profile.address)}", "port": ${profile.port}, "password": "${profile.json(profile.password!!)}" }]
             """.trimIndent()
+            StandardProfile.Protocol.SHADOWSOCKS -> """
+                "servers": [{ "address": "${profile.json(profile.address)}", "port": ${profile.port}, "method": "${profile.json(profile.cipher)}", "password": "${profile.json(profile.password!!)}" }]
+            """.trimIndent()
         }
         val protocol = profile.protocol.name.lowercase()
+        val streamSettings = if (profile.protocol == StandardProfile.Protocol.SHADOWSOCKS) "" else {
+            ",\n  \"streamSettings\": ${streamSettings(profile)}"
+        }
         return """{
           "protocol": "$protocol",
           "tag": "proxy",
-          "settings": { $settings },
-          "streamSettings": ${streamSettings(profile)}
+          "settings": { $settings }$streamSettings
         }""".trimIndent()
     }
 

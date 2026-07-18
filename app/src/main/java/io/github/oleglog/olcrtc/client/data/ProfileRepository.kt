@@ -151,6 +151,12 @@ internal class ProfileRepository(
         return latency
     }
 
+    fun setSubscriptionProfileFavorite(profileId: String, favorite: Boolean) {
+        require(subscriptions.updateProfileFavorite(profileId, favorite) == 1) {
+            "Subscription profile not found"
+        }
+    }
+
     private fun measureLatency(profile: ProfileConfig): Long = when (profile) {
         is ProfileConfig.Standard -> profile.value.measureTcpLatency()
         is ProfileConfig.Olcrtc -> throw IllegalArgumentException("Latency test requires an endpoint profile")

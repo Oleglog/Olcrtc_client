@@ -15,6 +15,7 @@ internal sealed interface BundleImportResult {
 
 internal sealed interface DecodedImportPayload {
     data class Profile(val uri: String) : DecodedImportPayload
+    data class Subscription(val url: String) : DecodedImportPayload
     data class Bundle(val raw: String) : DecodedImportPayload
     data class Multipart(val raw: String) : DecodedImportPayload
 }
@@ -48,6 +49,10 @@ internal object ImportPayload {
             return DecodedImportPayload.Multipart(encoded)
         }
         val value = unpack(encoded)
+        val scheme = value.substringBefore(':').lowercase()
+        if (scheme == "http" || scheme == "https") {
+            return DecodedImportPayload.Subscription(SubscriptionDeepLinkParser.validateHttpsUrl(value))
+        }
         if (!value.startsWith('{')) return DecodedImportPayload.Profile(value)
         return managerProfileUriOrNull(value)
             ?.let { DecodedImportPayload.Profile(it) }
@@ -71,7 +76,7 @@ internal object ImportPayload {
         if (root.keys != setOf("uri")) return null
         val uri = root.getValue("uri").stringValue("uri").trim()
         require(uri.length <= 16 * 1024) { "Profile URI is too long" }
-        require(uri.substringBefore(':').lowercase() in setOf("olcrtc", "vless", "vmess", "trojan")) {
+        require(uri.substringBefore(':').lowercase() in setOf("olcrtc", "vless", "vmess", "trojan", "ss")) {
             "Unsupported profile scheme"
         }
         return uri

@@ -3,13 +3,15 @@ package io.github.oleglog.olcrtc.client.profile.standard
 import java.net.URI
 import java.net.URLDecoder
 import java.net.URLEncoder
+import java.nio.ByteBuffer
+import java.nio.charset.CodingErrorAction
 import java.nio.charset.StandardCharsets
 import java.util.Base64
 
 object StandardUri {
     private val allowedParameters = setOf(
         "encryption", "security", "type", "flow", "sni", "fp", "alpn", "allowInsecure",
-        "pbk", "sid", "spx", "host", "path", "serviceName", "mode", "extra", "dns",
+        "pbk", "sid", "spx", "host", "path", "serviceName", "mode", "extra", "dns", "headerType",
     )
 
     fun parse(raw: String): StandardProfile {
@@ -18,6 +20,7 @@ object StandardUri {
             "vless" -> parseUrl(raw, StandardProfile.Protocol.VLESS)
             "trojan" -> parseUrl(raw, StandardProfile.Protocol.TROJAN)
             "vmess" -> parseVmess(raw)
+            "ss" -> parseShadowsocks(raw)
             else -> throw IllegalArgumentException("Unsupported standard profile scheme")
         }
     }
@@ -26,6 +29,7 @@ object StandardUri {
         StandardProfile.Protocol.VLESS -> serializeUrl(profile, "vless", requireNotNull(profile.uuid))
         StandardProfile.Protocol.TROJAN -> serializeUrl(profile, "trojan", requireNotNull(profile.password))
         StandardProfile.Protocol.VMESS -> serializeVmess(profile)
+        StandardProfile.Protocol.SHADOWSOCKS -> serializeShadowsocks(profile)
     }
 
     private fun parseUrl(raw: String, protocol: StandardProfile.Protocol): StandardProfile {
@@ -40,6 +44,9 @@ object StandardUri {
         require(unknown.isEmpty()) { "Unsupported parameters: ${unknown.sorted().joinToString()}" }
         if (protocol == StandardProfile.Protocol.VLESS) {
             require(params["encryption"] == null || params["encryption"] == "none") { "VLESS encryption must be none" }
+        }
+        require(params["headerType"] == null || params["headerType"].equals("none", ignoreCase = true)) {
+            "Unsupported stream header"
         }
 
         val transport = parseTransport(params["type"] ?: "tcp")
@@ -107,6 +114,42 @@ object StandardUri {
             webSocketPath = path.takeIf { transport == StandardProfile.Transport.WS },
             grpcServiceName = path.takeIf { transport == StandardProfile.Transport.GRPC },
             dnsServer = values["dns"]?.takeIf(String::isNotBlank),
+        )
+    }
+
+    private fun parseShadowsocks(raw: String): StandardProfile {
+        val encoded = raw.substringAfter(':', "").removePrefix("//")
+        require(encoded.isNotBlank()) { "Shadowsocks payload is required" }
+        val rawFragment = encoded.substringAfter('#', "")
+        val withoutFragment = encoded.substringBefore('#')
+        val authority = withoutFragment.substringBefore('?')
+        val query = withoutFragment.substringAfter('?', "")
+        val params = parseQuery(query.takeIf(String::isNotEmpty))
+        require(params.keys.all { it == "plugin" }) { "Unsupported Shadowsocks parameters" }
+        require(params["plugin"].isNullOrBlank()) { "Shadowsocks plugins are not supported" }
+
+        val (credentials, endpoint) = if ('@' in authority) {
+            decodeBase64Text(authority.substringBeforeLast('@')) to authority.substringAfterLast('@')
+        } else {
+            val legacy = decodeBase64Text(authority)
+            require('@' in legacy) { "Invalid Shadowsocks payload" }
+            legacy.substringBeforeLast('@') to legacy.substringAfterLast('@')
+        }
+        val separator = credentials.indexOf(':')
+        require(separator > 0 && separator < credentials.lastIndex) { "Invalid Shadowsocks credentials" }
+        val method = credentials.substring(0, separator).lowercase()
+        val password = credentials.substring(separator + 1)
+        val server = URI("ss://user@$endpoint")
+        val address = server.host?.takeIf(String::isNotBlank)
+            ?: throw IllegalArgumentException("address is required")
+        require(server.port in 1..65535) { "port must be in 1..65535" }
+        return StandardProfile(
+            name = rawFragment.takeIf(String::isNotEmpty)?.let(::decode).orEmpty().ifBlank { "Shadowsocks" },
+            protocol = StandardProfile.Protocol.SHADOWSOCKS,
+            address = address,
+            port = server.port,
+            password = password,
+            cipher = method,
         )
     }
 
@@ -190,6 +233,13 @@ object StandardUri {
         return "vmess://" + Base64.getUrlEncoder().withoutPadding().encodeToString(json.encodeToByteArray())
     }
 
+    private fun serializeShadowsocks(profile: StandardProfile): String {
+        val credentials = Base64.getUrlEncoder().withoutPadding()
+            .encodeToString("${profile.cipher}:${requireNotNull(profile.password)}".encodeToByteArray())
+        val address = if (':' in profile.address) "[${profile.address}]" else profile.address
+        return "ss://$credentials@$address:${profile.port}#${encode(profile.name)}"
+    }
+
     private fun parseTransport(value: String): StandardProfile.Transport = when (value.lowercase()) {
         "tcp", "raw" -> StandardProfile.Transport.TCP
         "ws" -> StandardProfile.Transport.WS
@@ -234,6 +284,21 @@ object StandardUri {
                 runCatching { bytes.decodeToString() }
                     .getOrElse { throw IllegalArgumentException("Invalid VMess Base64", it) }
             }
+    }
+
+    private fun decodeBase64Text(value: String): String {
+        val normalized = value.trim().replace('-', '+').replace('_', '/')
+        val padded = normalized + "=".repeat((4 - normalized.length % 4) % 4)
+        val bytes = runCatching { Base64.getDecoder().decode(padded) }
+            .getOrElse { throw IllegalArgumentException("Invalid Shadowsocks Base64", it) }
+        return runCatching {
+            Charsets.UTF_8.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes))
+                .toString()
+        }
+            .getOrElse { throw IllegalArgumentException("Invalid Shadowsocks Base64", it) }
     }
 
     private fun decode(value: String): String = URLDecoder.decode(value, StandardCharsets.UTF_8.name())

@@ -507,6 +507,7 @@ class OlcrtcVpnService : VpnService() {
             activeDnsEndpoint = started.dns
             activeSessionGeneration = attempt.generation
             publishStage(ConnectionStage.READY)
+            routingSettings.setLastSuccessfulProfileReference(attempt.reference.sessionId)
             transition(VpnState.CONNECTED)
             diagnostics.append(
                 "info",

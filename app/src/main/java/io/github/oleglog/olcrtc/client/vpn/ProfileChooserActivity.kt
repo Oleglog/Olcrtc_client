@@ -8,6 +8,8 @@ import androidx.core.content.ContextCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.github.oleglog.olcrtc.client.R
 import io.github.oleglog.olcrtc.client.data.ProfileRepository
+import io.github.oleglog.olcrtc.client.profile.orderProfiles
+import io.github.oleglog.olcrtc.client.routing.RoutingSettings
 import java.util.concurrent.Executors
 
 class ProfileChooserActivity : AppCompatActivity() {
@@ -34,11 +36,14 @@ class ProfileChooserActivity : AppCompatActivity() {
 
     private fun loadChoices(): List<Choice> {
         val repository = ProfileRepository.open(applicationContext)
+        val settings = RoutingSettings.open(applicationContext)
+        val localFavorites = settings.getFavoriteLocalProfileIds()
         val local = repository.listLocal().map {
             Choice(
                 label = "${it.name}\n${getString(R.string.profile_group_local)} · ${it.type}",
                 reference = "local:${it.id}",
                 localId = it.id,
+                favorite = it.id in localFavorites,
             )
         }
         val subscriptions = repository.listSubscriptions().flatMap { subscription ->
@@ -47,10 +52,16 @@ class ProfileChooserActivity : AppCompatActivity() {
                     label = "${profile.name}\n${subscription.name} · ${profile.type}",
                     reference = "subscription:${profile.id}",
                     subscriptionId = profile.id,
+                    favorite = profile.favorite,
                 )
             }
         }
-        return local + subscriptions
+        return orderProfiles(
+            local + subscriptions,
+            settings.getLastSuccessfulProfileReference(),
+            Choice::reference,
+            Choice::favorite,
+        )
     }
 
     private fun showChoices(choices: List<Choice>) {
@@ -86,6 +97,7 @@ class ProfileChooserActivity : AppCompatActivity() {
         val reference: String,
         val localId: Long? = null,
         val subscriptionId: String? = null,
+        val favorite: Boolean = false,
     )
 
     companion object {

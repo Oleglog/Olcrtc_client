@@ -64,6 +64,24 @@ class StandardUriTest {
     }
 
     @Test
+    fun parsesModernAndLegacyShadowsocksLinks() {
+        val credentials = Base64.getUrlEncoder().withoutPadding()
+            .encodeToString("aes-256-gcm:secret".encodeToByteArray())
+        val modern = StandardUri.parse("ss://$credentials@example.com:8388#Main%20SS")
+        val legacyPayload = Base64.getEncoder().withoutPadding()
+            .encodeToString("chacha20-ietf-poly1305:password@example.net:443".encodeToByteArray())
+        val legacy = StandardUri.parse("ss://$legacyPayload#Legacy")
+
+        assertEquals(StandardProfile.Protocol.SHADOWSOCKS, modern.protocol)
+        assertEquals("aes-256-gcm", modern.cipher)
+        assertEquals("secret", modern.password)
+        assertEquals("Main SS", modern.name)
+        assertEquals("example.net", legacy.address)
+        assertEquals("chacha20-ietf-poly1305", legacy.cipher)
+        assertEquals(modern, StandardUri.parse(StandardUri.serialize(modern)))
+    }
+
+    @Test
     fun serializesStandardProfilesRoundTrip() {
         val vless = StandardProfile(
             name = "VLESS Main",
@@ -125,5 +143,11 @@ class StandardUriTest {
             StandardUri.parse("vmess://not-base64")
         }
         assertTrue(error.message!!.contains("Base64"))
+        assertThrows(IllegalArgumentException::class.java) {
+            StandardUri.parse("ss://YWVzLTEyOC1jZmI6c2VjcmV0@example.com:8388")
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            StandardUri.parse("ss://YWVzLTI1Ni1nY206c2VjcmV0@example.com:8388?plugin=v2ray-plugin")
+        }
     }
 }

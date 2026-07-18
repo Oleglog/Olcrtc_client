@@ -278,6 +278,10 @@
     <string name="add_connection">Add connection</string>
     <string name="connection_manual_profiles">My connections</string>
     <string name="connection_subscription_profiles">From subscriptions</string>
+    <string name="connection_favorite_profiles">Favorites</string>
+    <string name="connection_last_successful">Last successful</string>
+    <string name="profile_add_favorite">Add to favorites</string>
+    <string name="profile_remove_favorite">Remove from favorites</string>
     <string name="connection_card_connected">Connected</string>
     <string name="connection_card_selected">Selected</string>
     <string name="connection_card_detail_status">%1$s · %2$s</string>
@@ -296,7 +300,7 @@
     <string name="manual_standard">Manual link</string>
     <string name="manual_profile_title">Manual profile</string>
     <string name="manual_olcrtc_hint">name=olcRTC\nprovider=wbstream\ntransport=vp8channel\nroom=room\nclient=client\nkey=64-hex\nauth=optional\ndns=77.88.8.8:53</string>
-    <string name="manual_standard_hint">Paste vless://, vmess:// or trojan:// link</string>
+    <string name="manual_standard_hint">Paste vless://, vmess://, trojan:// or ss:// link</string>
     <string name="import_preview">Review the imported content, then tap Import and connect</string>
     <string name="profile_saved">Connection saved</string>
     <string name="subscription_imported">Subscription imported</string>

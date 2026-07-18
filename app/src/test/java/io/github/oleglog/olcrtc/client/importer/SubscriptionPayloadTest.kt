@@ -10,18 +10,21 @@ import java.util.Base64
 class SubscriptionPayloadTest {
     private val vless = "vless://00000000-0000-0000-0000-000000000001@example.com:443?encryption=none&type=tcp&security=none#VLESS"
     private val olcrtc = "olcrtc://jitsi@room.example/room?k=${"a".repeat(64)}&t=datachannel&c=client"
+    private val shadowsocks = "ss://" + Base64.getUrlEncoder().withoutPadding()
+        .encodeToString("aes-256-gcm:secret".encodeToByteArray()) + "@example.com:8388#SS"
 
     @Test
     fun parsesPlainAndBase64Lists() {
-        val plain = "# profiles\n\n$vless\n$olcrtc\n"
+        val plain = "# profiles\n\n$vless\n$olcrtc\n$shadowsocks\n"
         val encoded = Base64.getEncoder().encode(plain.encodeToByteArray())
 
         val direct = SubscriptionPayload.parse(plain.encodeToByteArray())
         val decoded = SubscriptionPayload.parse(encoded)
 
-        assertEquals(2, direct.profiles.size)
+        assertEquals(3, direct.profiles.size)
         assertTrue(direct.profiles[0] is ImportedProfile.Standard)
         assertTrue(direct.profiles[1] is ImportedProfile.Olcrtc)
+        assertTrue(direct.profiles[2] is ImportedProfile.Standard)
         assertEquals(direct, decoded)
     }
 

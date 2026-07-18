@@ -64,6 +64,7 @@
                 <data android:scheme="vless" />
                 <data android:scheme="vmess" />
                 <data android:scheme="trojan" />
+                <data android:scheme="ss" />
             </intent-filter>
         </activity>
 
