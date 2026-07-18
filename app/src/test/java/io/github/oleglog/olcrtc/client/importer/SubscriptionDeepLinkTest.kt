@@ -2,6 +2,7 @@ package io.github.oleglog.olcrtc.client.importer
 
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.util.Base64
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertThrows
@@ -26,7 +27,7 @@ class SubscriptionDeepLinkTest {
     fun parsesEncryptedYandexMirrorBootstrap() {
         val source = encode("https://myolcrtc.mooo.com/sub/example")
         val mirror = encode("https://disk.yandex.ru/d/example")
-        val key = "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8"
+        val key = Base64.getUrlEncoder().withoutPadding().encodeToString(ByteArray(32) { it.toByte() })
 
         val link = SubscriptionDeepLinkParser.parseOrNull(
             "olcrtc://subscription?url=$source&name=Example&mirror_type=yandex_disk&mirror_url=$mirror&mirror_key=$key",
