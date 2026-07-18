@@ -558,8 +558,28 @@ class OlcrtcVpnService : VpnService() {
 
     private fun measureConnectionLatency(): Long {
         check(publishedState == VpnState.CONNECTED) { "VPN is not connected" }
-        return GomobileCore.urlTest(CONNECTION_TEST_URL, CONNECTION_TEST_TIMEOUT_MILLIS).coerceAtLeast(1)
+        val socksPort = checkNotNull(activeSocksPort) { "VPN SOCKS is not available" }
+        val coreResult = runCatching {
+            GomobileCore.urlTest(CONNECTION_TEST_URL, CONNECTION_TEST_TIMEOUT_MILLIS).coerceAtLeast(1)
+        }
+        val socksResult = runCatching {
+            measureSocksHttpLatency(socksPort, CONNECTION_TEST_URL, CONNECTION_TEST_TIMEOUT_MILLIS)
+        }
+        val counters = nativeSession?.trafficCounters() ?: TrafficCounters()
+        diagnostics.append(
+            "info",
+            "VPN path probe protocol=${activeProfileInfo?.protocol ?: "unknown"} " +
+                "core=${probeSummary(coreResult)} socks=${probeSummary(socksResult)} " +
+                "hevUp=${counters.bytesUp} hevDown=${counters.bytesDown}",
+        )
+        coreResult.getOrThrow()
+        return socksResult.getOrThrow()
     }
+
+    private fun probeSummary(result: Result<Long>): String = result.fold(
+        onSuccess = { "${it}ms" },
+        onFailure = { it.javaClass.simpleName },
+    )
 
     private fun handleNetworkAvailable(network: Network) {
         val eligible = isUnderlyingNetwork(network)
@@ -846,6 +866,12 @@ class OlcrtcVpnService : VpnService() {
                 )
             }
             is ProfileConfig.Standard -> {
+                diagnostics.append(
+                    "info",
+                    "Standard runtime protocol=${profile.value.protocol} transport=${profile.value.transport} " +
+                        "security=${profile.value.security} vision=${profile.value.flow != null} " +
+                        "routing=${routingPolicy.preset}",
+                )
                 olcrtcConfig = null
                 xraySocksPort = freeLoopbackPort()
                 xrayConfig = NativeConfig.xray(
