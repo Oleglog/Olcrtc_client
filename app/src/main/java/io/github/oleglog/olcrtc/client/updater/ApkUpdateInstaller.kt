@@ -18,6 +18,14 @@ internal data class VerifiedApkUpdate(
     val sha256: String,
 )
 
+internal enum class UpdateInstallAction {
+    REQUEST_PERMISSION,
+    DOWNLOAD,
+}
+
+internal fun updateInstallAction(canRequestPackageInstalls: Boolean): UpdateInstallAction =
+    if (canRequestPackageInstalls) UpdateInstallAction.DOWNLOAD else UpdateInstallAction.REQUEST_PERMISSION
+
 internal class ApkUpdateInstaller(
     private val context: Context,
     private val expectedPackageName: String = context.packageName,

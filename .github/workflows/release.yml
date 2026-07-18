@@ -22,6 +22,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Cache mobilecore AAR
+        id: mobilecore-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/go/bin/gomobile
+            app/libs/mobilecore.aar
+          key: mobilecore-${{ runner.os }}-android-all-${{ hashFiles('scripts/build_mobilecore.sh', 'native/mobilecore/go.mod', 'native/mobilecore/go.sum', 'native/mobilecore/**/*.go') }}
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -29,28 +38,21 @@ jobs:
           cache: gradle
 
       - uses: actions/setup-go@v5
+        if: steps.mobilecore-cache.outputs.cache-hit != 'true'
         with:
           go-version: "1.25.7"
           cache: true
           cache-dependency-path: native/mobilecore/go.mod
 
-      - name: Cache mobilecore AAR
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/go/bin/gomobile
-            app/libs/mobilecore.aar
-          key: mobilecore-${{ runner.os }}-android-all-${{ hashFiles('scripts/build_mobilecore.sh', 'native/mobilecore/go.mod', 'native/mobilecore/go.sum', 'native/mobilecore/**/*.go') }}
-
       - name: Cache gomobile and HEV sources
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/go/bin/gomobile
             app/libs/mobilecore.aar
             app/src/main/jniLibs
             native/hev-socks5-tunnel/upstream
-          key: release-native-${{ runner.os }}-${{ hashFiles('scripts/build_mobilecore.sh', 'scripts/build_hev.sh', 'native/mobilecore/go.mod', 'native/mobilecore/**/*.go', 'app/src/main/jni/**') }}
+          key: android-native-${{ runner.os }}-${{ hashFiles('scripts/build_mobilecore.sh', 'scripts/build_hev.sh', 'native/mobilecore/go.mod', 'native/mobilecore/**/*.go', 'app/src/main/jni/**') }}
 
       - uses: android-actions/setup-android@v3
 
@@ -87,11 +89,8 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
           HEV_APP_ABI: armeabi-v7a arm64-v8a
 
-      - name: Run unit tests
-        run: ./gradlew --no-daemon :app:testDebugUnitTest
-
-      - name: Assemble signed release APK
-        run: ./gradlew --no-daemon :app:assembleRelease
+      - name: Test and assemble signed release APK
+        run: ./gradlew --no-daemon --build-cache :app:testDebugUnitTest :app:assembleRelease
 
       - name: Package release artifacts
         shell: bash
@@ -118,3 +117,14 @@ jobs:
           name: olcRTC Client ${{ github.event.inputs.tag || github.ref_name }}
           files: release-artifacts/*
           generate_release_notes: true
+
+      - name: Keep latest five GitHub Releases
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
+            --jq 'map(select(.draft == false)) | sort_by(.published_at) | reverse | .[5:][]?.id' |
+          while read -r release_id; do
+            gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}"
+          done

@@ -13,4 +13,10 @@ class ApkUpdateInstallerTest {
         assertEquals("ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad", ApkUpdateInstaller.sha256(bytes))
         assertEquals(ApkUpdateInstaller.sha256(bytes), ApkUpdateInstaller.sha256(file))
     }
+
+    @Test
+    fun installClickEitherRequestsPermissionOrStartsDownload() {
+        assertEquals(UpdateInstallAction.REQUEST_PERMISSION, updateInstallAction(false))
+        assertEquals(UpdateInstallAction.DOWNLOAD, updateInstallAction(true))
+    }
 }

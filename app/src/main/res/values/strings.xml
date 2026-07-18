@@ -198,7 +198,9 @@
     <string name="settings_core_versions_message">Xray: %1$s\nolcRTC core: %2$s</string>
     <string name="settings_update_available">Update available: %1$s\nAsset: %2$s</string>
     <string name="settings_update_download_install">Download and install</string>
-    <string name="settings_update_install_permission">Allow APK installs for this app, then retry update installation.</string>
+    <string name="settings_update_install_permission">Allow APK installs for this app. Installation will continue automatically.</string>
+    <string name="settings_update_downloading">Downloading and verifying the APK…</string>
+    <string name="settings_update_install_failed">Could not open the Android package installer</string>
     <string name="settings_update_current">You are using the latest known version: %1$s</string>
     <string name="settings_update_no_asset">Release found, but no compatible APK asset is available</string>
     <string name="settings_system_screen_unavailable">System settings screen is unavailable on this device</string>

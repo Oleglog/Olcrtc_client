@@ -15,6 +15,8 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
@@ -42,9 +44,12 @@ import io.github.oleglog.olcrtc.client.support.IssueReportInfo
 import io.github.oleglog.olcrtc.client.updater.ApkUpdateInstaller
 import io.github.oleglog.olcrtc.client.updater.GitHubUpdateClient
 import io.github.oleglog.olcrtc.client.updater.GitHubRelease
+import io.github.oleglog.olcrtc.client.updater.UpdateInstallAction
+import io.github.oleglog.olcrtc.client.updater.updateInstallAction
 import io.github.oleglog.olcrtc.client.vpn.GomobileCore
 import io.github.oleglog.olcrtc.client.vpn.VpnState
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -54,6 +59,20 @@ class SettingsFragment : Fragment() {
     private val settings by lazy { RoutingSettings.open(requireContext().applicationContext) }
     private val diagnostics by lazy { DiagnosticsLogStore.open(requireContext().applicationContext) }
     private val profiles by lazy { ProfileRepository.open(requireContext().applicationContext) }
+    private var pendingUpdate: PendingUpdate? = null
+    private var updateInProgress = false
+
+    private val installPermission = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+        val pending = pendingUpdate ?: return@registerForActivityResult
+        val context = context ?: return@registerForActivityResult
+        if (ApkUpdateInstaller(context.applicationContext).canRequestPackageInstalls()) {
+            pendingUpdate = null
+            installUpdate(pending.release, pending.asset)
+        } else {
+            pendingUpdate = null
+            _binding?.status?.setText(R.string.settings_update_install_permission)
+        }
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View {
         _binding = FragmentSettingsBinding.inflate(inflater, container, false)
@@ -723,21 +742,65 @@ class SettingsFragment : Fragment() {
     }
 
     private fun installUpdate(release: GitHubRelease, asset: GitHubRelease.ReleaseAsset) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            val installer = ApkUpdateInstaller(requireContext().applicationContext)
-            if (!installer.canRequestPackageInstalls()) {
-                _binding?.status?.setText(R.string.settings_update_install_permission)
-                startActivity(Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:${requireContext().packageName}")))
-                return@launch
-            }
-            val result = runCatching {
-                withContext(Dispatchers.IO) { installer.downloadAndVerify(release, asset) }
-            }
-            result.onSuccess { update ->
-                (activity as? io.github.oleglog.olcrtc.client.MainActivity)?.stopVpn()
-                startActivity(installer.installIntent(update))
-            }.onFailure { _binding?.status?.text = it.message }
+        if (updateInProgress) {
+            _binding?.status?.setText(R.string.settings_update_downloading)
+            return
         }
+        val host = requireActivity()
+        val installer = ApkUpdateInstaller(host.applicationContext)
+        if (updateInstallAction(installer.canRequestPackageInstalls()) == UpdateInstallAction.REQUEST_PERMISSION) {
+            pendingUpdate = PendingUpdate(release, asset)
+            _binding?.status?.setText(R.string.settings_update_install_permission)
+            runCatching {
+                installPermission.launch(
+                    Intent(
+                        Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,
+                        Uri.parse("package:${host.packageName}"),
+                    ),
+                )
+            }.onFailure {
+                pendingUpdate = null
+                showUpdateFailure(host, it)
+            }
+            return
+        }
+
+        updateInProgress = true
+        _binding?.status?.setText(R.string.settings_update_downloading)
+        val progress = MaterialAlertDialogBuilder(host)
+            .setTitle(R.string.settings_check_update)
+            .setMessage(R.string.settings_update_downloading)
+            .setCancelable(false)
+            .create()
+            .also { it.show() }
+        host.lifecycleScope.launch {
+            val update = try {
+                withContext(Dispatchers.IO) { installer.downloadAndVerify(release, asset) }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                showUpdateFailure(host, error)
+                return@launch
+            } finally {
+                updateInProgress = false
+                progress.dismiss()
+            }
+            (host as? MainActivity)?.stopVpn()
+            runCatching { host.startActivity(installer.installIntent(update)) }
+                .onFailure { showUpdateFailure(host, it) }
+        }
+    }
+
+    private fun showUpdateFailure(host: Context, error: Throwable) {
+        val message = error.message ?: host.getString(R.string.settings_update_install_failed)
+        _binding?.status?.text = message
+        Toast.makeText(host, message, Toast.LENGTH_LONG).show()
+        if (!isAdded) return
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.settings_check_update)
+            .setMessage(message)
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     private fun showDiagnosticsMenu() {
@@ -886,6 +949,11 @@ class SettingsFragment : Fragment() {
         val perAppPolicy: PerAppPolicy,
         val routingRules: Int,
         val backgroundEffects: RoutingSettings.BackgroundEffects,
+    )
+
+    private data class PendingUpdate(
+        val release: GitHubRelease,
+        val asset: GitHubRelease.ReleaseAsset,
     )
 
     private companion object {

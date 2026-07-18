@@ -16,3 +16,4 @@ keystore.properties
 /app/libs/mobilecore.aar
 __pycache__/
 *.pyc
+/docs/

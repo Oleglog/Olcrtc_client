@@ -199,7 +199,9 @@
     <string name="settings_core_versions_message">Xray: %1$s\nolcRTC core: %2$s</string>
     <string name="settings_update_available">Доступно обновление: %1$s\nФайл: %2$s</string>
     <string name="settings_update_download_install">Скачать и установить</string>
-    <string name="settings_update_install_permission">Разрешите этому приложению установку APK и повторите попытку.</string>
+    <string name="settings_update_install_permission">Разрешите приложению установку APK. Установка продолжится автоматически.</string>
+    <string name="settings_update_downloading">Загрузка и проверка APK…</string>
+    <string name="settings_update_install_failed">Не удалось открыть системный установщик Android</string>
     <string name="settings_update_current">Установлена последняя известная версия: %1$s</string>
     <string name="settings_update_no_asset">Релиз найден, но совместимого APK-файла нет</string>
     <string name="settings_system_screen_unavailable">Эти системные настройки недоступны на устройстве</string>

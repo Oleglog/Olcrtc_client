@@ -158,7 +158,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun stopVpn() {
-        vpn?.stop()
+        runCatching { vpn?.stop() }
     }
 
     fun activeProfileReference(): String? = runCatching { vpn?.activeProfileReference }.getOrNull()
