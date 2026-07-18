@@ -3,6 +3,7 @@ package io.github.oleglog.olcrtc.client
 import io.github.oleglog.olcrtc.client.routing.RoutingSettings
 import io.github.oleglog.olcrtc.client.routing.RoutingSettings.BackgroundEffects.Intensity
 import io.github.oleglog.olcrtc.client.routing.RoutingSettings.BackgroundEffects.Style
+import io.github.oleglog.olcrtc.client.routing.parseBackgroundEffectStyle
 import io.github.oleglog.olcrtc.client.ui.particleCount
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -24,6 +25,12 @@ class BackgroundEffectsTest {
     fun intensityIncreasesParticleCount() {
         assertTrue(particleCount(Intensity.LOW) < particleCount(Intensity.MEDIUM))
         assertTrue(particleCount(Intensity.MEDIUM) < particleCount(Intensity.HIGH))
+        assertTrue(particleCount(Style.DRIFT, Intensity.MEDIUM) < particleCount(Style.SNOW, Intensity.MEDIUM))
+    }
+
+    @Test
+    fun oldGlowSettingMigratesToDrift() {
+        assertEquals(Style.DRIFT, parseBackgroundEffectStyle("GLOW"))
     }
 
     @Test

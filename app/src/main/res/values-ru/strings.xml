@@ -81,6 +81,10 @@
     <string name="subscription_last_error">последняя ошибка: %1$s</string>
     <string name="subscription_qr_progress">Отсканировано частей QR-кода: %1$d из %2$d</string>
     <string name="subscription_https_required">Ссылка подписки должна использовать HTTPS</string>
+    <string name="invalid_subscription_link">Некорректная ссылка подписки</string>
+    <string name="subscription_link_confirm_title">Добавить подписку?</string>
+    <string name="subscription_link_confirm_message">%1$s\nИсточник: %2$s</string>
+    <string name="subscription_link_confirm_action">Добавить и обновить</string>
     <string name="subscription_server_badge">сервер %1$s</string>
     <string name="subscription_mirror_badge">зеркало</string>
     <string name="subscription_primary_badge">основной сервер</string>
@@ -227,12 +231,12 @@
     <string name="settings_about_telegram">Telegram разработчика</string>
     <string name="settings_diagnostics_title">Диагностика</string>
     <string name="settings_background_effects">Частицы на фоне</string>
-    <string name="settings_background_effects_summary">Снег, мягкий дождь или сияние с настройкой интенсивности.</string>
+    <string name="settings_background_effects_summary">Снег, мягкий дождь или спокойный дрейф с настройкой интенсивности.</string>
     <string name="settings_background_effect_enabled">Включить частицы на фоне</string>
     <string name="settings_background_effect_style">Эффект</string>
     <string name="settings_background_effect_snow">Снег</string>
     <string name="settings_background_effect_rain">Дождь</string>
-    <string name="settings_background_effect_glow">Сияние</string>
+    <string name="settings_background_effect_drift">Дрейф</string>
     <string name="settings_background_effect_intensity">Интенсивность</string>
     <string name="settings_background_effect_intensity_low">Низкая</string>
     <string name="settings_background_effect_intensity_medium">Средняя</string>
@@ -339,8 +343,10 @@
     <string name="vpn_error_generic">Не удалось установить VPN-соединение</string>
     <string name="vpn_notification_profile">%1$s · %2$s</string>
     <string name="vpn_notification_speed">↑ %1$s ↓ %2$s</string>
+    <string name="vpn_notification_connect">Подключить</string>
+    <string name="vpn_notification_next_profile">Следующий профиль</string>
     <string name="vpn_notification_reconnect">Переподключить</string>
-    <string name="vpn_notification_stop">Остановить</string>
+    <string name="vpn_notification_disconnect">Отключить</string>
     <string name="vpn_tile_label">olcRTC VPN</string>
     <string name="vpn_tile_connecting">Подключение</string>
     <string name="vpn_native_unavailable">Нативные компоненты VPN не установлены</string>

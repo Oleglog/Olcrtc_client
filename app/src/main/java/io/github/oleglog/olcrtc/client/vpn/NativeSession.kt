@@ -41,32 +41,35 @@ internal class NativeSession(
     }
 
     fun restartOlcrtc(
-        socksPort: Int,
-        assetDirectory: String,
-        xrayConfig: String,
-        hevConfig: ByteArray,
         olcrtcConfig: NativeOlcrtcConfig,
         verifyDatapath: () -> Unit,
         reportStage: (ConnectionStage, Long?, Throwable?) -> Unit,
         reportStop: (routeReleasedMillis: Long, totalMillis: Long) -> Unit,
     ) {
-        val descriptor = synchronized(lifecycle) {
+        synchronized(lifecycle) {
             checkOpen()
             check(olcrtcStarted) { "fast switch requires an active olcRTC session" }
             this.verifyDatapath = verifyDatapath
             this.reportStage = reportStage
             this.reportStop = reportStop
-            checkNotNull(tun)
         }
         startSafely {
-            synchronized(lifecycle) {
-                checkOpen()
-                hevTunnel.stop()
-                nativeCore.stopAll()
-                coreStarted = false
-                olcrtcStarted = false
+            stage(ConnectionStage.START_CARRIER) {
+                synchronized(lifecycle) {
+                    checkOpen()
+                    nativeCore.stopOlcrtc()
+                    olcrtcStarted = false
+                    nativeCore.startOlcrtc(olcrtcConfig)
+                    olcrtcStarted = true
+                }
+                nativeCore.waitOlcrtcReady(olcrtcConfig.readyTimeoutMillis)
             }
-            startRuntime(descriptor, socksPort, assetDirectory, xrayConfig, hevConfig, olcrtcConfig)
+            stage(ConnectionStage.VERIFY_DATAPATH) {
+                verifyDatapath()
+                check(hevTunnel.isRunning() && nativeCore.isXrayRunning()) {
+                    "reused VPN runtime exited during datapath verification"
+                }
+            }
         }
     }
 

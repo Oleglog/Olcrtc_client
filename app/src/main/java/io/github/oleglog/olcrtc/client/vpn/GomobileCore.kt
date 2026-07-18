@@ -27,6 +27,10 @@ internal object GomobileCore : NativeCore {
         )
     }
 
+    override fun stopOlcrtc() {
+        Mobilecore.stopOlcrtc()
+    }
+
     override fun waitOlcrtcReady(timeoutMillis: Int) {
         Mobilecore.waitOlcrtcReady(timeoutMillis.toLong())
     }

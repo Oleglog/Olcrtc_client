@@ -155,7 +155,7 @@ class NativeSessionTest {
     }
 
     @Test
-    fun olcrtcRestartKeepsTunAndRestartsOnlyNativeRuntime() {
+    fun olcrtcRestartKeepsTunHevAndXray() {
         val events = mutableListOf<String>()
         val session = NativeSession(
             RecordingCore(events),
@@ -170,10 +170,6 @@ class NativeSessionTest {
         events.clear()
 
         session.restartOlcrtc(
-            socksPort = 2080,
-            assetDirectory = "/assets",
-            xrayConfig = "{}",
-            hevConfig = byteArrayOf(2),
             olcrtcConfig = olcrtcConfig().copy(socksPort = 2081),
             verifyDatapath = { events += "datapath:verify:new" },
             reportStage = { _, _, _ -> },
@@ -182,13 +178,9 @@ class NativeSessionTest {
 
         assertEquals(
             listOf(
-                "tunnel:stop",
-                "core:stop",
+                "olcrtc:stop",
                 "olcrtc:start",
                 "olcrtc:ready",
-                "xray:start",
-                "xray:ready",
-                "tunnel:start",
                 "datapath:verify:new",
             ),
             events,
@@ -443,6 +435,11 @@ class NativeSessionTest {
             olcrtcRunning = true
         }
 
+        override fun stopOlcrtc() {
+            events += "olcrtc:stop"
+            olcrtcRunning = false
+        }
+
         override fun waitOlcrtcReady(timeoutMillis: Int) {
             olcrtcReadyTimeoutMillis = timeoutMillis
             events += "olcrtc:ready"
@@ -483,6 +480,11 @@ class NativeSessionTest {
         override fun startOlcrtc(config: NativeOlcrtcConfig) {
             events += "olcrtc:start"
             running = true
+        }
+
+        override fun stopOlcrtc() {
+            events += "olcrtc:stop"
+            running = false
         }
 
         override fun waitOlcrtcReady(timeoutMillis: Int) {

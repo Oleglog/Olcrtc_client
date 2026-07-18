@@ -5,6 +5,7 @@ import java.io.Closeable
 internal interface NativeCore {
     fun setProtector(protector: SocketProtector)
     fun startOlcrtc(config: NativeOlcrtcConfig)
+    fun stopOlcrtc()
     fun waitOlcrtcReady(timeoutMillis: Int)
     fun startXray(assetDirectory: String, configJson: String)
     fun waitXrayReady(socksPort: Int, timeoutMillis: Int)

@@ -23,6 +23,7 @@ import androidx.navigation.fragment.NavHostFragment
 import androidx.navigation.ui.setupWithNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.github.oleglog.olcrtc.client.databinding.ActivityMainBinding
+import io.github.oleglog.olcrtc.client.importer.SubscriptionDeepLinkParser
 import io.github.oleglog.olcrtc.client.routing.RoutingSettings
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import io.github.oleglog.olcrtc.client.updater.ApkUpdateInstaller
@@ -392,8 +393,17 @@ class MainActivity : AppCompatActivity() {
         if (intent.action != Intent.ACTION_VIEW) return
         val raw = intent.dataString ?: return
         val scheme = intent.data?.scheme?.lowercase()
+        val subscriptionLink = runCatching { SubscriptionDeepLinkParser.parseOrNull(raw) }
+        if (subscriptionLink.isFailure) {
+            Toast.makeText(this, R.string.invalid_subscription_link, Toast.LENGTH_LONG).show()
+            return
+        }
         when {
             raw.length > MAX_EXTERNAL_IMPORT_CHARS -> Toast.makeText(this, R.string.external_import_too_large, Toast.LENGTH_LONG).show()
+            subscriptionLink.getOrNull() != null -> {
+                pendingImport = raw
+                if (::binding.isInitialized) binding.bottomNavigation.selectedItemId = R.id.profilesFragment
+            }
             scheme !in EXTERNAL_PROFILE_SCHEMES -> Toast.makeText(this, R.string.invalid_profile, Toast.LENGTH_LONG).show()
             else -> {
                 pendingImport = raw

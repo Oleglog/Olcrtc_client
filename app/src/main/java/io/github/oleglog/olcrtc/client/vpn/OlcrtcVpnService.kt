@@ -74,6 +74,7 @@ class OlcrtcVpnService : VpnService() {
     private var activeProfileInfo: ProfileInfo? = null
     private var wakeLock: PowerManager.WakeLock? = null
     private var activeSessionId: Long? = null
+    private var activeSessionBaseline = TrafficCounters()
     @Volatile private var lastTrafficCounters = TrafficCounters()
     private var lastTrafficSampleAt = 0L
     @Volatile private var lastUploadBytesPerSecond = 0L
@@ -83,6 +84,7 @@ class OlcrtcVpnService : VpnService() {
     @Volatile private var activeSocksPort: Int? = null
     @Volatile private var activeDnsEndpoint: DnsEndpoint? = null
     @Volatile private var nativeSession: NativeSession? = null
+    private var activeOlcrtcRuntime: OlcrtcRuntime? = null
     private var connectionAttempt: ConnectionAttempt? = null
     private var connectionFuture: Future<*>? = null
     private var nextConnectionGeneration = 0L
@@ -262,6 +264,7 @@ class OlcrtcVpnService : VpnService() {
                 stopVpn()
             }
             ACTION_RECONNECT -> commands.execute(::reconnectVpn)
+            ACTION_SWITCH_NEXT -> commands.execute(::switchToNextProfile)
             ACTION_TOGGLE -> {
                 startForeground(NOTIFICATION_ID, notification())
                 commands.execute(::toggleDesiredVpn)
@@ -292,6 +295,7 @@ class OlcrtcVpnService : VpnService() {
         finishConnectionSession("service destroyed")
         activeSocksPort = null
         activeDnsEndpoint = null
+        activeOlcrtcRuntime = null
         runCatching { nativeSession?.close() }
         nativeSession = null
         connectionStartup.shutdownNow()
@@ -401,7 +405,7 @@ class OlcrtcVpnService : VpnService() {
             val fastSwitch = shouldReuseTunForProfileSwitch(
                 previousIsOlcrtc = previousProfileInfo?.isOlcrtc == true,
                 nextIsOlcrtc = profile is ProfileConfig.Olcrtc,
-            ) && nativeSession?.isRunning() == true
+            ) && nativeSession?.isRunning() == true && activeOlcrtcRuntime != null
             transition(VpnState.RECONNECTING)
             val reusableSession = if (fastSwitch) detachNativeSession() else {
                 runCatching { closeNativeSession() }
@@ -452,6 +456,18 @@ class OlcrtcVpnService : VpnService() {
         }
     }
 
+    private fun switchToNextProfile() {
+        if (publishedState != VpnState.CONNECTED) return
+        val candidates = profiles.listLocal().map { ProfileReference.Local(it.id) } +
+            profiles.listSubscriptions().flatMap { subscription ->
+                profiles.listSubscriptionProfiles(subscription.id).map { ProfileReference.Subscription(it.id) }
+            }
+        val index = nextProfileIndex(activeProfile?.sessionId, candidates.map { it.sessionId }) ?: return
+        val target = candidates[index]
+        persistVpnIntent(true, target)
+        startProfile(target)
+    }
+
     private fun loadProfile(reference: ProfileReference): ProfileConfig? = when (reference) {
         is ProfileReference.Local -> profiles.get(reference.value)
         is ProfileReference.Subscription -> profiles.getSubscriptionProfile(reference.value)
@@ -461,10 +477,10 @@ class OlcrtcVpnService : VpnService() {
         reference: ProfileReference,
         profile: ProfileConfig,
         reconnecting: Boolean,
-        reusableSession: NativeSession? = null,
+        reusableSession: ReusableOlcrtcSession? = null,
     ) {
         val network = activeNetwork ?: run {
-            runCatching { reusableSession?.close() }
+            runCatching { reusableSession?.session?.close() }
                 .onFailure { diagnostics.append("error", "Reusable VPN session cleanup failed", it) }
             networkReconnectRequested = true
             publishStage(ConnectionStage.WAIT_NETWORK)
@@ -478,7 +494,7 @@ class OlcrtcVpnService : VpnService() {
             network = network,
             startedAt = SystemClock.elapsedRealtime(),
         )
-        attempt.session = reusableSession
+        attempt.session = reusableSession?.session
         connectionAttempt = attempt
         if (!reconnecting) transition(VpnState.CONNECTING)
         connectionFuture = connectionStartup.submit {
@@ -516,6 +532,7 @@ class OlcrtcVpnService : VpnService() {
             nativeSession = started.session
             activeSocksPort = started.socksPort
             activeDnsEndpoint = started.dns
+            activeOlcrtcRuntime = started.olcrtcRuntime
             activeSessionGeneration = attempt.generation
             publishStage(ConnectionStage.READY)
             transition(VpnState.CONNECTED)
@@ -718,6 +735,7 @@ class OlcrtcVpnService : VpnService() {
             else -> Unit
         }
         stopForeground(STOP_FOREGROUND_REMOVE)
+        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, disconnectedNotification())
         releaseWakeLock()
         stopSelf()
     }
@@ -725,6 +743,8 @@ class OlcrtcVpnService : VpnService() {
     private fun startConnectionSession(reference: ProfileReference) {
         if (activeSessionId != null) return
         val profile = activeProfileInfo ?: return
+        activeSessionBaseline = runCatching { nativeSession?.trafficCounters() ?: TrafficCounters() }
+            .getOrDefault(TrafficCounters())
         activeSessionId = connectionSessions.start(
             profileId = reference.sessionId,
             profileName = profile.name,
@@ -737,12 +757,14 @@ class OlcrtcVpnService : VpnService() {
         val sessionId = activeSessionId ?: return
         activeSessionId = null
         val counters = runCatching { nativeSession?.trafficCounters() ?: TrafficCounters() }.getOrDefault(TrafficCounters())
+        val baseline = activeSessionBaseline
+        activeSessionBaseline = TrafficCounters()
         runCatching {
             connectionSessions.finish(
                 id = sessionId,
                 reason = reason,
-                bytesUp = counters.bytesUp,
-                bytesDown = counters.bytesDown,
+                bytesUp = (counters.bytesUp - baseline.bytesUp).coerceAtLeast(0),
+                bytesDown = (counters.bytesDown - baseline.bytesDown).coerceAtLeast(0),
             )
         }
     }
@@ -801,7 +823,7 @@ class OlcrtcVpnService : VpnService() {
     private fun startNativeSession(
         profile: ProfileConfig,
         attempt: ConnectionAttempt,
-        reusableSession: NativeSession? = null,
+        reusableSession: ReusableOlcrtcSession? = null,
     ): StartedSession {
         attempt.requireActive()
         val routingRules = profiles.getEnabledRoutingRules()
@@ -824,6 +846,60 @@ class OlcrtcVpnService : VpnService() {
             requestedRoutingPolicy
         }
         val dns = sessionDns(profile, routingSettings.getDnsServer())
+        val assetDirectory = preparedGeoAssets?.absolutePath ?: noBackupFilesDir.absolutePath
+        val reportStage: (ConnectionStage, Long?, Throwable?) -> Unit = { stage, elapsed, error ->
+            reportAttemptStage(attempt, stage, elapsed, error)
+        }
+        val reportStop: (Long, Long) -> Unit = { routeReleased, total ->
+            diagnostics.append(
+                "info",
+                "VPN stop attempt=${attempt.generation} routeReleased=${routeReleased}ms total=${total}ms",
+            )
+        }
+
+        if (profile is ProfileConfig.Olcrtc && reusableSession != null) {
+            val runtime = reusableSession.runtime
+            val olcrtcConfig = NativeOlcrtcConfig.from(
+                profile.value,
+                runtime.olcrtcSocksPort,
+                checkNotNull(dns.carrier),
+            )
+            val xrayConfig = NativeConfig.xray(
+                socksPort = runtime.xraySocksPort,
+                olcrtcSocksPort = runtime.olcrtcSocksPort,
+                dns = dns.tunnel,
+                routingRules = routingRules,
+                routingPolicy = routingPolicy,
+            )
+            val verifyDatapath = { verifyDatapath(runtime.xraySocksPort, dns.tunnel) }
+            if (
+                reusableSession.session.isRunning() && runtime.assetDirectory == assetDirectory &&
+                runtime.xrayConfig == xrayConfig
+            ) {
+                attempt.session = reusableSession.session
+                try {
+                    attempt.requireActive()
+                    reusableSession.session.restartOlcrtc(
+                        olcrtcConfig = olcrtcConfig,
+                        verifyDatapath = verifyDatapath,
+                        reportStage = reportStage,
+                        reportStop = reportStop,
+                    )
+                    attempt.requireActive()
+                    return StartedSession(reusableSession.session, runtime.xraySocksPort, dns.tunnel, runtime)
+                } catch (error: Throwable) {
+                    runCatching { reusableSession.session.close() }
+                    throw error
+                }
+            }
+            diagnostics.append("info", "Fast profile switch fell back to full restart: Xray runtime changed")
+            runCatching { reusableSession.session.close() }
+            attempt.session = null
+        } else if (reusableSession != null) {
+            runCatching { reusableSession.session.close() }
+            attempt.session = null
+        }
+
         val xraySocksPort: Int
         val xrayConfig: String
         val olcrtcConfig: NativeOlcrtcConfig?
@@ -851,17 +927,8 @@ class OlcrtcVpnService : VpnService() {
                 )
             }
         }
-        val reportStage: (ConnectionStage, Long?, Throwable?) -> Unit = { stage, elapsed, error ->
-            reportAttemptStage(attempt, stage, elapsed, error)
-        }
-        val reportStop: (Long, Long) -> Unit = { routeReleased, total ->
-            diagnostics.append(
-                "info",
-                "VPN stop attempt=${attempt.generation} routeReleased=${routeReleased}ms total=${total}ms",
-            )
-        }
         val verifyDatapath = { verifyDatapath(xraySocksPort, dns.tunnel) }
-        val session = reusableSession ?: NativeSession(
+        val session = NativeSession(
             nativeCore = GomobileCore,
             hevTunnel = HevTunnel(),
             establishTun = { establishTun(attempt.network) },
@@ -872,42 +939,36 @@ class OlcrtcVpnService : VpnService() {
         attempt.session = session
         try {
             attempt.requireActive()
-            if (reusableSession == null) {
-                session.start(
-                    socksPort = xraySocksPort,
-                    assetDirectory = preparedGeoAssets?.absolutePath ?: noBackupFilesDir.absolutePath,
-                    xrayConfig = xrayConfig,
-                    hevConfig = NativeConfig.hev(xraySocksPort),
-                    olcrtcConfig = olcrtcConfig,
-                )
-            } else {
-                session.restartOlcrtc(
-                    socksPort = xraySocksPort,
-                    assetDirectory = preparedGeoAssets?.absolutePath ?: noBackupFilesDir.absolutePath,
-                    xrayConfig = xrayConfig,
-                    hevConfig = NativeConfig.hev(xraySocksPort),
-                    olcrtcConfig = checkNotNull(olcrtcConfig),
-                    verifyDatapath = verifyDatapath,
-                    reportStage = reportStage,
-                    reportStop = reportStop,
-                )
-            }
+            session.start(
+                socksPort = xraySocksPort,
+                assetDirectory = assetDirectory,
+                xrayConfig = xrayConfig,
+                hevConfig = NativeConfig.hev(xraySocksPort),
+                olcrtcConfig = olcrtcConfig,
+            )
             attempt.requireActive()
-            return StartedSession(session, xraySocksPort, dns.tunnel)
+            val runtime = olcrtcConfig?.let {
+                OlcrtcRuntime(xraySocksPort, it.socksPort, assetDirectory, xrayConfig)
+            }
+            return StartedSession(session, xraySocksPort, dns.tunnel, runtime)
         } catch (error: Throwable) {
             runCatching { session.close() }
             throw error
         }
     }
 
-    private fun detachNativeSession(): NativeSession? {
+    private fun detachNativeSession(): ReusableOlcrtcSession? {
+        val session = nativeSession ?: return null
+        val runtime = activeOlcrtcRuntime ?: return null
         activeSocksPort = null
         activeDnsEndpoint = null
+        activeOlcrtcRuntime = null
         activeSessionGeneration = 0L
         healthProbeFailures = 0
         healthProbeInFlight = false
         healthProbeToken++
-        return nativeSession.also { nativeSession = null }
+        nativeSession = null
+        return ReusableOlcrtcSession(session, runtime)
     }
 
     private fun verifyDatapath(socksPort: Int, dns: DnsEndpoint) {
@@ -955,6 +1016,7 @@ class OlcrtcVpnService : VpnService() {
         val startedAt = SystemClock.elapsedRealtime()
         activeSocksPort = null
         activeDnsEndpoint = null
+        activeOlcrtcRuntime = null
         activeSessionGeneration = 0L
         healthProbeFailures = 0
         healthProbeInFlight = false
@@ -1035,7 +1097,7 @@ class OlcrtcVpnService : VpnService() {
                 "VPN state: $state${error?.let { ": $it" } ?: ""}",
             )
         }
-        if (state == VpnState.CONNECTED) startNotificationTicker() else if (state != VpnState.RECONNECTING) stopNotificationTicker()
+        if (state == VpnState.CONNECTED) startNotificationTicker() else stopNotificationTicker()
         updateNotification()
         VpnTileService.update(this, state)
         notifyCallbacks()
@@ -1065,7 +1127,12 @@ class OlcrtcVpnService : VpnService() {
         lastTrafficCounters = runCatching { nativeSession?.trafficCounters() ?: TrafficCounters() }.getOrDefault(TrafficCounters())
         lastTrafficSampleAt = System.currentTimeMillis()
         lastHealthProbeAt = lastTrafficSampleAt
-        notificationTicker = commands.scheduleAtFixedRate({ sampleTrafficAndNotify() }, 1, 1, TimeUnit.SECONDS)
+        notificationTicker = commands.scheduleAtFixedRate(
+            { sampleTrafficAndNotify() },
+            NOTIFICATION_SAMPLE_INTERVAL_SECONDS,
+            NOTIFICATION_SAMPLE_INTERVAL_SECONDS,
+            TimeUnit.SECONDS,
+        )
     }
 
     private fun stopNotificationTicker() {
@@ -1176,6 +1243,7 @@ class OlcrtcVpnService : VpnService() {
         val profile = activeProfileInfo
         val builder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setOnlyAlertOnce(true)
             .setContentTitle(profile?.name ?: getString(R.string.vpn_notification_title))
             .setContentText(
                 if (profile == null) notificationStateText() else getString(
@@ -1185,11 +1253,29 @@ class OlcrtcVpnService : VpnService() {
                 ),
             )
             .setOngoing(true)
-            .addAction(0, getString(R.string.vpn_notification_stop), stopPendingIntent())
+        if (publishedState == VpnState.CONNECTED) {
+            builder.addAction(0, getString(R.string.vpn_notification_next_profile), switchNextPendingIntent())
+        }
         if (publishedState == VpnState.CONNECTED || publishedState == VpnState.ERROR) {
             builder.addAction(0, getString(R.string.vpn_notification_reconnect), reconnectPendingIntent())
         }
+        builder.addAction(0, getString(R.string.vpn_notification_disconnect), stopPendingIntent())
         return builder.build()
+    }
+
+    private fun disconnectedNotification(): android.app.Notification {
+        val profile = activeProfileInfo
+        return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle(profile?.name ?: getString(R.string.vpn_notification_title))
+            .setContentText(
+                profile?.let {
+                    getString(R.string.vpn_notification_profile, it.protocol, notificationStateText())
+                } ?: notificationStateText(),
+            )
+            .setAutoCancel(true)
+            .addAction(0, getString(R.string.vpn_notification_connect), togglePendingIntent())
+            .build()
     }
 
     private fun notificationStateText(): String = when (publishedState) {
@@ -1235,6 +1321,10 @@ class OlcrtcVpnService : VpnService() {
     private fun stopPendingIntent(): PendingIntent = servicePendingIntent(ACTION_STOP, STOP_REQUEST_CODE)
 
     private fun reconnectPendingIntent(): PendingIntent = servicePendingIntent(ACTION_RECONNECT, RECONNECT_REQUEST_CODE)
+
+    private fun switchNextPendingIntent(): PendingIntent = servicePendingIntent(ACTION_SWITCH_NEXT, SWITCH_NEXT_REQUEST_CODE)
+
+    private fun togglePendingIntent(): PendingIntent = servicePendingIntent(ACTION_TOGGLE, TOGGLE_REQUEST_CODE)
 
     private fun servicePendingIntent(action: String, requestCode: Int): PendingIntent {
         val intent = Intent(this, OlcrtcVpnService::class.java).setAction(action)
@@ -1296,6 +1386,19 @@ class OlcrtcVpnService : VpnService() {
         val session: NativeSession,
         val socksPort: Int,
         val dns: DnsEndpoint,
+        val olcrtcRuntime: OlcrtcRuntime?,
+    )
+
+    private data class ReusableOlcrtcSession(
+        val session: NativeSession,
+        val runtime: OlcrtcRuntime,
+    )
+
+    private data class OlcrtcRuntime(
+        val xraySocksPort: Int,
+        val olcrtcSocksPort: Int,
+        val assetDirectory: String,
+        val xrayConfig: String,
     )
 
     private class ConnectionAttempt(
@@ -1331,6 +1434,7 @@ class OlcrtcVpnService : VpnService() {
         const val ACTION_START = "io.github.oleglog.olcrtc.client.vpn.START"
         const val ACTION_STOP = "io.github.oleglog.olcrtc.client.vpn.STOP"
         const val ACTION_RECONNECT = "io.github.oleglog.olcrtc.client.vpn.RECONNECT"
+        const val ACTION_SWITCH_NEXT = "io.github.oleglog.olcrtc.client.vpn.SWITCH_NEXT"
         const val ACTION_TOGGLE = "io.github.oleglog.olcrtc.client.vpn.TOGGLE"
         const val EXTRA_PROFILE_ID = "profile_id"
         const val EXTRA_SUBSCRIPTION_PROFILE_ID = "subscription_profile_id"
@@ -1338,6 +1442,8 @@ class OlcrtcVpnService : VpnService() {
         const val NOTIFICATION_ID = 1
         private const val STOP_REQUEST_CODE = 1
         private const val RECONNECT_REQUEST_CODE = 2
+        private const val SWITCH_NEXT_REQUEST_CODE = 3
+        private const val TOGGLE_REQUEST_CODE = 4
         const val VPN_MTU = 1500
         const val VPN_IPV4_ADDRESS = "10.0.0.2"
         const val VPN_IPV4_PREFIX = 32
@@ -1345,7 +1451,8 @@ class OlcrtcVpnService : VpnService() {
         const val MAX_DNS_RESPONSE_BYTES = 65_535
         private const val CONNECTION_TEST_URL = "https://www.google.com/generate_204"
         private const val CONNECTION_TEST_TIMEOUT_MILLIS = 5_000
-        private const val TUNNEL_HEALTH_INTERVAL_MILLIS = 15_000L
+        private const val NOTIFICATION_SAMPLE_INTERVAL_SECONDS = 5L
+        private const val TUNNEL_HEALTH_INTERVAL_MILLIS = 60_000L
         private const val TUNNEL_HEALTH_TIMEOUT_MILLIS = 30_000
         private val RECONNECTABLE_STATES = setOf(
             VpnState.PREPARING,

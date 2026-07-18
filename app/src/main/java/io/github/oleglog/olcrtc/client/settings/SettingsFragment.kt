@@ -230,6 +230,7 @@ class SettingsFragment : Fragment() {
         }
         val styleButtons = mutableMapOf<Int, RoutingSettings.BackgroundEffects.Style>()
         val styleGroup = MaterialButtonToggleGroup(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
             isSingleSelection = true
             isSelectionRequired = true
             RoutingSettings.BackgroundEffects.Style.entries.forEach { style ->
@@ -240,11 +241,14 @@ class SettingsFragment : Fragment() {
                 ).apply {
                     id = View.generateViewId()
                     text = backgroundEffectStyleLabel(style)
-                    maxLines = 1
+                    maxLines = 2
                     applySegmentedStyle()
                 }
                 styleButtons[button.id] = style
-                addView(button, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                addView(button, LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ))
             }
             addOnButtonCheckedListener { _, checkedId, isChecked ->
                 if (isChecked) selectedStyle = styleButtons.getValue(checkedId)
@@ -253,6 +257,7 @@ class SettingsFragment : Fragment() {
         styleGroup.check(styleButtons.entries.first { it.value == selectedStyle }.key)
         val intensityButtons = mutableMapOf<Int, RoutingSettings.BackgroundEffects.Intensity>()
         val intensityGroup = MaterialButtonToggleGroup(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
             isSingleSelection = true
             isSelectionRequired = true
             RoutingSettings.BackgroundEffects.Intensity.entries.forEach { intensity ->
@@ -263,11 +268,14 @@ class SettingsFragment : Fragment() {
                 ).apply {
                     id = View.generateViewId()
                     text = backgroundEffectIntensityLabel(intensity)
-                    maxLines = 1
+                    maxLines = 2
                     applySegmentedStyle()
                 }
                 intensityButtons[button.id] = intensity
-                addView(button, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                addView(button, LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ))
             }
             addOnButtonCheckedListener { _, checkedId, isChecked ->
                 if (isChecked) selectedIntensity = intensityButtons.getValue(checkedId)
@@ -339,7 +347,7 @@ class SettingsFragment : Fragment() {
         when (value) {
             RoutingSettings.BackgroundEffects.Style.SNOW -> R.string.settings_background_effect_snow
             RoutingSettings.BackgroundEffects.Style.RAIN -> R.string.settings_background_effect_rain
-            RoutingSettings.BackgroundEffects.Style.GLOW -> R.string.settings_background_effect_glow
+            RoutingSettings.BackgroundEffects.Style.DRIFT -> R.string.settings_background_effect_drift
         },
     )
 
@@ -863,6 +871,7 @@ class SettingsFragment : Fragment() {
         }
         val buttonAssets = mutableMapOf<Int, GitHubRelease.ReleaseAsset>()
         val tabs = MaterialButtonToggleGroup(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
             isSingleSelection = true
             isSelectionRequired = true
             assets.forEach { asset ->
@@ -872,12 +881,17 @@ class SettingsFragment : Fragment() {
                     com.google.android.material.R.attr.materialButtonOutlinedStyle,
                 ).apply {
                     id = View.generateViewId()
-                    text = apkTabLabel(asset)
-                    maxLines = 1
+                    text = "${apkTabLabel(asset)}\n${asset.name}"
+                    gravity = android.view.Gravity.START or android.view.Gravity.CENTER_VERTICAL
+                    textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+                    maxLines = 3
                     applySegmentedStyle()
                 }
                 buttonAssets[button.id] = asset
-                addView(button, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+                addView(button, LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ))
             }
             addOnButtonCheckedListener { _, checkedId, isChecked ->
                 if (isChecked) {

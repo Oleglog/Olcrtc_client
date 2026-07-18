@@ -43,7 +43,7 @@ internal class ParticleDriftView @JvmOverloads constructor(
             lastFrameMillis = now
             step(dt / 1000f)
             invalidate()
-            Choreographer.getInstance().postFrameCallback(this)
+            Choreographer.getInstance().postFrameCallbackDelayed(this, FRAME_INTERVAL_MILLIS)
         }
     }
 
@@ -55,7 +55,6 @@ internal class ParticleDriftView @JvmOverloads constructor(
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
         isClickable = false
         isFocusable = false
-        setLayerType(LAYER_TYPE_HARDWARE, null)
     }
 
     fun configure(value: RoutingSettings.BackgroundEffects) {
@@ -77,6 +76,22 @@ internal class ParticleDriftView @JvmOverloads constructor(
         updateRunning()
     }
 
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        updateRunning()
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        updateRunning()
+    }
+
+    override fun onDetachedFromWindow() {
+        running = false
+        Choreographer.getInstance().removeFrameCallback(frameCallback)
+        super.onDetachedFromWindow()
+    }
+
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         lastWidth = w
@@ -87,7 +102,8 @@ internal class ParticleDriftView @JvmOverloads constructor(
     }
 
     private fun updateRunning() {
-        val shouldRun = active && isShown && animationsEnabled() && width > 0 && height > 0
+        val shouldRun = active && isAttachedToWindow && windowVisibility == VISIBLE &&
+            isShown && animationsEnabled() && width > 0 && height > 0
         if (shouldRun == running) return
         running = shouldRun
         if (running) {
@@ -112,7 +128,7 @@ internal class ParticleDriftView @JvmOverloads constructor(
             RoutingSettings.BackgroundEffects.Intensity.MEDIUM -> 1f
             RoutingSettings.BackgroundEffects.Intensity.HIGH -> 1.25f
         }
-        repeat(particleCount(settings.intensity)) {
+        repeat(particleCount(settings.style, settings.intensity)) {
             particles += when (settings.style) {
                 RoutingSettings.BackgroundEffects.Style.SNOW -> Particle(
                     x = Random.nextFloat() * lastWidth,
@@ -132,14 +148,14 @@ internal class ParticleDriftView @JvmOverloads constructor(
                     speedY = 150f + Random.nextFloat() * 80f,
                     alpha = Random.nextInt(40, 86),
                 )
-                RoutingSettings.BackgroundEffects.Style.GLOW -> Particle(
+                RoutingSettings.BackgroundEffects.Style.DRIFT -> Particle(
                     x = Random.nextFloat() * lastWidth,
                     y = Random.nextFloat() * lastHeight,
-                    size = dp(1.8f + Random.nextFloat() * 2f),
+                    size = dp(0.7f + Random.nextFloat() * 0.8f),
                     length = 0f,
-                    speedX = (-7f + Random.nextFloat() * 14f) * speedScale,
-                    speedY = (-5f + Random.nextFloat() * 10f) * speedScale,
-                    alpha = Random.nextInt(58, 112),
+                    speedX = (-4f + Random.nextFloat() * 8f) * speedScale,
+                    speedY = (4f + Random.nextFloat() * 8f) * speedScale,
+                    alpha = Random.nextInt(28, 66),
                 )
             }
         }
@@ -166,7 +182,7 @@ internal class ParticleDriftView @JvmOverloads constructor(
                         particle.x = Random.nextFloat() * (width + particle.length)
                     }
                 }
-                RoutingSettings.BackgroundEffects.Style.GLOW -> {
+                RoutingSettings.BackgroundEffects.Style.DRIFT -> {
                     if (particle.x < -particle.size) particle.x = width + particle.size
                     if (particle.x > width + particle.size) particle.x = -particle.size
                     if (particle.y < -particle.size) particle.y = height + particle.size
@@ -197,13 +213,9 @@ internal class ParticleDriftView @JvmOverloads constructor(
                         paint,
                     )
                 }
-                RoutingSettings.BackgroundEffects.Style.GLOW -> {
+                RoutingSettings.BackgroundEffects.Style.DRIFT -> {
                     paint.style = Paint.Style.FILL
-                    paint.alpha = particle.alpha / 3
-                    canvas.drawCircle(particle.x, particle.y, particle.size * 2.4f, paint)
-                    paint.alpha = particle.alpha
                     canvas.drawCircle(particle.x, particle.y, particle.size, paint)
-                    paint.alpha = 255
                 }
             }
         }
@@ -216,10 +228,27 @@ internal class ParticleDriftView @JvmOverloads constructor(
     }
 
     private fun dp(value: Float): Float = value * resources.displayMetrics.density
+
+    private companion object {
+        const val FRAME_INTERVAL_MILLIS = 33L
+    }
 }
 
 internal fun particleCount(intensity: RoutingSettings.BackgroundEffects.Intensity): Int = when (intensity) {
     RoutingSettings.BackgroundEffects.Intensity.LOW -> 28
     RoutingSettings.BackgroundEffects.Intensity.MEDIUM -> 48
     RoutingSettings.BackgroundEffects.Intensity.HIGH -> 72
+}
+
+internal fun particleCount(
+    style: RoutingSettings.BackgroundEffects.Style,
+    intensity: RoutingSettings.BackgroundEffects.Intensity,
+): Int = if (style == RoutingSettings.BackgroundEffects.Style.DRIFT) {
+    when (intensity) {
+        RoutingSettings.BackgroundEffects.Intensity.LOW -> 12
+        RoutingSettings.BackgroundEffects.Intensity.MEDIUM -> 20
+        RoutingSettings.BackgroundEffects.Intensity.HIGH -> 32
+    }
+} else {
+    particleCount(intensity)
 }

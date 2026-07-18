@@ -35,9 +35,7 @@ internal class RoutingSettings private constructor(
         val preferences = store.data.first()
         BackgroundEffects(
             enabled = preferences[BACKGROUND_EFFECTS] ?: true,
-            style = preferences[BACKGROUND_EFFECT_STYLE]
-                ?.let { runCatching { BackgroundEffects.Style.valueOf(it) }.getOrNull() }
-                ?: BackgroundEffects.Style.SNOW,
+            style = parseBackgroundEffectStyle(preferences[BACKGROUND_EFFECT_STYLE]),
             intensity = preferences[BACKGROUND_EFFECT_INTENSITY]
                 ?.let { runCatching { BackgroundEffects.Intensity.valueOf(it) }.getOrNull() }
                 ?: BackgroundEffects.Intensity.MEDIUM,
@@ -131,7 +129,7 @@ internal class RoutingSettings private constructor(
         val style: Style = Style.SNOW,
         val intensity: Intensity = Intensity.MEDIUM,
     ) {
-        enum class Style { SNOW, RAIN, GLOW }
+        enum class Style { SNOW, RAIN, DRIFT }
         enum class Intensity { LOW, MEDIUM, HIGH }
     }
 
@@ -161,4 +159,11 @@ internal class RoutingSettings private constructor(
             ).also { instance = it }
         }
     }
+}
+
+internal fun parseBackgroundEffectStyle(value: String?): RoutingSettings.BackgroundEffects.Style = when (value) {
+    "GLOW" -> RoutingSettings.BackgroundEffects.Style.DRIFT
+    else -> value
+        ?.let { runCatching { RoutingSettings.BackgroundEffects.Style.valueOf(it) }.getOrNull() }
+        ?: RoutingSettings.BackgroundEffects.Style.SNOW
 }

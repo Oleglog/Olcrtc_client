@@ -32,6 +32,7 @@ import io.github.oleglog.olcrtc.client.importer.BundleImportResult
 import io.github.oleglog.olcrtc.client.importer.DecodedImportPayload
 import io.github.oleglog.olcrtc.client.importer.ImportPayload
 import io.github.oleglog.olcrtc.client.importer.QrScannerActivity
+import io.github.oleglog.olcrtc.client.importer.SubscriptionDeepLinkParser
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import java.text.DateFormat
 import java.util.Date
@@ -63,7 +64,13 @@ class ProfilesFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
+        (activity as? MainActivity)?.setImportListener(::confirmExternalSubscription)
         loadSubscriptions()
+    }
+
+    override fun onStop() {
+        (activity as? MainActivity)?.setImportListener(null)
+        super.onStop()
     }
 
     override fun onDestroyView() {
@@ -178,21 +185,13 @@ class ProfilesFragment : Fragment() {
         if (storage.isShutdown) return
         storage.execute {
             val result = runCatching {
-                when (val payload = ImportPayload.decode(raw)) {
+                val deepLink = SubscriptionDeepLinkParser.parseOrNull(raw)
+                if (deepLink != null) {
+                    importSubscriptionSource(deepLink.url, deepLink.name)
+                } else when (val payload = ImportPayload.decode(raw)) {
                     is DecodedImportPayload.Bundle -> importSubscriptionBundle(payload.raw)
                     is DecodedImportPayload.Multipart -> importSubscriptionBundle(payload.raw)
-                    is DecodedImportPayload.Profile -> {
-                        val uri = java.net.URI(payload.uri)
-                        require(uri.scheme.equals("https", ignoreCase = true) && !uri.host.isNullOrBlank()) {
-                            getString(R.string.subscription_https_required)
-                        }
-                        val id = profiles.insertSubscriptionSource(
-                            name = requireNotNull(uri.host),
-                            url = payload.uri,
-                            kind = "GENERIC",
-                        )
-                        refreshSubscription(id)
-                    }
+                    is DecodedImportPayload.Profile -> importSubscriptionSource(payload.uri, null)
                 }
             }
             activity?.runOnUiThread {
@@ -201,6 +200,32 @@ class ProfilesFragment : Fragment() {
                 loadSubscriptions()
             }
         }
+    }
+
+    private fun confirmExternalSubscription(raw: String) {
+        val link = runCatching { requireNotNull(SubscriptionDeepLinkParser.parseOrNull(raw)) }
+            .getOrElse {
+                showError(it)
+                return
+            }
+        val host = requireNotNull(java.net.URI(link.url).host)
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.subscription_link_confirm_title)
+            .setMessage(getString(R.string.subscription_link_confirm_message, link.name ?: host, host))
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.subscription_link_confirm_action) { _, _ -> saveNewSubscription(raw) }
+            .show()
+    }
+
+    private fun importSubscriptionSource(url: String, name: String?): SubscriptionRefresher.Result {
+        val validatedUrl = SubscriptionDeepLinkParser.validateHttpsUrl(url)
+        val host = requireNotNull(java.net.URI(validatedUrl).host)
+        val id = profiles.insertSubscriptionSource(
+            name = name ?: host,
+            url = validatedUrl,
+            kind = "GENERIC",
+        )
+        return refreshSubscription(id)
     }
 
     private fun importSubscriptionBundle(raw: String): SubscriptionRefresher.Result =
