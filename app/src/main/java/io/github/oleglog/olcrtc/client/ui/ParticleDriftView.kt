@@ -86,12 +86,6 @@ internal class ParticleDriftView @JvmOverloads constructor(
         updateRunning()
     }
 
-    override fun onDetachedFromWindow() {
-        running = false
-        Choreographer.getInstance().removeFrameCallback(frameCallback)
-        super.onDetachedFromWindow()
-    }
-
     override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
         super.onSizeChanged(w, h, oldw, oldh)
         lastWidth = w
