@@ -77,8 +77,11 @@
             android:minHeight="52dp"
             android:maxLines="2"
             android:ellipsize="end"
+            android:textColor="@color/segmented_button_text"
             android:text="@string/settings_per_app_all"
-            app:cornerRadius="@dimen/corner_button" />
+            app:backgroundTint="@color/segmented_button_background"
+            app:cornerRadius="@dimen/corner_button"
+            app:strokeColor="@color/segmented_button_stroke" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/mode_exclude"
@@ -89,8 +92,11 @@
             android:minHeight="52dp"
             android:maxLines="2"
             android:ellipsize="end"
+            android:textColor="@color/segmented_button_text"
             android:text="@string/settings_per_app_exclude"
-            app:cornerRadius="@dimen/corner_button" />
+            app:backgroundTint="@color/segmented_button_background"
+            app:cornerRadius="@dimen/corner_button"
+            app:strokeColor="@color/segmented_button_stroke" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/mode_only"
@@ -101,8 +107,11 @@
             android:minHeight="52dp"
             android:maxLines="2"
             android:ellipsize="end"
+            android:textColor="@color/segmented_button_text"
             android:text="@string/settings_per_app_only"
-            app:cornerRadius="@dimen/corner_button" />
+            app:backgroundTint="@color/segmented_button_background"
+            app:cornerRadius="@dimen/corner_button"
+            app:strokeColor="@color/segmented_button_stroke" />
     </com.google.android.material.button.MaterialButtonToggleGroup>
 
     <TextView
@@ -132,8 +141,11 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:textColor="@color/segmented_button_text"
             android:text="@string/settings_apps_user"
-            app:cornerRadius="@dimen/corner_button" />
+            app:backgroundTint="@color/segmented_button_background"
+            app:cornerRadius="@dimen/corner_button"
+            app:strokeColor="@color/segmented_button_stroke" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/filter_system"
@@ -141,8 +153,11 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:textColor="@color/segmented_button_text"
             android:text="@string/settings_apps_system"
-            app:cornerRadius="@dimen/corner_button" />
+            app:backgroundTint="@color/segmented_button_background"
+            app:cornerRadius="@dimen/corner_button"
+            app:strokeColor="@color/segmented_button_stroke" />
     </com.google.android.material.button.MaterialButtonToggleGroup>
 
     <LinearLayout

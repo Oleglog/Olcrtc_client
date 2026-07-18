@@ -155,6 +155,49 @@ class NativeSessionTest {
     }
 
     @Test
+    fun olcrtcRestartKeepsTunAndRestartsOnlyNativeRuntime() {
+        val events = mutableListOf<String>()
+        val session = NativeSession(
+            RecordingCore(events),
+            RecordingTunnel(events),
+            establishTun = {
+                events += "tun:establish"
+                RecordingTun(events)
+            },
+            verifyDatapath = { events += "datapath:verify" },
+        )
+        session.start(1080, "/assets", "{}", byteArrayOf(1), olcrtcConfig())
+        events.clear()
+
+        session.restartOlcrtc(
+            socksPort = 2080,
+            assetDirectory = "/assets",
+            xrayConfig = "{}",
+            hevConfig = byteArrayOf(2),
+            olcrtcConfig = olcrtcConfig().copy(socksPort = 2081),
+            verifyDatapath = { events += "datapath:verify:new" },
+            reportStage = { _, _, _ -> },
+            reportStop = { _, _ -> },
+        )
+
+        assertEquals(
+            listOf(
+                "tunnel:stop",
+                "core:stop",
+                "olcrtc:start",
+                "olcrtc:ready",
+                "xray:start",
+                "xray:ready",
+                "tunnel:start",
+                "datapath:verify:new",
+            ),
+            events,
+        )
+        assertTrue(session.isRunning())
+        session.close()
+    }
+
+    @Test
     fun preservesOlcrtcStartFailureDuringRollback() {
         val events = mutableListOf<String>()
         val session = NativeSession(

@@ -8,11 +8,14 @@ internal class NativeSession(
     private val nativeCore: NativeCore,
     private val hevTunnel: NativeTunnel,
     private val establishTun: () -> TunDescriptor,
-    private val verifyDatapath: () -> Unit,
-    private val reportStage: (ConnectionStage, Long?, Throwable?) -> Unit = { _, _, _ -> },
-    private val reportStop: (routeReleasedMillis: Long, totalMillis: Long) -> Unit = { _, _ -> },
+    verifyDatapath: () -> Unit,
+    reportStage: (ConnectionStage, Long?, Throwable?) -> Unit = { _, _, _ -> },
+    reportStop: (routeReleasedMillis: Long, totalMillis: Long) -> Unit = { _, _ -> },
 ) : Closeable {
     private val lifecycle = Any()
+    @Volatile private var verifyDatapath = verifyDatapath
+    @Volatile private var reportStage = reportStage
+    @Volatile private var reportStop = reportStop
     @Volatile private var coreStarted = false
     @Volatile private var olcrtcStarted = false
     @Volatile private var tun: TunDescriptor? = null
@@ -26,47 +29,94 @@ internal class NativeSession(
         olcrtcConfig: NativeOlcrtcConfig? = null,
     ) {
         checkOpen()
-        try {
+        startSafely {
             val descriptor = stage(ConnectionStage.CREATE_TUN) {
                 synchronized(lifecycle) {
                     checkOpen()
                     establishTun().also { tun = it }
                 }
             }
-            if (olcrtcConfig != null) {
-                stage(ConnectionStage.START_CARRIER) {
-                    synchronized(lifecycle) {
-                        checkOpen()
-                        coreStarted = true
-                        nativeCore.startOlcrtc(olcrtcConfig)
-                        olcrtcStarted = true
-                    }
-                    nativeCore.waitOlcrtcReady(olcrtcConfig.readyTimeoutMillis)
-                }
+            startRuntime(descriptor, socksPort, assetDirectory, xrayConfig, hevConfig, olcrtcConfig)
+        }
+    }
+
+    fun restartOlcrtc(
+        socksPort: Int,
+        assetDirectory: String,
+        xrayConfig: String,
+        hevConfig: ByteArray,
+        olcrtcConfig: NativeOlcrtcConfig,
+        verifyDatapath: () -> Unit,
+        reportStage: (ConnectionStage, Long?, Throwable?) -> Unit,
+        reportStop: (routeReleasedMillis: Long, totalMillis: Long) -> Unit,
+    ) {
+        val descriptor = synchronized(lifecycle) {
+            checkOpen()
+            check(olcrtcStarted) { "fast switch requires an active olcRTC session" }
+            this.verifyDatapath = verifyDatapath
+            this.reportStage = reportStage
+            this.reportStop = reportStop
+            checkNotNull(tun)
+        }
+        startSafely {
+            synchronized(lifecycle) {
+                checkOpen()
+                hevTunnel.stop()
+                nativeCore.stopAll()
+                coreStarted = false
+                olcrtcStarted = false
             }
-            stage(ConnectionStage.START_XRAY) {
+            startRuntime(descriptor, socksPort, assetDirectory, xrayConfig, hevConfig, olcrtcConfig)
+        }
+    }
+
+    private fun startRuntime(
+        descriptor: TunDescriptor,
+        socksPort: Int,
+        assetDirectory: String,
+        xrayConfig: String,
+        hevConfig: ByteArray,
+        olcrtcConfig: NativeOlcrtcConfig?,
+    ) {
+        if (olcrtcConfig != null) {
+            stage(ConnectionStage.START_CARRIER) {
                 synchronized(lifecycle) {
                     checkOpen()
                     coreStarted = true
-                    nativeCore.startXray(assetDirectory, xrayConfig)
+                    nativeCore.startOlcrtc(olcrtcConfig)
+                    olcrtcStarted = true
                 }
-                nativeCore.waitXrayReady(socksPort, XRAY_READY_TIMEOUT_MILLIS)
+                nativeCore.waitOlcrtcReady(olcrtcConfig.readyTimeoutMillis)
             }
-            stage(ConnectionStage.START_HEV) {
-                synchronized(lifecycle) {
-                    checkOpen()
-                    hevTunnel.start(hevConfig, descriptor.fd)
-                    check(hevTunnel.isRunning()) {
-                        "HEV tunnel exited during startup"
-                    }
-                }
+        }
+        stage(ConnectionStage.START_XRAY) {
+            synchronized(lifecycle) {
+                checkOpen()
+                coreStarted = true
+                nativeCore.startXray(assetDirectory, xrayConfig)
             }
-            stage(ConnectionStage.VERIFY_DATAPATH) {
-                verifyDatapath()
+            nativeCore.waitXrayReady(socksPort, XRAY_READY_TIMEOUT_MILLIS)
+        }
+        stage(ConnectionStage.START_HEV) {
+            synchronized(lifecycle) {
+                checkOpen()
+                hevTunnel.start(hevConfig, descriptor.fd)
                 check(hevTunnel.isRunning()) {
-                    "HEV tunnel exited during datapath verification"
+                    "HEV tunnel exited during startup"
                 }
             }
+        }
+        stage(ConnectionStage.VERIFY_DATAPATH) {
+            verifyDatapath()
+            check(hevTunnel.isRunning()) {
+                "HEV tunnel exited during datapath verification"
+            }
+        }
+    }
+
+    private inline fun startSafely(action: () -> Unit) {
+        try {
+            action()
         } catch (error: Throwable) {
             val failure = if (closed && error !is CancellationException) {
                 CancellationException("native session cancelled").apply { initCause(error) }

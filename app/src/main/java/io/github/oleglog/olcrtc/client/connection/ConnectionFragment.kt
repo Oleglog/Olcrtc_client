@@ -93,7 +93,11 @@ class ConnectionFragment : Fragment() {
         binding.testSelected.isEnabled = false
         renderContentState(ConnectionContentState.LOADING)
         binding.connect.setOnClickListener {
-            if (currentState == VpnState.CONNECTED || currentState in BUSY_STATES) activityHost.stopVpn() else connectSelected()
+            if (currentState in BUSY_STATES || currentState == VpnState.CONNECTED && !hasPendingProfileSwitch()) {
+                activityHost.stopVpn()
+            } else {
+                connectSelected()
+            }
         }
         binding.addProfile.setOnClickListener { showAddConnectionMenu() }
         binding.contentStateAction.setOnClickListener { showAddConnectionMenu() }
@@ -362,7 +366,6 @@ class ConnectionFragment : Fragment() {
         val state = connectionCardState(
             selected = selected,
             connected = connected,
-            hasConnectedProfile = connectedProfileId != null || connectedSubscriptionProfileId != null,
         )
         card.strokeColor = if (state == ConnectionCardState.INACTIVE) {
             resolveColor(com.google.android.material.R.attr.colorOutline)
@@ -451,19 +454,21 @@ class ConnectionFragment : Fragment() {
     }
 
     private fun selectSubscriptionProfile(id: String) {
-        if (currentState == VpnState.CONNECTED || currentState in BUSY_STATES) return
+        if (currentState in BUSY_STATES) return
         selectedProfileId = null
         selectedSubscriptionProfileId = id
         showStatus(null)
+        updateConnectButtonText()
         updateActionAvailability()
         refreshCardAppearance()
     }
 
     private fun selectProfile(id: Long) {
-        if (currentState == VpnState.CONNECTED || currentState in BUSY_STATES) return
+        if (currentState in BUSY_STATES) return
         selectedSubscriptionProfileId = null
         selectedProfileId = id
         showStatus(null)
+        updateConnectButtonText()
         updateActionAvailability()
         refreshCardAppearance()
     }
@@ -643,16 +648,7 @@ class ConnectionFragment : Fragment() {
         }
         binding.connectionSummary.text = vpnStateText(state, stage, reconnectAttempt)
         showStatus(error ?: if (state == VpnState.ERROR) getString(R.string.vpn_notification_error) else null)
-        val connectText = getString(
-            when (state) {
-                VpnState.PREPARING, VpnState.CONNECTING -> R.string.cancel_connection
-                VpnState.CONNECTED, VpnState.RECONNECTING -> R.string.disconnect
-                VpnState.STOPPING -> R.string.disconnecting
-                VpnState.ERROR -> R.string.retry
-                VpnState.NO_PROFILE, VpnState.DISCONNECTED -> R.string.connect
-            },
-        )
-        setConnectButtonText(connectText)
+        updateConnectButtonText()
         applyingPulse = state in PULSE_STATES
         updateConnectPulse()
         updateActionAvailability()
@@ -678,6 +674,24 @@ class ConnectionFragment : Fragment() {
             }
             .start()
     }
+
+    private fun updateConnectButtonText() {
+        val text = getString(
+            when {
+                currentState == VpnState.CONNECTED && hasPendingProfileSwitch() -> R.string.switch_connection
+                currentState == VpnState.PREPARING || currentState == VpnState.CONNECTING -> R.string.cancel_connection
+                currentState == VpnState.CONNECTED || currentState == VpnState.RECONNECTING -> R.string.disconnect
+                currentState == VpnState.STOPPING -> R.string.disconnecting
+                currentState == VpnState.ERROR -> R.string.retry
+                else -> R.string.connect
+            },
+        )
+        setConnectButtonText(text)
+    }
+
+    private fun hasPendingProfileSwitch(): Boolean =
+        selectedProfileId != null && selectedProfileId != connectedProfileId ||
+            selectedSubscriptionProfileId != null && selectedSubscriptionProfileId != connectedSubscriptionProfileId
 
     private fun animationsEnabled(): Boolean {
         val resolver = requireContext().contentResolver
@@ -780,7 +794,7 @@ class ConnectionFragment : Fragment() {
             currentState == VpnState.CONNECTED || currentState in BUSY_STATES ||
                 selectedProfileId != null || selectedSubscriptionProfileId != null
             )
-        binding.testSelected.isEnabled = currentState == VpnState.CONNECTED && !latencyInProgress
+        binding.testSelected.isEnabled = currentState == VpnState.CONNECTED && !hasPendingProfileSwitch() && !latencyInProgress
         binding.pingProgress.isVisible = latencyInProgress
         if (latencyInProgress) {
             binding.testSelected.text = ""
@@ -1103,10 +1117,9 @@ internal enum class ConnectionCardState {
 internal fun connectionCardState(
     selected: Boolean,
     connected: Boolean,
-    hasConnectedProfile: Boolean,
 ): ConnectionCardState = when {
     connected -> ConnectionCardState.CONNECTED
-    selected && !hasConnectedProfile -> ConnectionCardState.SELECTED
+    selected -> ConnectionCardState.SELECTED
     else -> ConnectionCardState.INACTIVE
 }
 

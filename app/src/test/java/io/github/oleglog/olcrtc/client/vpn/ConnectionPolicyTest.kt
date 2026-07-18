@@ -21,6 +21,14 @@ class ConnectionPolicyTest {
     }
 
     @Test
+    fun reusesTunOnlyBetweenOlcrtcProfiles() {
+        assertTrue(shouldReuseTunForProfileSwitch(previousIsOlcrtc = true, nextIsOlcrtc = true))
+        assertFalse(shouldReuseTunForProfileSwitch(previousIsOlcrtc = true, nextIsOlcrtc = false))
+        assertFalse(shouldReuseTunForProfileSwitch(previousIsOlcrtc = false, nextIsOlcrtc = true))
+        assertFalse(shouldReuseTunForProfileSwitch(previousIsOlcrtc = false, nextIsOlcrtc = false))
+    }
+
+    @Test
     fun reconnectsOnlyAfterSecondConsecutiveHealthFailure() {
         assertFalse(shouldReconnectAfterHealthFailures(0))
         assertFalse(shouldReconnectAfterHealthFailures(1))

@@ -5,22 +5,22 @@ import org.junit.Test
 
 class ConnectionCardStateTest {
     @Test
-    fun connectedCardIsTheOnlyHighlightedCard() {
+    fun connectedAndSwitchTargetHaveDistinctHighlights() {
         assertEquals(
             ConnectionCardState.CONNECTED,
-            connectionCardState(selected = true, connected = true, hasConnectedProfile = true),
+            connectionCardState(selected = true, connected = true),
         )
         assertEquals(
-            ConnectionCardState.INACTIVE,
-            connectionCardState(selected = true, connected = false, hasConnectedProfile = true),
+            ConnectionCardState.SELECTED,
+            connectionCardState(selected = true, connected = false),
         )
     }
 
     @Test
-    fun selectionIsVisibleOnlyWhileDisconnected() {
+    fun selectionIsVisibleWhileDisconnected() {
         assertEquals(
             ConnectionCardState.SELECTED,
-            connectionCardState(selected = true, connected = false, hasConnectedProfile = false),
+            connectionCardState(selected = true, connected = false),
         )
     }
 

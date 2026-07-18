@@ -126,11 +126,20 @@ internal class ParticleDriftView @JvmOverloads constructor(
                 RoutingSettings.BackgroundEffects.Style.RAIN -> Particle(
                     x = Random.nextFloat() * lastWidth,
                     y = Random.nextFloat() * lastHeight,
-                    size = dp(0.8f + Random.nextFloat() * 0.7f),
-                    length = dp(9f + Random.nextFloat() * 13f),
-                    speedX = (-32f - Random.nextFloat() * 24f) * speedScale,
-                    speedY = (360f + Random.nextFloat() * 300f) * speedScale,
-                    alpha = Random.nextInt(65, 125),
+                    size = dp(0.7f + Random.nextFloat() * 0.5f),
+                    length = dp(6f + Random.nextFloat() * 5f),
+                    speedX = -14f - Random.nextFloat() * 14f,
+                    speedY = 150f + Random.nextFloat() * 80f,
+                    alpha = Random.nextInt(40, 86),
+                )
+                RoutingSettings.BackgroundEffects.Style.GLOW -> Particle(
+                    x = Random.nextFloat() * lastWidth,
+                    y = Random.nextFloat() * lastHeight,
+                    size = dp(1.8f + Random.nextFloat() * 2f),
+                    length = 0f,
+                    speedX = (-7f + Random.nextFloat() * 14f) * speedScale,
+                    speedY = (-5f + Random.nextFloat() * 10f) * speedScale,
+                    alpha = Random.nextInt(58, 112),
                 )
             }
         }
@@ -157,6 +166,12 @@ internal class ParticleDriftView @JvmOverloads constructor(
                         particle.x = Random.nextFloat() * (width + particle.length)
                     }
                 }
+                RoutingSettings.BackgroundEffects.Style.GLOW -> {
+                    if (particle.x < -particle.size) particle.x = width + particle.size
+                    if (particle.x > width + particle.size) particle.x = -particle.size
+                    if (particle.y < -particle.size) particle.y = height + particle.size
+                    if (particle.y > height + particle.size) particle.y = -particle.size
+                }
             }
         }
     }
@@ -181,6 +196,14 @@ internal class ParticleDriftView @JvmOverloads constructor(
                         particle.y - particle.length,
                         paint,
                     )
+                }
+                RoutingSettings.BackgroundEffects.Style.GLOW -> {
+                    paint.style = Paint.Style.FILL
+                    paint.alpha = particle.alpha / 3
+                    canvas.drawCircle(particle.x, particle.y, particle.size * 2.4f, paint)
+                    paint.alpha = particle.alpha
+                    canvas.drawCircle(particle.x, particle.y, particle.size, paint)
+                    paint.alpha = 255
                 }
             }
         }

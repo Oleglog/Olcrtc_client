@@ -19,6 +19,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.os.LocaleListCompat
 import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
@@ -227,62 +228,78 @@ class SettingsFragment : Fragment() {
             setText(R.string.settings_background_effect_enabled)
             isChecked = current.enabled
         }
-        val styleButton = com.google.android.material.button.MaterialButton(requireContext()).apply {
-            text = settingsRowText(R.string.settings_background_effect_style, backgroundEffectStyleLabel(selectedStyle))
-            setOnClickListener {
-                val values = RoutingSettings.BackgroundEffects.Style.entries
-                MaterialAlertDialogBuilder(requireContext())
-                    .setTitle(R.string.settings_background_effect_style)
-                    .setSingleChoiceItems(
-                        values.map(::backgroundEffectStyleLabel).toTypedArray(),
-                        values.indexOf(selectedStyle),
-                    ) { dialog, index ->
-                        selectedStyle = values[index]
-                        text = settingsRowText(
-                            R.string.settings_background_effect_style,
-                            backgroundEffectStyleLabel(selectedStyle),
-                        )
-                        dialog.dismiss()
-                    }
-                    .setNegativeButton(R.string.cancel, null)
-                    .show()
+        val styleButtons = mutableMapOf<Int, RoutingSettings.BackgroundEffects.Style>()
+        val styleGroup = MaterialButtonToggleGroup(requireContext()).apply {
+            isSingleSelection = true
+            isSelectionRequired = true
+            RoutingSettings.BackgroundEffects.Style.entries.forEach { style ->
+                val button = MaterialButton(
+                    requireContext(),
+                    null,
+                    com.google.android.material.R.attr.materialButtonOutlinedStyle,
+                ).apply {
+                    id = View.generateViewId()
+                    text = backgroundEffectStyleLabel(style)
+                    maxLines = 1
+                    applySegmentedStyle()
+                }
+                styleButtons[button.id] = style
+                addView(button, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            }
+            addOnButtonCheckedListener { _, checkedId, isChecked ->
+                if (isChecked) selectedStyle = styleButtons.getValue(checkedId)
             }
         }
-        val intensityButton = com.google.android.material.button.MaterialButton(requireContext()).apply {
-            text = settingsRowText(
-                R.string.settings_background_effect_intensity,
-                backgroundEffectIntensityLabel(selectedIntensity),
-            )
-            setOnClickListener {
-                val values = RoutingSettings.BackgroundEffects.Intensity.entries
-                MaterialAlertDialogBuilder(requireContext())
-                    .setTitle(R.string.settings_background_effect_intensity)
-                    .setSingleChoiceItems(
-                        values.map(::backgroundEffectIntensityLabel).toTypedArray(),
-                        values.indexOf(selectedIntensity),
-                    ) { dialog, index ->
-                        selectedIntensity = values[index]
-                        text = settingsRowText(
-                            R.string.settings_background_effect_intensity,
-                            backgroundEffectIntensityLabel(selectedIntensity),
-                        )
-                        dialog.dismiss()
-                    }
-                    .setNegativeButton(R.string.cancel, null)
-                    .show()
+        styleGroup.check(styleButtons.entries.first { it.value == selectedStyle }.key)
+        val intensityButtons = mutableMapOf<Int, RoutingSettings.BackgroundEffects.Intensity>()
+        val intensityGroup = MaterialButtonToggleGroup(requireContext()).apply {
+            isSingleSelection = true
+            isSelectionRequired = true
+            RoutingSettings.BackgroundEffects.Intensity.entries.forEach { intensity ->
+                val button = MaterialButton(
+                    requireContext(),
+                    null,
+                    com.google.android.material.R.attr.materialButtonOutlinedStyle,
+                ).apply {
+                    id = View.generateViewId()
+                    text = backgroundEffectIntensityLabel(intensity)
+                    maxLines = 1
+                    applySegmentedStyle()
+                }
+                intensityButtons[button.id] = intensity
+                addView(button, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+            }
+            addOnButtonCheckedListener { _, checkedId, isChecked ->
+                if (isChecked) selectedIntensity = intensityButtons.getValue(checkedId)
             }
         }
-        val always = MaterialSwitch(requireContext()).apply {
-            setText(R.string.settings_background_effect_always)
-            isChecked = current.always
-        }
+        intensityGroup.check(intensityButtons.entries.first { it.value == selectedIntensity }.key)
         val content = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(24.dp, 8.dp, 24.dp, 0)
             addView(enabled)
-            addView(styleButton)
-            addView(intensityButton)
-            addView(always)
+            addView(TextView(requireContext()).apply {
+                setText(R.string.settings_background_effect_style)
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall)
+            }, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = 12.dp
+                bottomMargin = 8.dp
+            })
+            addView(styleGroup)
+            addView(TextView(requireContext()).apply {
+                setText(R.string.settings_background_effect_intensity)
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall)
+            }, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply {
+                topMargin = 12.dp
+                bottomMargin = 8.dp
+            })
+            addView(intensityGroup)
         }
         MaterialAlertDialogBuilder(requireContext())
             .setTitle(R.string.settings_background_effects)
@@ -296,7 +313,6 @@ class SettingsFragment : Fragment() {
                                 enabled = enabled.isChecked,
                                 style = selectedStyle,
                                 intensity = selectedIntensity,
-                                always = always.isChecked,
                             ),
                         )
                     }
@@ -316,13 +332,6 @@ class SettingsFragment : Fragment() {
                 R.string.settings_background_effect_summary_format,
                 backgroundEffectStyleLabel(value.style),
                 backgroundEffectIntensityLabel(value.intensity),
-                getString(
-                    if (value.always) {
-                        R.string.settings_background_effect_visibility_always
-                    } else {
-                        R.string.settings_background_effect_visibility_vpn
-                    },
-                ),
             )
         }
 
@@ -330,6 +339,7 @@ class SettingsFragment : Fragment() {
         when (value) {
             RoutingSettings.BackgroundEffects.Style.SNOW -> R.string.settings_background_effect_snow
             RoutingSettings.BackgroundEffects.Style.RAIN -> R.string.settings_background_effect_rain
+            RoutingSettings.BackgroundEffects.Style.GLOW -> R.string.settings_background_effect_glow
         },
     )
 
@@ -375,6 +385,7 @@ class SettingsFragment : Fragment() {
                     setText(label)
                     maxLines = 2
                     minHeight = 56.dp
+                    applySegmentedStyle()
                 }
                 presetButtons[button.id] = preset
                 addView(
@@ -863,6 +874,7 @@ class SettingsFragment : Fragment() {
                     id = View.generateViewId()
                     text = apkTabLabel(asset)
                     maxLines = 1
+                    applySegmentedStyle()
                 }
                 buttonAssets[button.id] = asset
                 addView(button, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
@@ -1084,6 +1096,12 @@ class SettingsFragment : Fragment() {
         )
         runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
             .onFailure { _binding?.status?.text = it.message }
+    }
+
+    private fun MaterialButton.applySegmentedStyle() {
+        backgroundTintList = AppCompatResources.getColorStateList(requireContext(), R.color.segmented_button_background)
+        strokeColor = AppCompatResources.getColorStateList(requireContext(), R.color.segmented_button_stroke)
+        setTextColor(AppCompatResources.getColorStateList(requireContext(), R.color.segmented_button_text))
     }
 
     private val Int.dp get() = (this * resources.displayMetrics.density).toInt()

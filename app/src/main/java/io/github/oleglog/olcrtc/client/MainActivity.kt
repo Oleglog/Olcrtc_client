@@ -180,7 +180,6 @@ class MainActivity : AppCompatActivity() {
         lastConnectionStage = stage
         lastReconnectAttempt = reconnectAttempt
         hasVpnState = true
-        updateBackgroundEffects()
         stateListener?.invoke(state, error, stage, reconnectAttempt)
     }
 
@@ -188,12 +187,7 @@ class MainActivity : AppCompatActivity() {
         backgroundEffects = RoutingSettings.open(applicationContext).getBackgroundEffects()
         binding.backgroundEffects.configure(backgroundEffects)
         binding.backgroundEffects.isVisible = backgroundEffects.enabled
-        updateBackgroundEffects()
-    }
-
-    private fun updateBackgroundEffects() {
-        val vpnActive = lastVpnState == VpnState.CONNECTED || lastVpnState == VpnState.RECONNECTING
-        binding.backgroundEffects.setActive(backgroundEffectsActive(backgroundEffects, vpnActive))
+        binding.backgroundEffects.setActive(backgroundEffects.enabled)
     }
 
     private fun showBatteryOptimizationRecommendation(): Boolean {
@@ -448,11 +442,6 @@ class MainActivity : AppCompatActivity() {
         val asset: GitHubRelease.ReleaseAsset,
     )
 }
-
-internal fun backgroundEffectsActive(
-    settings: RoutingSettings.BackgroundEffects,
-    vpnActive: Boolean,
-): Boolean = settings.enabled && (settings.always || vpnActive)
 
 internal fun shouldShowBatteryOptimizationPrompt(
     ignoringOptimizations: Boolean,

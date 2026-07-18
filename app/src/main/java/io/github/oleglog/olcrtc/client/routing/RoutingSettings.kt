@@ -34,14 +34,13 @@ internal class RoutingSettings private constructor(
     fun getBackgroundEffects(): BackgroundEffects = runBlocking {
         val preferences = store.data.first()
         BackgroundEffects(
-            enabled = preferences[BACKGROUND_EFFECTS] ?: false,
+            enabled = preferences[BACKGROUND_EFFECTS] ?: true,
             style = preferences[BACKGROUND_EFFECT_STYLE]
                 ?.let { runCatching { BackgroundEffects.Style.valueOf(it) }.getOrNull() }
                 ?: BackgroundEffects.Style.SNOW,
             intensity = preferences[BACKGROUND_EFFECT_INTENSITY]
                 ?.let { runCatching { BackgroundEffects.Intensity.valueOf(it) }.getOrNull() }
                 ?: BackgroundEffects.Intensity.MEDIUM,
-            always = preferences[BACKGROUND_EFFECT_ALWAYS] ?: false,
         )
     }
 
@@ -78,7 +77,6 @@ internal class RoutingSettings private constructor(
             preferences[BACKGROUND_EFFECTS] = value.enabled
             preferences[BACKGROUND_EFFECT_STYLE] = value.style.name
             preferences[BACKGROUND_EFFECT_INTENSITY] = value.intensity.name
-            preferences[BACKGROUND_EFFECT_ALWAYS] = value.always
         }
     }
 
@@ -129,12 +127,11 @@ internal class RoutingSettings private constructor(
     }
 
     data class BackgroundEffects(
-        val enabled: Boolean = false,
+        val enabled: Boolean = true,
         val style: Style = Style.SNOW,
         val intensity: Intensity = Intensity.MEDIUM,
-        val always: Boolean = false,
     ) {
-        enum class Style { SNOW, RAIN }
+        enum class Style { SNOW, RAIN, GLOW }
         enum class Intensity { LOW, MEDIUM, HIGH }
     }
 
@@ -146,7 +143,6 @@ internal class RoutingSettings private constructor(
         private val BACKGROUND_EFFECTS = booleanPreferencesKey("background_effects")
         private val BACKGROUND_EFFECT_STYLE = stringPreferencesKey("background_effect_style")
         private val BACKGROUND_EFFECT_INTENSITY = stringPreferencesKey("background_effect_intensity")
-        private val BACKGROUND_EFFECT_ALWAYS = booleanPreferencesKey("background_effect_always")
         private val PER_APP_MODE = stringPreferencesKey("per_app_mode")
         private val PER_APP_PACKAGES = stringSetPreferencesKey("per_app_packages")
         private val VPN_DESIRED_CONNECTED = booleanPreferencesKey("vpn_desired_connected")
