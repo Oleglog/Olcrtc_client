@@ -114,8 +114,8 @@ internal object NativeConfig {
                 "vnext": [{
                   "address": "${profile.json(profile.address)}",
                   "port": ${profile.port},
-                  "users": [{ "id": "${profile.json(profile.uuid!!)}", "encryption": "none"${profile.flow?.let { ", \"flow\": \"${profile.json(it)}\"" } ?: ""} }]
-                }]
+                  "users": [{ "id": "${profile.json(profile.uuid!!)}", "encryption": "none"${profile.flow?.let { ", \"flow\": \"${profile.json("$it-udp443")}\"" } ?: ""} }]
+                }]${profile.flow?.let { ",\n\"packetEncoding\": \"xudp\"" } ?: ""}
             """.trimIndent()
             StandardProfile.Protocol.VMESS -> """
                 "vnext": [{

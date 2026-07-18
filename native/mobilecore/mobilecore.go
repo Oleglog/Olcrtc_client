@@ -208,6 +208,9 @@ func runURLTest(link string, timeoutMillis int, dial destinationDialer) (int64, 
 		return 0, err
 	}
 	response.Body.Close()
+	if response.StatusCode != http.StatusNoContent {
+		return 0, fmt.Errorf("URL test returned HTTP %d", response.StatusCode)
+	}
 	return time.Since(startedAt).Milliseconds(), nil
 }
 
