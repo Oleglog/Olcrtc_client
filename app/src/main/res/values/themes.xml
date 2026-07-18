@@ -21,6 +21,12 @@
         <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.OlcrtcClient.LargeComponent</item>
     </style>
 
+    <style name="Theme.OlcrtcClient.ProfileChooser" parent="Theme.OlcrtcClient">
+        <item name="android:backgroundDimEnabled">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+    </style>
+
     <style name="ShapeAppearance.OlcrtcClient.MediumComponent" parent="ShapeAppearance.Material3.MediumComponent">
         <item name="cornerSize">8dp</item>
     </style>

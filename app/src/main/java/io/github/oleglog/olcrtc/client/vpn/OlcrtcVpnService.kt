@@ -263,7 +263,6 @@ class OlcrtcVpnService : VpnService() {
                 stopVpn()
             }
             ACTION_RECONNECT -> commands.execute(::reconnectVpn)
-            ACTION_SWITCH_NEXT -> commands.execute(::switchToNextProfile)
             ACTION_TOGGLE -> {
                 startForeground(NOTIFICATION_ID, notification())
                 commands.execute(::toggleDesiredVpn)
@@ -444,18 +443,6 @@ class OlcrtcVpnService : VpnService() {
             VpnState.DISCONNECTED, VpnState.ERROR -> startProfile(reference)
             else -> Unit
         }
-    }
-
-    private fun switchToNextProfile() {
-        if (publishedState != VpnState.CONNECTED) return
-        val candidates = profiles.listLocal().map { ProfileReference.Local(it.id) } +
-            profiles.listSubscriptions().flatMap { subscription ->
-                profiles.listSubscriptionProfiles(subscription.id).map { ProfileReference.Subscription(it.id) }
-            }
-        val index = nextProfileIndex(activeProfile?.sessionId, candidates.map { it.sessionId }) ?: return
-        val target = candidates[index]
-        persistVpnIntent(true, target)
-        startProfile(target)
     }
 
     private fun loadProfile(reference: ProfileReference): ProfileConfig? = when (reference) {
@@ -1177,8 +1164,9 @@ class OlcrtcVpnService : VpnService() {
                 ),
             )
             .setOngoing(true)
-        if (publishedState == VpnState.CONNECTED) {
-            builder.addAction(0, getString(R.string.vpn_notification_next_profile), switchNextPendingIntent())
+            .setContentIntent(mainActivityPendingIntent())
+        if (publishedState == VpnState.CONNECTED || publishedState == VpnState.ERROR) {
+            builder.addAction(0, getString(R.string.vpn_notification_choose_profile), profileChooserPendingIntent())
         }
         if (publishedState == VpnState.CONNECTED || publishedState == VpnState.ERROR) {
             builder.addAction(0, getString(R.string.vpn_notification_reconnect), reconnectPendingIntent())
@@ -1198,6 +1186,8 @@ class OlcrtcVpnService : VpnService() {
                 } ?: notificationStateText(),
             )
             .setAutoCancel(true)
+            .setContentIntent(mainActivityPendingIntent())
+            .addAction(0, getString(R.string.vpn_notification_choose_profile), profileChooserPendingIntent())
             .addAction(0, getString(R.string.vpn_notification_connect), togglePendingIntent())
             .build()
     }
@@ -1246,9 +1236,22 @@ class OlcrtcVpnService : VpnService() {
 
     private fun reconnectPendingIntent(): PendingIntent = servicePendingIntent(ACTION_RECONNECT, RECONNECT_REQUEST_CODE)
 
-    private fun switchNextPendingIntent(): PendingIntent = servicePendingIntent(ACTION_SWITCH_NEXT, SWITCH_NEXT_REQUEST_CODE)
-
     private fun togglePendingIntent(): PendingIntent = servicePendingIntent(ACTION_TOGGLE, TOGGLE_REQUEST_CODE)
+
+    private fun mainActivityPendingIntent(): PendingIntent = PendingIntent.getActivity(
+        this,
+        MAIN_ACTIVITY_REQUEST_CODE,
+        Intent(this, io.github.oleglog.olcrtc.client.MainActivity::class.java),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
+
+    private fun profileChooserPendingIntent(): PendingIntent = PendingIntent.getActivity(
+        this,
+        PROFILE_CHOOSER_REQUEST_CODE,
+        Intent(this, ProfileChooserActivity::class.java)
+            .putExtra(ProfileChooserActivity.EXTRA_ACTIVE_PROFILE, activeProfile?.sessionId),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+    )
 
     private fun servicePendingIntent(action: String, requestCode: Int): PendingIntent {
         val intent = Intent(this, OlcrtcVpnService::class.java).setAction(action)
@@ -1342,7 +1345,6 @@ class OlcrtcVpnService : VpnService() {
         const val ACTION_START = "io.github.oleglog.olcrtc.client.vpn.START"
         const val ACTION_STOP = "io.github.oleglog.olcrtc.client.vpn.STOP"
         const val ACTION_RECONNECT = "io.github.oleglog.olcrtc.client.vpn.RECONNECT"
-        const val ACTION_SWITCH_NEXT = "io.github.oleglog.olcrtc.client.vpn.SWITCH_NEXT"
         const val ACTION_TOGGLE = "io.github.oleglog.olcrtc.client.vpn.TOGGLE"
         const val EXTRA_PROFILE_ID = "profile_id"
         const val EXTRA_SUBSCRIPTION_PROFILE_ID = "subscription_profile_id"
@@ -1350,8 +1352,9 @@ class OlcrtcVpnService : VpnService() {
         const val NOTIFICATION_ID = 1
         private const val STOP_REQUEST_CODE = 1
         private const val RECONNECT_REQUEST_CODE = 2
-        private const val SWITCH_NEXT_REQUEST_CODE = 3
         private const val TOGGLE_REQUEST_CODE = 4
+        private const val MAIN_ACTIVITY_REQUEST_CODE = 5
+        private const val PROFILE_CHOOSER_REQUEST_CODE = 6
         const val VPN_MTU = 1500
         const val VPN_IPV4_ADDRESS = "10.0.0.2"
         const val VPN_IPV4_PREFIX = 32

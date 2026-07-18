@@ -342,7 +342,9 @@
     <string name="vpn_notification_profile">%1$s · %2$s</string>
     <string name="vpn_notification_speed">↑ %1$s ↓ %2$s</string>
     <string name="vpn_notification_connect">Connect</string>
-    <string name="vpn_notification_next_profile">Next profile</string>
+    <string name="vpn_notification_choose_profile">Profile</string>
+    <string name="vpn_notification_profile_chooser_title">Choose connection</string>
+    <string name="vpn_notification_profile_chooser_empty">No connections available</string>
     <string name="vpn_notification_reconnect">Reconnect</string>
     <string name="vpn_notification_disconnect">Disconnect</string>
     <string name="vpn_tile_label">olcRTC VPN</string>
