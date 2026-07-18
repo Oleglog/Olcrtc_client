@@ -12,6 +12,7 @@ class VersionComparatorTest {
         assertTrue(VersionComparator.isNewer("v1.1.1", "1.1.0"))
         assertTrue(VersionComparator.isNewer("v1.1.2", "1.1.1"))
         assertTrue(VersionComparator.isNewer("v1.1.3", "1.1.2"))
+        assertTrue(VersionComparator.isNewer("v1.1.4", "1.1.3"))
         assertTrue(VersionComparator.isNewer("2.0.0-beta.1", "1.9.9"))
         assertFalse(VersionComparator.isNewer("v1.0.0", "1.0.0"))
         assertFalse(VersionComparator.isNewer("v0.9.9", "1.0.0"))

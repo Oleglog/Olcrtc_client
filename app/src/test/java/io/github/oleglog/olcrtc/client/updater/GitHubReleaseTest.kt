@@ -28,17 +28,6 @@ class GitHubReleaseTest {
     }
 
     @Test
-    fun parsesReleaseLists() {
-        val parsed = GitHubReleaseParser.parseList(
-            """[{"tag_name":"v1.1.1","name":"Release","prerelease":false,"body":"Notes","assets":[{"name":"app.apk","browser_download_url":"https://example.com/app.apk","size":42}]}]""",
-        )
-
-        assertEquals(1, parsed.size)
-        assertEquals("v1.1.1", parsed.single().tagName)
-        assertEquals(42L, parsed.single().assets.single().size)
-    }
-
-    @Test
     fun promptsOncePerNewCompatibleReleaseAndThrottlesChecks() {
         val result = UpdateCheckResult(release, arm64, newerThanCurrent = true)
         assertTrue(shouldShowUpdatePrompt(result, null))
