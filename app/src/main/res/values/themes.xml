@@ -27,8 +27,69 @@
         <item name="android:windowIsTranslucent">true</item>
     </style>
 
+    <style name="ThemeOverlay.OlcrtcClient.Bronze">
+        <item name="colorPrimary">@color/olcrtc_bronze_primary</item>
+        <item name="colorOnPrimary">@color/olcrtc_bronze_on_primary</item>
+        <item name="colorPrimaryContainer">@color/olcrtc_bronze_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/olcrtc_bronze_on_primary_container</item>
+        <item name="colorSecondary">@color/olcrtc_bronze_secondary</item>
+        <item name="colorOnSecondary">@color/olcrtc_bronze_on_secondary</item>
+        <item name="colorSurface">@color/olcrtc_bronze_surface</item>
+        <item name="colorOnSurface">@color/olcrtc_bronze_on_surface</item>
+        <item name="colorSurfaceVariant">@color/olcrtc_bronze_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/olcrtc_bronze_on_surface_variant</item>
+        <item name="colorOutline">@color/olcrtc_bronze_outline</item>
+        <item name="android:colorBackground">@color/olcrtc_bronze_surface</item>
+        <item name="android:navigationBarColor">@color/olcrtc_bronze_surface</item>
+    </style>
+
+    <style name="ThemeOverlay.OlcrtcClient.Polar">
+        <item name="colorPrimary">@color/olcrtc_polar_primary</item>
+        <item name="colorOnPrimary">@color/olcrtc_polar_on_primary</item>
+        <item name="colorPrimaryContainer">@color/olcrtc_polar_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/olcrtc_polar_on_primary_container</item>
+        <item name="colorSecondary">@color/olcrtc_polar_secondary</item>
+        <item name="colorOnSecondary">@color/olcrtc_polar_on_secondary</item>
+        <item name="colorSurface">@color/olcrtc_polar_surface</item>
+        <item name="colorOnSurface">@color/olcrtc_polar_on_surface</item>
+        <item name="colorSurfaceVariant">@color/olcrtc_polar_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/olcrtc_polar_on_surface_variant</item>
+        <item name="colorOutline">@color/olcrtc_polar_outline</item>
+        <item name="android:colorBackground">@color/olcrtc_polar_surface</item>
+        <item name="android:navigationBarColor">@color/olcrtc_polar_surface</item>
+    </style>
+
     <style name="ShapeAppearance.OlcrtcClient.MediumComponent" parent="ShapeAppearance.Material3.MediumComponent">
         <item name="cornerSize">8dp</item>
+    </style>
+
+    <style name="Widget.OlcrtcClient.SettingsRow" parent="Widget.Material3.Button.TextButton">
+        <item name="android:gravity">start|center_vertical</item>
+        <item name="android:maxLines">3</item>
+        <item name="android:minHeight">68dp</item>
+        <item name="android:paddingStart">16dp</item>
+        <item name="android:paddingEnd">12dp</item>
+        <item name="android:textAlignment">viewStart</item>
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="cornerRadius">0dp</item>
+        <item name="iconGravity">end</item>
+        <item name="iconTint">?attr/colorOnSurfaceVariant</item>
+        <item name="insetTop">0dp</item>
+        <item name="insetBottom">0dp</item>
+    </style>
+
+    <style name="Widget.OlcrtcClient.SettingsDivider">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">1dp</item>
+        <item name="android:layout_marginStart">16dp</item>
+        <item name="android:layout_marginEnd">16dp</item>
+        <item name="android:alpha">0.25</item>
+        <item name="android:background">?attr/colorOutline</item>
+    </style>
+
+    <style name="Widget.OlcrtcClient.BottomNavigation.ActiveIndicator"
+        parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">?attr/colorPrimaryContainer</item>
     </style>
 
     <style name="ShapeAppearance.OlcrtcClient.LargeComponent" parent="ShapeAppearance.Material3.LargeComponent">

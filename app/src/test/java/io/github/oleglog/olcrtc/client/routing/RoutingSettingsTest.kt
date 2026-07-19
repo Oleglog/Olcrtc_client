@@ -36,4 +36,13 @@ class RoutingSettingsTest {
             RoutingSettings.VpnIntent(desiredConnected = true, subscriptionProfileId = " ")
         }
     }
+
+    @Test
+    fun parsesAppearancePaletteAndRejectsInvalidGlowIntensity() {
+        assertEquals(RoutingSettings.Appearance.Palette.POLAR, parseAppearancePalette("POLAR"))
+        assertEquals(RoutingSettings.Appearance.Palette.SAGE, parseAppearancePalette("unknown"))
+        assertThrows(IllegalArgumentException::class.java) {
+            RoutingSettings.Appearance(glowIntensity = 101)
+        }
+    }
 }

@@ -1,169 +1,188 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true">
+    android:background="?attr/colorSurface"
+    android:clipToPadding="false"
+    android:fillViewport="true"
+    android:paddingBottom="@dimen/space_5">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="@dimen/page_padding">
+        android:paddingStart="@dimen/page_padding"
+        android:paddingTop="@dimen/space_4"
+        android:paddingEnd="@dimen/page_padding">
 
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:text="@string/navigation_settings"
-            android:textAppearance="?attr/textAppearanceHeadlineMedium" />
+            android:textAppearance="?attr/textAppearanceHeadlineSmall" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/settings_routing_row"
-            style="?attr/materialButtonOutlinedStyle"
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_4"
-            android:gravity="start|center_vertical"
-            android:maxLines="3"
-            android:minHeight="64dp"
-            android:text="@string/settings_routing_title"
-            app:cornerRadius="@dimen/corner_button"
-            app:icon="@drawable/ic_chevron_right_24"
-            app:iconGravity="textEnd" />
+            android:layout_marginTop="@dimen/space_1"
+            android:text="@string/settings_intro"
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="?attr/colorOnSurfaceVariant" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/settings_apps_row"
-            style="?attr/materialButtonOutlinedStyle"
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_2"
-            android:gravity="start|center_vertical"
-            android:maxLines="3"
-            android:minHeight="64dp"
-            android:text="@string/settings_per_app_title"
-            app:cornerRadius="@dimen/corner_button"
-            app:icon="@drawable/ic_chevron_right_24"
-            app:iconGravity="textEnd" />
+            android:layout_marginTop="@dimen/space_5"
+            android:layout_marginBottom="@dimen/space_2"
+            android:text="@string/settings_group_connection"
+            android:textAppearance="?attr/textAppearanceLabelLarge"
+            android:textColor="?attr/colorOnSurfaceVariant" />
 
-        <FrameLayout
-            android:id="@+id/settings_effects_row"
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_2"
-            android:background="@drawable/bg_settings_row"
-            android:clickable="true"
-            android:focusable="true"
-            android:foreground="?attr/selectableItemBackground"
-            android:minHeight="64dp"
-            android:padding="@dimen/space_3">
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="@dimen/corner_quiet"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorOutline"
+            app:strokeWidth="1dp">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="center_vertical"
-                android:orientation="vertical"
-                android:paddingEnd="64dp">
+                android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/settings_effects_title"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/settings_routing_row"
+                    style="@style/Widget.OlcrtcClient.SettingsRow"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/settings_background_effects"
-                    android:textAppearance="?attr/textAppearanceTitleSmall" />
+                    android:text="@string/settings_routing_title"
+                    app:icon="@drawable/ic_chevron_right_24" />
 
-                <TextView
-                    android:id="@+id/settings_effects_summary"
+                <View style="@style/Widget.OlcrtcClient.SettingsDivider" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/settings_apps_row"
+                    style="@style/Widget.OlcrtcClient.SettingsRow"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_1"
-                    android:text="@string/settings_background_effects_summary"
-                    android:textAppearance="?attr/textAppearanceBodySmall"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
+                    android:text="@string/settings_per_app_title"
+                    app:icon="@drawable/ic_chevron_right_24" />
+
+                <View style="@style/Widget.OlcrtcClient.SettingsDivider" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/settings_dns_row"
+                    style="@style/Widget.OlcrtcClient.SettingsRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/dns_server"
+                    app:icon="@drawable/ic_chevron_right_24" />
             </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
-            <com.google.android.material.materialswitch.MaterialSwitch
-                android:id="@+id/settings_effects_switch"
-                android:layout_width="wrap_content"
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/space_5"
+            android:layout_marginBottom="@dimen/space_2"
+            android:text="@string/settings_group_interface"
+            android:textAppearance="?attr/textAppearanceLabelLarge"
+            android:textColor="?attr/colorOnSurfaceVariant" />
+
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardBackgroundColor="?attr/colorSurfaceVariant"
+            app:cardCornerRadius="@dimen/corner_quiet"
+            app:cardElevation="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_gravity="end|center_vertical" />
-        </FrameLayout>
+                android:orientation="vertical">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/settings_dns_row"
-            style="?attr/materialButtonOutlinedStyle"
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/settings_appearance_row"
+                    style="@style/Widget.OlcrtcClient.SettingsRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_appearance_title"
+                    app:icon="@drawable/ic_chevron_right_24" />
+
+                <View style="@style/Widget.OlcrtcClient.SettingsDivider" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/settings_system_row"
+                    style="@style/Widget.OlcrtcClient.SettingsRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_system_title"
+                    app:icon="@drawable/ic_chevron_right_24" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_2"
-            android:gravity="start|center_vertical"
-            android:maxLines="3"
-            android:minHeight="64dp"
-            android:text="@string/dns_server"
-            app:cornerRadius="@dimen/corner_button"
-            app:icon="@drawable/ic_chevron_right_24"
-            app:iconGravity="textEnd" />
+            android:layout_marginTop="@dimen/space_5"
+            android:layout_marginBottom="@dimen/space_2"
+            android:text="@string/settings_group_support"
+            android:textAppearance="?attr/textAppearanceLabelLarge"
+            android:textColor="?attr/colorOnSurfaceVariant" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/settings_system_row"
-            style="?attr/materialButtonOutlinedStyle"
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_2"
-            android:gravity="start|center_vertical"
-            android:maxLines="3"
-            android:minHeight="64dp"
-            android:text="@string/settings_system_title"
-            app:cornerRadius="@dimen/corner_button"
-            app:icon="@drawable/ic_chevron_right_24"
-            app:iconGravity="textEnd" />
+            app:cardBackgroundColor="?attr/colorSurface"
+            app:cardCornerRadius="@dimen/corner_quiet"
+            app:cardElevation="0dp"
+            app:strokeColor="?attr/colorOutline"
+            app:strokeWidth="1dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/settings_updates_row"
-            style="?attr/materialButtonOutlinedStyle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_2"
-            android:gravity="start|center_vertical"
-            android:maxLines="3"
-            android:minHeight="64dp"
-            android:text="@string/settings_updates_title"
-            app:cornerRadius="@dimen/corner_button"
-            app:icon="@drawable/ic_chevron_right_24"
-            app:iconGravity="textEnd" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/settings_diagnostics_row"
-            style="?attr/materialButtonOutlinedStyle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_2"
-            android:gravity="start|center_vertical"
-            android:maxLines="3"
-            android:minHeight="64dp"
-            android:text="@string/settings_diagnostics_title"
-            app:cornerRadius="@dimen/corner_button"
-            app:icon="@drawable/ic_chevron_right_24"
-            app:iconGravity="textEnd" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/settings_updates_row"
+                    style="@style/Widget.OlcrtcClient.SettingsRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_updates_title"
+                    app:icon="@drawable/ic_chevron_right_24" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/settings_about_row"
-            style="?attr/materialButtonOutlinedStyle"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_2"
-            android:gravity="start|center_vertical"
-            android:maxLines="3"
-            android:minHeight="64dp"
-            android:text="@string/settings_about"
-            app:cornerRadius="@dimen/corner_button"
-            app:icon="@drawable/ic_chevron_right_24"
-            app:iconGravity="textEnd" />
+                <View style="@style/Widget.OlcrtcClient.SettingsDivider" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/settings_diagnostics_row"
+                    style="@style/Widget.OlcrtcClient.SettingsRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_diagnostics_title"
+                    app:icon="@drawable/ic_chevron_right_24" />
+
+                <View style="@style/Widget.OlcrtcClient.SettingsDivider" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/settings_about_row"
+                    style="@style/Widget.OlcrtcClient.SettingsRow"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/settings_about"
+                    app:icon="@drawable/ic_chevron_right_24" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
 
         <TextView
             android:id="@+id/status"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_4"
-            android:textAppearance="?attr/textAppearanceBodyMedium" />
-
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="?attr/colorOnSurfaceVariant" />
     </LinearLayout>
-</ScrollView>
+</androidx.core.widget.NestedScrollView>

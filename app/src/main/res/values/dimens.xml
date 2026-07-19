@@ -9,6 +9,7 @@
     <dimen name="corner_card">8dp</dimen>
     <dimen name="corner_button">8dp</dimen>
     <dimen name="corner_sheet">16dp</dimen>
+    <dimen name="corner_quiet">20dp</dimen>
     <dimen name="button_primary_height">56dp</dimen>
     <dimen name="button_secondary_height">56dp</dimen>
     <dimen name="icon_touch_target">48dp</dimen>
@@ -19,5 +20,4 @@
     <dimen name="card_elevation_connected">2dp</dimen>
     <dimen name="card_elevation_selected">1dp</dimen>
     <dimen name="card_status_mark_width">5dp</dimen>
-    <dimen name="button_pulse_elevation">3dp</dimen>
 </resources>

@@ -52,7 +52,7 @@ internal class ParticleDriftView @JvmOverloads constructor(
 
     init {
         val attributes = context.obtainStyledAttributes(
-            attrs, intArrayOf(android.R.attr.colorPrimary), defStyleAttr, 0,
+            attrs, intArrayOf(com.google.android.material.R.attr.colorPrimary), defStyleAttr, 0,
         )
         accentColor = attributes.getColor(0, 0).also { attributes.recycle() }
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO

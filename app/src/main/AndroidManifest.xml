@@ -38,6 +38,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".settings.AppearanceSettingsActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".vpn.ProfileChooserActivity"
             android:excludeFromRecents="true"
             android:exported="false"

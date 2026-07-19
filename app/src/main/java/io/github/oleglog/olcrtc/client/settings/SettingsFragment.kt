@@ -1,5 +1,6 @@
 package io.github.oleglog.olcrtc.client.settings
 
+import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -17,6 +18,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.appcompat.content.res.AppCompatResources
@@ -61,6 +63,11 @@ class SettingsFragment : Fragment() {
     private val settings by lazy { RoutingSettings.open(requireContext().applicationContext) }
     private val diagnostics by lazy { DiagnosticsLogStore.open(requireContext().applicationContext) }
     private val profiles by lazy { ProfileRepository.open(requireContext().applicationContext) }
+    private val appearanceSettings = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) requireActivity().recreate()
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View {
         _binding = FragmentSettingsBinding.inflate(inflater, container, false)
@@ -71,9 +78,8 @@ class SettingsFragment : Fragment() {
         val binding = requireNotNull(_binding)
         binding.settingsRoutingRow.setOnClickListener { showRoutingSettings() }
         binding.settingsAppsRow.setOnClickListener { selectApps() }
-        binding.settingsEffectsRow.setOnClickListener { showBackgroundEffectsSettings() }
-        binding.settingsEffectsSwitch.setOnCheckedChangeListener { button, enabled ->
-            if (button.tag == null) setBackgroundEffectsEnabled(enabled)
+        binding.settingsAppearanceRow.setOnClickListener {
+            appearanceSettings.launch(Intent(requireContext(), AppearanceSettingsActivity::class.java))
         }
         binding.settingsDnsRow.setOnClickListener { showDnsSettings() }
         binding.settingsSystemRow.setOnClickListener {
@@ -101,6 +107,10 @@ class SettingsFragment : Fragment() {
         }
         binding.settingsDiagnosticsRow.setOnClickListener { showDiagnosticsMenu() }
         binding.settingsAboutRow.setOnClickListener { showAbout() }
+        binding.settingsAppearanceRow.text = settingsRowText(
+            R.string.settings_appearance_title,
+            getString(R.string.settings_appearance_summary),
+        )
         binding.settingsSystemRow.text = settingsRowText(
             R.string.settings_system_title,
             getString(R.string.settings_system_row_summary),
@@ -167,14 +177,9 @@ class SettingsFragment : Fragment() {
                     dnsServer = settings.getDnsServer(),
                     perAppPolicy = settings.getPerAppPolicy(),
                     routingRules = profiles.getEnabledRoutingRules().size,
-                    backgroundEffects = settings.getBackgroundEffects(),
                 )
             }
             val binding = _binding ?: return@launch
-            binding.settingsEffectsSwitch.tag = true
-            binding.settingsEffectsSwitch.isChecked = values.backgroundEffects.enabled
-            binding.settingsEffectsSwitch.tag = null
-            binding.settingsEffectsSummary.text = backgroundEffectsSummary(values.backgroundEffects)
             val preset = getString(
                 if (values.routingPolicy.preset == RoutingPolicy.Preset.ALL_VPN) {
                     R.string.routing_all_vpn
@@ -208,156 +213,6 @@ class SettingsFragment : Fragment() {
     private fun selectApps() {
         startActivity(Intent(requireContext(), AppSelectorActivity::class.java))
     }
-
-    private fun setBackgroundEffectsEnabled(enabled: Boolean) {
-        viewLifecycleOwner.lifecycleScope.launch {
-            withContext(Dispatchers.IO) {
-                settings.setBackgroundEffects(settings.getBackgroundEffects().copy(enabled = enabled))
-            }
-            (activity as? MainActivity)?.refreshBackgroundEffects()
-            _binding?.status?.setText(R.string.settings_saved)
-            load()
-        }
-    }
-
-    private fun showBackgroundEffectsSettings() {
-        val current = settings.getBackgroundEffects()
-        var selectedStyle = current.style
-        var selectedIntensity = current.intensity
-        val enabled = MaterialSwitch(requireContext()).apply {
-            setText(R.string.settings_background_effect_enabled)
-            isChecked = current.enabled
-        }
-        val styleButtons = mutableMapOf<Int, RoutingSettings.BackgroundEffects.Style>()
-        val styleGroup = MaterialButtonToggleGroup(requireContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            isSingleSelection = true
-            isSelectionRequired = true
-            RoutingSettings.BackgroundEffects.Style.entries.forEach { style ->
-                val button = MaterialButton(
-                    requireContext(),
-                    null,
-                    com.google.android.material.R.attr.materialButtonOutlinedStyle,
-                ).apply {
-                    id = View.generateViewId()
-                    text = backgroundEffectStyleLabel(style)
-                    maxLines = 2
-                    applySegmentedStyle()
-                }
-                styleButtons[button.id] = style
-                addView(button, LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ))
-            }
-            addOnButtonCheckedListener { _, checkedId, isChecked ->
-                if (isChecked) selectedStyle = styleButtons.getValue(checkedId)
-            }
-        }
-        styleGroup.check(styleButtons.entries.first { it.value == selectedStyle }.key)
-        val intensityButtons = mutableMapOf<Int, RoutingSettings.BackgroundEffects.Intensity>()
-        val intensityGroup = MaterialButtonToggleGroup(requireContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            isSingleSelection = true
-            isSelectionRequired = true
-            RoutingSettings.BackgroundEffects.Intensity.entries.forEach { intensity ->
-                val button = MaterialButton(
-                    requireContext(),
-                    null,
-                    com.google.android.material.R.attr.materialButtonOutlinedStyle,
-                ).apply {
-                    id = View.generateViewId()
-                    text = backgroundEffectIntensityLabel(intensity)
-                    maxLines = 2
-                    applySegmentedStyle()
-                }
-                intensityButtons[button.id] = intensity
-                addView(button, LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ))
-            }
-            addOnButtonCheckedListener { _, checkedId, isChecked ->
-                if (isChecked) selectedIntensity = intensityButtons.getValue(checkedId)
-            }
-        }
-        intensityGroup.check(intensityButtons.entries.first { it.value == selectedIntensity }.key)
-        val content = LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(24.dp, 8.dp, 24.dp, 0)
-            addView(enabled)
-            addView(TextView(requireContext()).apply {
-                setText(R.string.settings_background_effect_style)
-                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall)
-            }, LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                topMargin = 12.dp
-                bottomMargin = 8.dp
-            })
-            addView(styleGroup)
-            addView(TextView(requireContext()).apply {
-                setText(R.string.settings_background_effect_intensity)
-                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall)
-            }, LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-            ).apply {
-                topMargin = 12.dp
-                bottomMargin = 8.dp
-            })
-            addView(intensityGroup)
-        }
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.settings_background_effects)
-            .setView(content)
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.save_settings) { _, _ ->
-                viewLifecycleOwner.lifecycleScope.launch {
-                    withContext(Dispatchers.IO) {
-                        settings.setBackgroundEffects(
-                            RoutingSettings.BackgroundEffects(
-                                enabled = enabled.isChecked,
-                                style = selectedStyle,
-                                intensity = selectedIntensity,
-                            ),
-                        )
-                    }
-                    (activity as? MainActivity)?.refreshBackgroundEffects()
-                    _binding?.status?.setText(R.string.settings_saved)
-                    load()
-                }
-            }
-            .show()
-    }
-
-    private fun backgroundEffectsSummary(value: RoutingSettings.BackgroundEffects): String =
-        if (!value.enabled) {
-            getString(R.string.settings_background_effect_disabled)
-        } else {
-            getString(
-                R.string.settings_background_effect_summary_format,
-                backgroundEffectStyleLabel(value.style),
-                backgroundEffectIntensityLabel(value.intensity),
-            )
-        }
-
-    private fun backgroundEffectStyleLabel(value: RoutingSettings.BackgroundEffects.Style): String = getString(
-        when (value) {
-            RoutingSettings.BackgroundEffects.Style.SNOW -> R.string.settings_background_effect_snow
-            RoutingSettings.BackgroundEffects.Style.RAIN -> R.string.settings_background_effect_rain
-            RoutingSettings.BackgroundEffects.Style.DRIFT -> R.string.settings_background_effect_drift
-        },
-    )
-
-    private fun backgroundEffectIntensityLabel(value: RoutingSettings.BackgroundEffects.Intensity): String = getString(
-        when (value) {
-            RoutingSettings.BackgroundEffects.Intensity.LOW -> R.string.settings_background_effect_intensity_low
-            RoutingSettings.BackgroundEffects.Intensity.MEDIUM -> R.string.settings_background_effect_intensity_medium
-            RoutingSettings.BackgroundEffects.Intensity.HIGH -> R.string.settings_background_effect_intensity_high
-        },
-    )
 
     private fun showRoutingSettings() {
         val choices = listOf(
@@ -1125,7 +980,6 @@ class SettingsFragment : Fragment() {
         val dnsServer: String?,
         val perAppPolicy: PerAppPolicy,
         val routingRules: Int,
-        val backgroundEffects: RoutingSettings.BackgroundEffects,
     )
 
     private companion object {

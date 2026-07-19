@@ -18,6 +18,7 @@ import io.github.oleglog.olcrtc.client.routing.AppRoutingItem
 import io.github.oleglog.olcrtc.client.routing.AppRoutingRepository
 import io.github.oleglog.olcrtc.client.routing.PerAppPolicy
 import io.github.oleglog.olcrtc.client.routing.RoutingSettings
+import io.github.oleglog.olcrtc.client.ui.AppearanceTheme
 import kotlinx.coroutines.runBlocking
 import java.util.Locale
 import java.util.concurrent.Executors
@@ -42,6 +43,7 @@ class AppSelectorActivity : AppCompatActivity() {
 
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
+        AppearanceTheme.apply(this)
         binding = ActivityAppSelectorBinding.inflate(layoutInflater)
         setContentView(binding.root)
         restoredSelection = state?.containsKey(KEY_SELECTED) == true

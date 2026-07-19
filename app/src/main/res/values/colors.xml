@@ -1,15 +1,44 @@
 <resources>
-    <color name="olcrtc_primary">#8A6D3B</color>
+    <color name="olcrtc_primary">#397765</color>
     <color name="olcrtc_on_primary">#FFFFFF</color>
-    <color name="olcrtc_primary_container">#F0E4CF</color>
-    <color name="olcrtc_on_primary_container">#2C2418</color>
-    <color name="olcrtc_secondary">#6F6354</color>
+    <color name="olcrtc_primary_container">#C0EBDD</color>
+    <color name="olcrtc_on_primary_container">#0D2F25</color>
+    <color name="olcrtc_secondary">#52665E</color>
     <color name="olcrtc_on_secondary">#FFFFFF</color>
-    <color name="olcrtc_surface">#FBF7F1</color>
-    <color name="olcrtc_on_surface">#2B2620</color>
-    <color name="olcrtc_surface_variant">#EFE8DE</color>
-    <color name="olcrtc_on_surface_variant">#5C544A</color>
-    <color name="olcrtc_outline">#8E8678</color>
+    <color name="olcrtc_surface">#EEF3F2</color>
+    <color name="olcrtc_on_surface">#17211F</color>
+    <color name="olcrtc_surface_variant">#DDE8E4</color>
+    <color name="olcrtc_on_surface_variant">#42534E</color>
+    <color name="olcrtc_outline">#71817B</color>
     <color name="olcrtc_error">#9C3A2A</color>
     <color name="olcrtc_on_error">#FFFFFF</color>
+
+    <color name="olcrtc_bronze_primary">#8A6D3B</color>
+    <color name="olcrtc_bronze_on_primary">#FFFFFF</color>
+    <color name="olcrtc_bronze_primary_container">#F0E4CF</color>
+    <color name="olcrtc_bronze_on_primary_container">#2C2418</color>
+    <color name="olcrtc_bronze_secondary">#6F6354</color>
+    <color name="olcrtc_bronze_on_secondary">#FFFFFF</color>
+    <color name="olcrtc_bronze_surface">#FBF7F1</color>
+    <color name="olcrtc_bronze_on_surface">#2B2620</color>
+    <color name="olcrtc_bronze_surface_variant">#EFE8DE</color>
+    <color name="olcrtc_bronze_on_surface_variant">#5C544A</color>
+    <color name="olcrtc_bronze_outline">#8E8678</color>
+
+    <color name="olcrtc_polar_primary">#28627A</color>
+    <color name="olcrtc_polar_on_primary">#FFFFFF</color>
+    <color name="olcrtc_polar_primary_container">#BCE8FB</color>
+    <color name="olcrtc_polar_on_primary_container">#062A38</color>
+    <color name="olcrtc_polar_secondary">#52636A</color>
+    <color name="olcrtc_polar_on_secondary">#FFFFFF</color>
+    <color name="olcrtc_polar_surface">#F0F6F8</color>
+    <color name="olcrtc_polar_on_surface">#142127</color>
+    <color name="olcrtc_polar_surface_variant">#DCE8ED</color>
+    <color name="olcrtc_polar_on_surface_variant">#3D4F57</color>
+    <color name="olcrtc_polar_outline">#6F828B</color>
+
+    <color name="appearance_preview_system">#607D75</color>
+    <color name="appearance_preview_sage">#397765</color>
+    <color name="appearance_preview_bronze">#8A6D3B</color>
+    <color name="appearance_preview_polar">#28627A</color>
 </resources>

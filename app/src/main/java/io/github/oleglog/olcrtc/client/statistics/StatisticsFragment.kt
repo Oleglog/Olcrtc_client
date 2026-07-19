@@ -1,14 +1,17 @@
 package io.github.oleglog.olcrtc.client.statistics
 
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
+import com.google.android.material.card.MaterialCardView
 import io.github.oleglog.olcrtc.client.MainActivity
 import io.github.oleglog.olcrtc.client.R
 import io.github.oleglog.olcrtc.client.data.ConnectionSessionEntity
@@ -88,6 +91,8 @@ class StatisticsFragment : Fragment() {
                     currentSession = null
                     b.activeContent.text = it.message ?: getString(R.string.statistics_error)
                     b.todayContent.text = ""
+                    b.monthContent.text = ""
+                    b.clearHistory.visibility = View.GONE
                     b.historyEmpty.visibility = View.VISIBLE
                     b.historyList.removeAllViews()
                 }
@@ -100,7 +105,9 @@ class StatisticsFragment : Fragment() {
         currentSession = summary.current
         b.activeContent.text = summary.current?.let(::formatCurrentSession) ?: getString(R.string.statistics_no_active_session)
         b.todayContent.text = formatTotals(summary.today)
+        b.monthContent.text = formatTotals(summary.month)
         b.historyList.removeAllViews()
+        b.clearHistory.visibility = if (summary.recent.isEmpty()) View.GONE else View.VISIBLE
         if (summary.recent.isEmpty()) {
             b.historyEmpty.visibility = View.VISIBLE
         } else {
@@ -120,10 +127,25 @@ class StatisticsFragment : Fragment() {
             formatBytes(session.bytesUp + session.bytesDown),
             disconnectReasonLabel(session.disconnectReason),
         )
-        return TextView(requireContext()).apply {
-            this.text = text
-            setTextAppearance(android.R.style.TextAppearance_Material_Body1)
-            setPadding(0, 6.dp, 0, 6.dp)
+        return MaterialCardView(requireContext()).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = 6.dp }
+            radius = 12.dp.toFloat()
+            cardElevation = 0f
+            isClickable = true
+            isFocusable = true
+            setRippleColor(ColorStateList.valueOf(
+                resolveColor(com.google.android.material.R.attr.colorPrimaryContainer),
+            ))
+            setCardBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurfaceVariant))
+            addView(TextView(requireContext()).apply {
+                this.text = text
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
+                setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
+                setPadding(12.dp, 12.dp, 12.dp, 12.dp)
+            })
             setOnClickListener { showReasonDialog(session) }
         }
     }
@@ -238,6 +260,11 @@ class StatisticsFragment : Fragment() {
         "unknown" -> R.string.settings_diagnostics_network_unknown
         else -> R.string.settings_diagnostics_network_other
     })
+
+    private fun resolveColor(attribute: Int): Int {
+        val values = requireContext().obtainStyledAttributes(intArrayOf(attribute))
+        return values.getColor(0, 0).also { values.recycle() }
+    }
 
     private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
 

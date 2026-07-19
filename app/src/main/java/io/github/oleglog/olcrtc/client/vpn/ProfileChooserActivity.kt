@@ -10,6 +10,7 @@ import io.github.oleglog.olcrtc.client.R
 import io.github.oleglog.olcrtc.client.data.ProfileRepository
 import io.github.oleglog.olcrtc.client.profile.orderProfiles
 import io.github.oleglog.olcrtc.client.routing.RoutingSettings
+import io.github.oleglog.olcrtc.client.ui.AppearanceTheme
 import java.util.concurrent.Executors
 
 class ProfileChooserActivity : AppCompatActivity() {
@@ -17,6 +18,7 @@ class ProfileChooserActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppearanceTheme.apply(this)
         storage.execute {
             val result = runCatching { loadChoices() }
             runOnUiThread {

@@ -16,6 +16,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import io.github.oleglog.olcrtc.client.R
 import io.github.oleglog.olcrtc.client.databinding.ActivityQrScannerBinding
+import io.github.oleglog.olcrtc.client.ui.AppearanceTheme
 import java.util.concurrent.Executors
 
 class QrScannerActivity : AppCompatActivity() {
@@ -33,6 +34,7 @@ class QrScannerActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppearanceTheme.apply(this)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         binding = ActivityQrScannerBinding.inflate(layoutInflater)
         setContentView(binding.root)

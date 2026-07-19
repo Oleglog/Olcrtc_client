@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@android:color/black">
@@ -20,33 +21,40 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="top"
-        android:background="#99000000"
+        android:layout_marginStart="@dimen/page_padding"
+        android:layout_marginTop="@dimen/space_6"
+        android:layout_marginEnd="@dimen/page_padding"
+        android:background="@drawable/bg_qr_message"
         android:gravity="center"
-        android:padding="24dp"
+        android:padding="@dimen/space_4"
         android:text="@string/qr_scanner_hint"
         android:textColor="@android:color/white"
-        android:textSize="18sp" />
+        android:textAppearance="?attr/textAppearanceTitleMedium" />
 
     <TextView
         android:id="@+id/progress"
-        android:layout_width="match_parent"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:layout_marginBottom="80dp"
-        android:background="#99000000"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginStart="@dimen/page_padding"
+        android:layout_marginEnd="@dimen/page_padding"
+        android:layout_marginBottom="88dp"
+        android:background="@drawable/bg_qr_message"
         android:gravity="center"
-        android:padding="16dp"
+        android:padding="@dimen/space_4"
         android:textColor="@android:color/white"
-        android:textSize="16sp"
+        android:textAppearance="?attr/textAppearanceBodyLarge"
         android:visibility="gone" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/cancel"
-        style="?attr/materialButtonOutlinedStyle"
+        style="@style/Widget.Material3.Button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|center_horizontal"
-        android:layout_marginBottom="24dp"
+        android:layout_marginBottom="@dimen/space_6"
         android:text="@string/cancel"
-        android:textColor="@android:color/white" />
+        android:textColor="?attr/colorOnSurface"
+        app:backgroundTint="?attr/colorSurface"
+        app:cornerRadius="@dimen/corner_quiet" />
 </FrameLayout>

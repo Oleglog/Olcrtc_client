@@ -29,6 +29,7 @@ import io.github.oleglog.olcrtc.client.databinding.ActivityMainBinding
 import io.github.oleglog.olcrtc.client.importer.SubscriptionDeepLinkParser
 import io.github.oleglog.olcrtc.client.routing.RoutingSettings
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
+import io.github.oleglog.olcrtc.client.ui.AppearanceTheme
 import io.github.oleglog.olcrtc.client.updater.ApkUpdateInstaller
 import io.github.oleglog.olcrtc.client.updater.GitHubRelease
 import io.github.oleglog.olcrtc.client.updater.GitHubUpdateClient
@@ -65,6 +66,7 @@ class MainActivity : AppCompatActivity() {
     private var lastReconnectAttempt = 0
     private var hasVpnState = false
     private var backgroundEffects = RoutingSettings.BackgroundEffects()
+    private var appearance = RoutingSettings.Appearance()
     private var pendingInstall: PendingInstall? = null
     private var pendingUpdatePrompt: UpdateCheckResult? = null
     private var updateInstallInProgress = false
@@ -129,6 +131,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        AppearanceTheme.apply(this)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
         pendingProfileId = savedInstanceState?.getLong(KEY_PENDING_PROFILE_ID)?.takeIf { it > 0 }
@@ -206,11 +209,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     fun refreshBackgroundEffects() {
-        backgroundEffects = RoutingSettings.open(applicationContext).getBackgroundEffects()
+        val settings = RoutingSettings.open(applicationContext)
+        backgroundEffects = settings.getBackgroundEffects()
+        appearance = settings.getAppearance()
+        val effectsVisible = backgroundEffects.enabled && appearance.motionEnabled
         binding.backgroundEffects.configure(backgroundEffects)
-        binding.backgroundEffects.isVisible = backgroundEffects.enabled
-        binding.backgroundEffects.setActive(backgroundEffects.enabled)
+        binding.backgroundEffects.isVisible = effectsVisible
+        binding.backgroundEffects.setActive(effectsVisible)
     }
+
+    internal fun currentAppearance(): RoutingSettings.Appearance = appearance
 
     private fun showBatteryOptimizationRecommendation(): Boolean {
         val ignoringOptimizations = getSystemService(PowerManager::class.java)

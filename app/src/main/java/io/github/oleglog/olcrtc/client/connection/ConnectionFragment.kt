@@ -5,6 +5,9 @@ import android.content.res.ColorStateList
 import android.content.ClipboardManager
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.text.format.Formatter
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -44,6 +47,7 @@ import io.github.oleglog.olcrtc.client.profile.ImportedProfile
 import io.github.oleglog.olcrtc.client.profile.orderProfiles
 import io.github.oleglog.olcrtc.client.profile.ProfileUri
 import io.github.oleglog.olcrtc.client.routing.RoutingSettings
+import io.github.oleglog.olcrtc.client.statistics.ConnectionSessionRepository
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import io.github.oleglog.olcrtc.client.vpn.ConnectionStage
 import io.github.oleglog.olcrtc.client.vpn.VpnState
@@ -55,8 +59,10 @@ class ConnectionFragment : Fragment() {
     private val binding get() = requireNotNull(_binding)
     private val profiles by lazy { ProfileRepository.open(requireContext().applicationContext) }
     private val settings by lazy { RoutingSettings.open(requireContext().applicationContext) }
+    private val statistics by lazy { ConnectionSessionRepository.open(requireContext().applicationContext) }
     private val storage = Executors.newSingleThreadExecutor()
     private val latency = Executors.newSingleThreadExecutor()
+    private val ticker = Handler(Looper.getMainLooper())
     private val bundleImports = BundleImportDispatcher()
     private var currentState = VpnState.NO_PROFILE
     private var selectedProfileId: Long? = null
@@ -69,6 +75,21 @@ class ConnectionFragment : Fragment() {
     private var latencyRequestId = 0L
     private var latencyInProgress = false
     private var profilesLoaded = false
+    private var availableProfiles = emptyList<ConnectionListItem>()
+    private var profilePickerExpanded = false
+    private var currentSessionStartedAt: Long? = null
+    private var todayBytesUp = 0L
+    private var todayBytesDown = 0L
+    @Volatile private var dashboardLoadInFlight = false
+    private val dashboardTicker = object : Runnable {
+        override fun run() {
+            if (currentState == VpnState.CONNECTED && currentSessionStartedAt == null) {
+                loadDashboardSummary()
+            }
+            updateDashboard()
+            ticker.postDelayed(this, DASHBOARD_REFRESH_MILLIS)
+        }
+    }
 
     private val qrScanner = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
@@ -103,6 +124,10 @@ class ConnectionFragment : Fragment() {
         binding.addProfile.setOnClickListener { showAddConnectionMenu() }
         binding.contentStateAction.setOnClickListener { showAddConnectionMenu() }
         binding.testSelected.setOnClickListener { testSelectedProfile() }
+        binding.selectedProfileCard.setOnClickListener {
+            setProfilePickerExpanded(!profilePickerExpanded)
+        }
+        updateConnectPulse()
     }
 
     override fun onStart() {
@@ -110,17 +135,22 @@ class ConnectionFragment : Fragment() {
         activityHost.setVpnStateListener(::showVpnState)
         activityHost.setImportListener(R.id.connectionFragment) { validatePreview(it, R.string.source_deep_link) }
         loadProfiles()
+        loadDashboardSummary()
+        ticker.removeCallbacks(dashboardTicker)
+        ticker.post(dashboardTicker)
     }
 
     override fun onStop() {
         activityHost.setImportListener(R.id.connectionFragment, null)
         activityHost.setVpnStateListener(null)
+        ticker.removeCallbacks(dashboardTicker)
         super.onStop()
     }
 
     override fun onDestroyView() {
         pulseAnimator?.cancel()
         pulseAnimator = null
+        ticker.removeCallbacks(dashboardTicker)
         _binding = null
         super.onDestroyView()
     }
@@ -174,6 +204,7 @@ class ConnectionFragment : Fragment() {
             activity?.runOnUiThread {
                 if (_binding == null) return@runOnUiThread
                 result.onSuccess { model ->
+                    availableProfiles = model.profiles
                     binding.profileList.removeAllViews()
                     if (currentState != VpnState.CONNECTED) {
                         selectedProfileId = selectedProfileId?.takeIf { selected ->
@@ -222,9 +253,11 @@ class ConnectionFragment : Fragment() {
                         }
                     }
                     profilesLoaded = true
+                    updateSelectedProfile()
                     renderContentState(
                         connectionContentState(loading = false, hasProfiles = hasProfiles, failed = false),
                     )
+                    setProfilePickerExpanded(profilePickerExpanded && hasProfiles, animate = false)
                     updateActionAvailability()
                 }.onFailure { error ->
                     if (profilesLoaded && binding.profileList.childCount > 0) {
@@ -237,6 +270,39 @@ class ConnectionFragment : Fragment() {
                 }
             }
         }
+    }
+
+    private fun updateSelectedProfile() {
+        if (_binding == null) return
+        val selected = availableProfiles.firstOrNull { item ->
+            item.localId == selectedProfileId && selectedProfileId != null ||
+                item.subscriptionProfileId == selectedSubscriptionProfileId && selectedSubscriptionProfileId != null
+        }
+        binding.selectedProfileName.text = selected?.name ?: getString(R.string.connection_choose_profile)
+        binding.selectedProfileDetail.text = selected?.let { item ->
+            listOfNotNull(item.type, item.subscriptionName).joinToString(" В· ")
+        }.orEmpty()
+        binding.selectedProfileCard.contentDescription = listOfNotNull(
+            selected?.name,
+            getString(
+                if (profilePickerExpanded) R.string.connection_close_profiles
+                else R.string.connection_open_profiles,
+            ),
+        ).joinToString(", ")
+    }
+
+    private fun setProfilePickerExpanded(expanded: Boolean, animate: Boolean = true) {
+        if (_binding == null) return
+        profilePickerExpanded = expanded && availableProfiles.isNotEmpty()
+        binding.profilePickerPanel.isVisible = profilePickerExpanded
+        val rotation = if (profilePickerExpanded) 90f else 0f
+        binding.profilePickerChevron.animate().cancel()
+        if (animate && animationsEnabled()) {
+            binding.profilePickerChevron.animate().rotation(rotation).setDuration(180L).start()
+        } else {
+            binding.profilePickerChevron.rotation = rotation
+        }
+        updateSelectedProfile()
     }
 
     private fun sectionTitle(textRes: Int): TextView = TextView(requireContext()).apply {
@@ -387,7 +453,7 @@ class ConnectionFragment : Fragment() {
         val pressedColor = if (destructive) {
             ContextCompat.getColor(requireContext(), R.color.olcrtc_error)
         } else {
-            ContextCompat.getColor(requireContext(), R.color.olcrtc_primary)
+            resolveColor(com.google.android.material.R.attr.colorPrimary)
         }
         imageTintList = ColorStateList(
             arrayOf(
@@ -397,7 +463,7 @@ class ConnectionFragment : Fragment() {
             intArrayOf(
                 pressedColor,
                 if (accented) {
-                    ContextCompat.getColor(requireContext(), R.color.olcrtc_primary)
+                    resolveColor(com.google.android.material.R.attr.colorPrimary)
                 } else {
                     resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
                 },
@@ -418,7 +484,7 @@ class ConnectionFragment : Fragment() {
         card.strokeColor = if (state == ConnectionCardState.INACTIVE) {
             resolveColor(com.google.android.material.R.attr.colorOutline)
         } else {
-            ContextCompat.getColor(requireContext(), R.color.olcrtc_primary)
+            resolveColor(com.google.android.material.R.attr.colorPrimary)
         }
         card.strokeWidth = when (state) {
             ConnectionCardState.CONNECTED -> dimen(R.dimen.card_border_active)
@@ -435,7 +501,7 @@ class ConnectionFragment : Fragment() {
             if (state == ConnectionCardState.INACTIVE) {
                 resolveColor(com.google.android.material.R.attr.colorSurfaceVariant)
             } else {
-                ContextCompat.getColor(requireContext(), R.color.olcrtc_primary)
+                resolveColor(com.google.android.material.R.attr.colorPrimary)
             },
         )
         updateCardContent(card, state)
@@ -508,6 +574,7 @@ class ConnectionFragment : Fragment() {
         val autoConnect = shouldAutoConnectSelectedProfile(currentState, connectedSubscriptionProfileId == id)
         selectedProfileId = null
         selectedSubscriptionProfileId = id
+        setProfilePickerExpanded(false)
         showStatus(null)
         updateConnectButtonText()
         updateActionAvailability()
@@ -520,6 +587,7 @@ class ConnectionFragment : Fragment() {
         val autoConnect = shouldAutoConnectSelectedProfile(currentState, connectedProfileId == id)
         selectedSubscriptionProfileId = null
         selectedProfileId = id
+        setProfilePickerExpanded(false)
         showStatus(null)
         updateConnectButtonText()
         updateActionAvailability()
@@ -661,7 +729,7 @@ class ConnectionFragment : Fragment() {
             addView(ImageView(requireContext()).apply {
                 setImageResource(iconRes)
                 imageTintList = ColorStateList.valueOf(
-                    ContextCompat.getColor(requireContext(), R.color.olcrtc_primary),
+                    resolveColor(com.google.android.material.R.attr.colorPrimary),
                 )
                 contentDescription = null
             }, LinearLayout.LayoutParams(24.dp, 24.dp))
@@ -693,6 +761,7 @@ class ConnectionFragment : Fragment() {
         reconnectAttempt: Int,
     ) {
         if (_binding == null) return
+        val stateChanged = currentState != state
         vpnStateRevision++
         currentState = state
         currentStage = stage
@@ -709,38 +778,47 @@ class ConnectionFragment : Fragment() {
                 selectedProfileId = connectedProfileId
                 selectedSubscriptionProfileId = connectedSubscriptionProfileId
                 loadProfiles()
+                if (stateChanged) loadDashboardSummary()
             }
             VpnState.DISCONNECTED, VpnState.ERROR, VpnState.NO_PROFILE -> {
                 connectedProfileId = null
                 connectedSubscriptionProfileId = null
+                if (stateChanged) loadDashboardSummary()
             }
             else -> {}
         }
-        binding.connectionSummary.text = vpnStateText(state, stage, reconnectAttempt)
+        binding.connectionSummary.text = if (state == VpnState.CONNECTED) {
+            getString(R.string.connection_protected)
+        } else {
+            vpnStateText(state, stage, reconnectAttempt)
+        }
         showStatus(error ?: if (state == VpnState.ERROR) getString(R.string.vpn_notification_error) else null)
         updateConnectButtonText()
-        applyingPulse = state in PULSE_STATES
+        applyingPulse = state == VpnState.CONNECTED
         updateConnectPulse()
         updateActionAvailability()
+        updateSelectedProfile()
+        updateDashboard()
         refreshCardAppearance()
     }
 
     private fun setConnectButtonText(text: CharSequence) {
         if (_binding == null) return
-        val button = binding.connect
-        if (button.text == text) return
+        val title = binding.connectTitle
+        binding.connect.contentDescription = text
+        if (title.text == text) return
         if (!animationsEnabled()) {
-            button.text = text
+            title.text = text
             return
         }
-        button.animate().cancel()
-        button.animate()
+        title.animate().cancel()
+        title.animate()
             .alpha(0f)
             .setDuration(100L)
             .withEndAction {
-                button.text = text
-                button.animate().cancel()
-                button.animate().alpha(1f).setDuration(120L).start()
+                title.text = text
+                title.animate().cancel()
+                title.animate().alpha(1f).setDuration(120L).start()
             }
             .start()
     }
@@ -763,6 +841,7 @@ class ConnectionFragment : Fragment() {
             selectedSubscriptionProfileId != null && selectedSubscriptionProfileId != connectedSubscriptionProfileId
 
     private fun animationsEnabled(): Boolean {
+        if (!activityHost.currentAppearance().motionEnabled) return false
         val resolver = requireContext().contentResolver
         val scale = android.provider.Settings.Global.getFloat(
             resolver,
@@ -777,17 +856,18 @@ class ConnectionFragment : Fragment() {
 
     private fun updateConnectPulse() {
         if (_binding == null) return
-        val button = binding.connect
+        val halo = binding.connectionHalo
         pulseAnimator?.cancel()
         pulseAnimator = null
-        if (!applyingPulse || !animationsEnabled()) {
-            button.translationZ = 0f
+        val glow = activityHost.currentAppearance().glowIntensity / 100f
+        val connectedAlpha = glow * 0.68f
+        if (!applyingPulse || !animationsEnabled() || connectedAlpha == 0f) {
+            halo.alpha = if (applyingPulse) connectedAlpha else connectedAlpha * 0.18f
             return
         }
-        val targetZ = dimen(R.dimen.button_pulse_elevation).toFloat()
         // ponytail: ObjectAnimator used because ViewPropertyAnimator has no repeat.
-        android.animation.ObjectAnimator.ofFloat(button, "translationZ", 0f, targetZ, 0f).apply {
-            duration = 600L
+        android.animation.ObjectAnimator.ofFloat(halo, View.ALPHA, connectedAlpha * 0.45f, connectedAlpha).apply {
+            duration = 2_400L
             repeatMode = android.animation.ValueAnimator.REVERSE
             repeatCount = android.animation.ValueAnimator.INFINITE
             start()
@@ -829,8 +909,8 @@ class ConnectionFragment : Fragment() {
         if (_binding == null) return
         val contentVisible = state == ConnectionContentState.CONTENT
         binding.contentState.isVisible = !contentVisible
-        binding.profileList.isVisible = contentVisible
         binding.actionArea.isVisible = contentVisible
+        if (!contentVisible) setProfilePickerExpanded(false, animate = false)
         binding.contentLoading.isVisible = state == ConnectionContentState.LOADING
         binding.contentStateAction.isVisible = state == ConnectionContentState.EMPTY ||
             state == ConnectionContentState.ERROR
@@ -863,6 +943,7 @@ class ConnectionFragment : Fragment() {
             currentState == VpnState.CONNECTED || currentState in BUSY_STATES ||
                 selectedProfileId != null || selectedSubscriptionProfileId != null
             )
+        binding.connect.alpha = if (binding.connect.isEnabled) 1f else 0.55f
         binding.testSelected.isEnabled = currentState == VpnState.CONNECTED && !hasPendingProfileSwitch() && !latencyInProgress
         binding.pingProgress.isVisible = latencyInProgress
         if (latencyInProgress) {
@@ -871,6 +952,63 @@ class ConnectionFragment : Fragment() {
         } else {
             binding.testSelected.setText(R.string.profile_test_latency)
             binding.testSelected.setIconResource(R.drawable.ic_ping_24)
+        }
+    }
+
+    private fun loadDashboardSummary() {
+        if (dashboardLoadInFlight || storage.isShutdown) return
+        dashboardLoadInFlight = true
+        storage.execute {
+            val result = runCatching { statistics.summary() }
+            val host = activity
+            if (host == null) {
+                dashboardLoadInFlight = false
+                return@execute
+            }
+            host.runOnUiThread {
+                dashboardLoadInFlight = false
+                if (_binding == null) return@runOnUiThread
+                result.onSuccess { summary ->
+                    currentSessionStartedAt = summary.current?.startedAt
+                    todayBytesUp = summary.today.bytesUp
+                    todayBytesDown = summary.today.bytesDown
+                    updateDashboard()
+                }
+            }
+        }
+    }
+
+    private fun updateDashboard() {
+        if (_binding == null) return
+        val traffic = activityHost.trafficSnapshot()?.takeIf { it.size >= 4 }
+        val sessionActive = currentSessionStartedAt != null && currentState in ACTIVE_SESSION_STATES
+        val liveUp = if (sessionActive) traffic?.get(0)?.coerceAtLeast(0) ?: 0 else 0
+        val liveDown = if (sessionActive) traffic?.get(1)?.coerceAtLeast(0) ?: 0 else 0
+        val upSpeed = if (currentState == VpnState.CONNECTED) traffic?.get(2)?.coerceAtLeast(0) ?: 0 else 0
+        val downSpeed = if (currentState == VpnState.CONNECTED) traffic?.get(3)?.coerceAtLeast(0) ?: 0 else 0
+        binding.todayDownload.text = getString(R.string.traffic_rate_format, formatBytes(downSpeed))
+        binding.todayUpload.text = getString(R.string.traffic_rate_format, formatBytes(upSpeed))
+        binding.todayTotal.text = formatBytes(todayBytesUp + todayBytesDown + liveUp + liveDown)
+        binding.connectionTimer.text = currentSessionStartedAt
+            ?.takeIf { sessionActive }
+            ?.let { formatDuration(System.currentTimeMillis() - it) }
+            ?: "00:00"
+    }
+
+    private fun formatBytes(bytes: Long): String = Formatter.formatShortFileSize(
+        requireContext(),
+        bytes.coerceAtLeast(0),
+    )
+
+    private fun formatDuration(durationMillis: Long): String {
+        val totalSeconds = durationMillis.coerceAtLeast(0) / 1_000
+        val hours = totalSeconds / 3_600
+        val minutes = totalSeconds % 3_600 / 60
+        val seconds = totalSeconds % 60
+        return if (hours > 0) {
+            String.format(Locale.getDefault(), "%d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
         }
     }
 
@@ -1222,10 +1360,12 @@ class ConnectionFragment : Fragment() {
             VpnState.STOPPING,
         )
         private val CARD_PROGRESS_STATES = BUSY_STATES
-        private val PULSE_STATES = setOf(
-            VpnState.PREPARING,
-            VpnState.CONNECTING,
+        private val ACTIVE_SESSION_STATES = setOf(
+            VpnState.CONNECTED,
+            VpnState.RECONNECTING,
+            VpnState.STOPPING,
         )
+        private const val DASHBOARD_REFRESH_MILLIS = 1_000L
     }
 }
 

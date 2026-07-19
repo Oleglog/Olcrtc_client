@@ -15,7 +15,6 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.AppCompatImageButton
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
@@ -107,11 +106,15 @@ class ProfilesFragment : Fragment() {
         layoutParams = LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT,
-        ).apply { bottomMargin = 12.dp }
-        radius = resources.getDimension(R.dimen.corner_card)
+        ).apply { bottomMargin = resources.getDimensionPixelSize(R.dimen.space_3) }
+        radius = resources.getDimension(R.dimen.corner_quiet)
+        cardElevation = 0f
+        strokeWidth = resources.getDimensionPixelSize(R.dimen.card_border)
+        strokeColor = resolveColor(com.google.android.material.R.attr.colorOutline)
+        setCardBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurface))
         addView(LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(14.dp, 12.dp, 8.dp, 12.dp)
+            setPadding(16.dp, 16.dp, 8.dp, 12.dp)
             addView(TextView(requireContext()).apply {
                 text = subscription.name
                 setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium)
@@ -120,6 +123,7 @@ class ProfilesFragment : Fragment() {
                 text = subscriptionSummary(subscription)
                 setPadding(0, 4.dp, 0, 12.dp)
                 setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
+                setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
             })
             addView(LinearLayout(requireContext()).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -161,7 +165,7 @@ class ProfilesFragment : Fragment() {
             setBackgroundResource(backgroundValue.resourceId)
             setImageResource(iconRes)
             imageTintList = ColorStateList.valueOf(
-                ContextCompat.getColor(requireContext(), R.color.olcrtc_on_surface_variant),
+                resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant),
             )
             contentDescription = getString(descriptionRes)
             layoutParams = LinearLayout.LayoutParams(48.dp, 48.dp)
@@ -172,13 +176,11 @@ class ProfilesFragment : Fragment() {
     private fun subscriptionSummary(subscription: SubscriptionSummary): String = buildString {
         append(subscription.profileCount).append(' ').append(getString(R.string.profiles_count_suffix))
         subscription.serverVersion?.let { append(" · ").append(getString(R.string.subscription_server_badge, it)) }
-        subscription.lastSuccessAt?.let {
-            append(" · ").append(getString(R.string.subscription_last_success, formatTime(it)))
-        }
         subscription.lastErrorCode?.let {
             append(" · ").append(getString(R.string.subscription_last_error, it))
+        } ?: subscription.lastSuccessAt?.let {
+            append(" · ").append(getString(R.string.subscription_last_success, formatTime(it)))
         }
-        append(" · ").append(getString(R.string.subscription_primary_badge))
         if (subscription.mirrorAvailable) append(" · ").append(getString(R.string.subscription_mirror_badge))
         if (!subscription.enabled) append(" · ").append(getString(R.string.subscription_disabled_badge))
     }
@@ -434,6 +436,11 @@ class ProfilesFragment : Fragment() {
         DateFormat.SHORT,
         DateFormat.SHORT,
     ).format(Date(value))
+
+    private fun resolveColor(attribute: Int): Int {
+        val values = requireContext().obtainStyledAttributes(intArrayOf(attribute))
+        return values.getColor(0, 0).also { values.recycle() }
+    }
 
     private val binding get() = requireNotNull(_binding)
     private val Int.dp get() = (this * resources.displayMetrics.density).toInt()

@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.PreferencesFileSerializer
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
@@ -39,6 +40,15 @@ internal class RoutingSettings private constructor(
             intensity = preferences[BACKGROUND_EFFECT_INTENSITY]
                 ?.let { runCatching { BackgroundEffects.Intensity.valueOf(it) }.getOrNull() }
                 ?: BackgroundEffects.Intensity.MEDIUM,
+        )
+    }
+
+    fun getAppearance(): Appearance = runBlocking {
+        val preferences = store.data.first()
+        Appearance(
+            palette = parseAppearancePalette(preferences[APPEARANCE_PALETTE]),
+            glowIntensity = (preferences[APPEARANCE_GLOW_INTENSITY] ?: 60).coerceIn(0, 100),
+            motionEnabled = preferences[APPEARANCE_MOTION] ?: true,
         )
     }
 
@@ -85,6 +95,14 @@ internal class RoutingSettings private constructor(
             preferences[BACKGROUND_EFFECTS] = value.enabled
             preferences[BACKGROUND_EFFECT_STYLE] = value.style.name
             preferences[BACKGROUND_EFFECT_INTENSITY] = value.intensity.name
+        }
+    }
+
+    suspend fun setAppearance(value: Appearance) {
+        store.edit { preferences ->
+            preferences[APPEARANCE_PALETTE] = value.palette.name
+            preferences[APPEARANCE_GLOW_INTENSITY] = value.glowIntensity
+            preferences[APPEARANCE_MOTION] = value.motionEnabled
         }
     }
 
@@ -159,6 +177,18 @@ internal class RoutingSettings private constructor(
         enum class Intensity { LOW, MEDIUM, HIGH }
     }
 
+    data class Appearance(
+        val palette: Palette = Palette.SAGE,
+        val glowIntensity: Int = 60,
+        val motionEnabled: Boolean = true,
+    ) {
+        init {
+            require(glowIntensity in 0..100) { "Glow intensity must be between 0 and 100" }
+        }
+
+        enum class Palette { SYSTEM, SAGE, BRONZE, POLAR }
+    }
+
     companion object {
         private const val FILE_NAME = "routing"
         private val PRESET = stringPreferencesKey("preset")
@@ -167,6 +197,9 @@ internal class RoutingSettings private constructor(
         private val BACKGROUND_EFFECTS = booleanPreferencesKey("background_effects")
         private val BACKGROUND_EFFECT_STYLE = stringPreferencesKey("background_effect_style")
         private val BACKGROUND_EFFECT_INTENSITY = stringPreferencesKey("background_effect_intensity")
+        private val APPEARANCE_PALETTE = stringPreferencesKey("appearance_palette")
+        private val APPEARANCE_GLOW_INTENSITY = intPreferencesKey("appearance_glow_intensity")
+        private val APPEARANCE_MOTION = booleanPreferencesKey("appearance_motion")
         private val PER_APP_MODE = stringPreferencesKey("per_app_mode")
         private val PER_APP_PACKAGES = stringSetPreferencesKey("per_app_packages")
         private val VPN_DESIRED_CONNECTED = booleanPreferencesKey("vpn_desired_connected")
@@ -195,3 +228,7 @@ internal fun parseBackgroundEffectStyle(value: String?): RoutingSettings.Backgro
         ?.let { runCatching { RoutingSettings.BackgroundEffects.Style.valueOf(it) }.getOrNull() }
         ?: RoutingSettings.BackgroundEffects.Style.SNOW
 }
+
+internal fun parseAppearancePalette(value: String?): RoutingSettings.Appearance.Palette = value
+    ?.let { runCatching { RoutingSettings.Appearance.Palette.valueOf(it) }.getOrNull() }
+    ?: RoutingSettings.Appearance.Palette.SAGE
