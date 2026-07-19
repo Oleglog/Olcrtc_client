@@ -27,7 +27,7 @@
         <item name="android:windowIsTranslucent">true</item>
     </style>
 
-    <style name="ThemeOverlay.OlcrtcClient.Bronze">
+    <style name="ThemeOverlay.OlcrtcClient.Bronze" parent="">
         <item name="colorPrimary">@color/olcrtc_bronze_primary</item>
         <item name="colorOnPrimary">@color/olcrtc_bronze_on_primary</item>
         <item name="colorPrimaryContainer">@color/olcrtc_bronze_primary_container</item>
@@ -43,7 +43,7 @@
         <item name="android:navigationBarColor">@color/olcrtc_bronze_surface</item>
     </style>
 
-    <style name="ThemeOverlay.OlcrtcClient.Polar">
+    <style name="ThemeOverlay.OlcrtcClient.Polar" parent="">
         <item name="colorPrimary">@color/olcrtc_polar_primary</item>
         <item name="colorOnPrimary">@color/olcrtc_polar_on_primary</item>
         <item name="colorPrimaryContainer">@color/olcrtc_polar_primary_container</item>
@@ -74,11 +74,11 @@
         <item name="cornerRadius">0dp</item>
         <item name="iconGravity">end</item>
         <item name="iconTint">?attr/colorOnSurfaceVariant</item>
-        <item name="insetTop">0dp</item>
-        <item name="insetBottom">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
     </style>
 
-    <style name="Widget.OlcrtcClient.SettingsDivider">
+    <style name="Widget.OlcrtcClient.SettingsDivider" parent="">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">1dp</item>
         <item name="android:layout_marginStart">16dp</item>

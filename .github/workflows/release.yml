@@ -97,21 +97,7 @@ jobs:
           HEV_APP_ABI: armeabi-v7a arm64-v8a
 
       - name: Run unit tests
-        id: unit-tests
-        shell: bash
-        run: |
-          set -o pipefail
-          ./gradlew --no-daemon --build-cache :app:testDebugUnitTest 2>&1 | tee unit-tests.log
-
-      - name: Report unit test failure
-        if: failure() && steps.unit-tests.outcome == 'failure'
-        shell: bash
-        run: |
-          details="$(tail -n 120 unit-tests.log)"
-          details="${details//'%'/'%25'}"
-          details="${details//$'\r'/'%0D'}"
-          details="${details//$'\n'/'%0A'}"
-          echo "::error title=Unit test failure::$details"
+        run: ./gradlew --no-daemon --build-cache :app:testDebugUnitTest
 
       - name: Assemble signed release APK
         run: ./gradlew --no-daemon --build-cache :app:assembleRelease
