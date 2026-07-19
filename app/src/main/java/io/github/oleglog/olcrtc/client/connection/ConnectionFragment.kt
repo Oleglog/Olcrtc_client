@@ -453,7 +453,7 @@ class ConnectionFragment : Fragment() {
         val pressedColor = if (destructive) {
             ContextCompat.getColor(requireContext(), R.color.olcrtc_error)
         } else {
-            resolveColor(com.google.android.material.R.attr.colorPrimary)
+            resolveColor(androidx.appcompat.R.attr.colorPrimary)
         }
         imageTintList = ColorStateList(
             arrayOf(
@@ -463,7 +463,7 @@ class ConnectionFragment : Fragment() {
             intArrayOf(
                 pressedColor,
                 if (accented) {
-                    resolveColor(com.google.android.material.R.attr.colorPrimary)
+                    resolveColor(androidx.appcompat.R.attr.colorPrimary)
                 } else {
                     resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant)
                 },
@@ -484,7 +484,7 @@ class ConnectionFragment : Fragment() {
         card.strokeColor = if (state == ConnectionCardState.INACTIVE) {
             resolveColor(com.google.android.material.R.attr.colorOutline)
         } else {
-            resolveColor(com.google.android.material.R.attr.colorPrimary)
+            resolveColor(androidx.appcompat.R.attr.colorPrimary)
         }
         card.strokeWidth = when (state) {
             ConnectionCardState.CONNECTED -> dimen(R.dimen.card_border_active)
@@ -501,7 +501,7 @@ class ConnectionFragment : Fragment() {
             if (state == ConnectionCardState.INACTIVE) {
                 resolveColor(com.google.android.material.R.attr.colorSurfaceVariant)
             } else {
-                resolveColor(com.google.android.material.R.attr.colorPrimary)
+                resolveColor(androidx.appcompat.R.attr.colorPrimary)
             },
         )
         updateCardContent(card, state)
@@ -729,7 +729,7 @@ class ConnectionFragment : Fragment() {
             addView(ImageView(requireContext()).apply {
                 setImageResource(iconRes)
                 imageTintList = ColorStateList.valueOf(
-                    resolveColor(com.google.android.material.R.attr.colorPrimary),
+                    resolveColor(androidx.appcompat.R.attr.colorPrimary),
                 )
                 contentDescription = null
             }, LinearLayout.LayoutParams(24.dp, 24.dp))
