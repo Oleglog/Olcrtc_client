@@ -81,6 +81,15 @@ jobs:
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
           MOBILECORE_TARGET: android
 
+      - name: Save mobilecore AAR cache
+        if: steps.mobilecore-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/go/bin/gomobile
+            app/libs/mobilecore.aar
+          key: ${{ steps.mobilecore-cache.outputs.cache-primary-key }}
+
       - name: Build HEV tunnel
         run: scripts/build_hev.sh
         env:
@@ -88,7 +97,21 @@ jobs:
           HEV_APP_ABI: armeabi-v7a arm64-v8a
 
       - name: Run unit tests
-        run: ./gradlew --no-daemon --build-cache :app:testDebugUnitTest
+        id: unit-tests
+        shell: bash
+        run: |
+          set -o pipefail
+          ./gradlew --no-daemon --build-cache :app:testDebugUnitTest 2>&1 | tee unit-tests.log
+
+      - name: Report unit test failure
+        if: failure() && steps.unit-tests.outcome == 'failure'
+        shell: bash
+        run: |
+          details="$(tail -n 120 unit-tests.log)"
+          details="${details//'%'/'%25'}"
+          details="${details//$'\r'/'%0D'}"
+          details="${details//$'\n'/'%0A'}"
+          echo "::error title=Unit test failure::$details"
 
       - name: Assemble signed release APK
         run: ./gradlew --no-daemon --build-cache :app:assembleRelease
