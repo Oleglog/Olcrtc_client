@@ -51,12 +51,12 @@ class RoutingSettingsTest {
     }
 
     @Test
-    fun normalizesAppearancePaletteAndAccentAsOneTheme() {
+    fun keepsPaletteAndAccentIndependentExceptForMonochrome() {
         val custom = RoutingSettings.Appearance(
             palette = RoutingSettings.Appearance.Palette.BRONZE,
             accent = RoutingSettings.Appearance.Accent.ROSE,
         ).normalized()
-        assertEquals(RoutingSettings.Appearance.Palette.NEUTRAL, custom.palette)
+        assertEquals(RoutingSettings.Appearance.Palette.BRONZE, custom.palette)
         assertEquals(RoutingSettings.Appearance.Accent.ROSE, custom.accent)
 
         val mono = RoutingSettings.Appearance(

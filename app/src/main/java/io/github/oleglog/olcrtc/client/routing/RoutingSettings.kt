@@ -35,11 +35,11 @@ internal class RoutingSettings private constructor(
     fun getBackgroundEffects(): BackgroundEffects = runBlocking {
         val preferences = store.data.first()
         BackgroundEffects(
-            enabled = preferences[BACKGROUND_EFFECTS] ?: true,
+            enabled = preferences[BACKGROUND_EFFECTS] ?: false,
             style = parseBackgroundEffectStyle(preferences[BACKGROUND_EFFECT_STYLE]),
             intensity = preferences[BACKGROUND_EFFECT_INTENSITY]
                 ?.let { runCatching { BackgroundEffects.Intensity.valueOf(it) }.getOrNull() }
-                ?: BackgroundEffects.Intensity.MEDIUM,
+                ?: BackgroundEffects.Intensity.LOW,
         )
     }
 
@@ -172,9 +172,9 @@ internal class RoutingSettings private constructor(
     }
 
     data class BackgroundEffects(
-        val enabled: Boolean = true,
-        val style: Style = Style.SNOW,
-        val intensity: Intensity = Intensity.MEDIUM,
+        val enabled: Boolean = false,
+        val style: Style = Style.DRIFT,
+        val intensity: Intensity = Intensity.LOW,
     ) {
         enum class Style { SNOW, RAIN, DRIFT }
         enum class Intensity { LOW, MEDIUM, HIGH }
@@ -190,11 +190,8 @@ internal class RoutingSettings private constructor(
             require(glowIntensity in 0..100) { "Glow intensity must be between 0 and 100" }
         }
 
-        fun normalized(): Appearance = when {
-            palette == Palette.MONO && accent != Accent.AUTO -> copy(accent = Accent.AUTO)
-            accent != Accent.AUTO && palette != Palette.NEUTRAL -> copy(palette = Palette.NEUTRAL)
-            else -> this
-        }
+        fun normalized(): Appearance =
+            if (palette == Palette.MONO && accent != Accent.AUTO) copy(accent = Accent.AUTO) else this
 
         enum class Palette { SYSTEM, NEUTRAL, BRONZE, BLACK, MONO }
         enum class Accent { AUTO, TEAL, BLUE, VIOLET, ROSE, AMBER }
@@ -235,10 +232,10 @@ internal class RoutingSettings private constructor(
 }
 
 internal fun parseBackgroundEffectStyle(value: String?): RoutingSettings.BackgroundEffects.Style = when (value) {
-    "GLOW" -> RoutingSettings.BackgroundEffects.Style.DRIFT
+    null, "GLOW", "SNOW", "RAIN" -> RoutingSettings.BackgroundEffects.Style.DRIFT
     else -> value
         ?.let { runCatching { RoutingSettings.BackgroundEffects.Style.valueOf(it) }.getOrNull() }
-        ?: RoutingSettings.BackgroundEffects.Style.SNOW
+        ?: RoutingSettings.BackgroundEffects.Style.DRIFT
 }
 
 internal fun parseAppearancePalette(value: String?): RoutingSettings.Appearance.Palette = when (value) {

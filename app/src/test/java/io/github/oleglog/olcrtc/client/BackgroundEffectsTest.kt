@@ -13,13 +13,13 @@ import org.junit.Test
 
 class BackgroundEffectsTest {
     @Test
-    fun backgroundEffectsDefaultToEnabledMediumSnow() {
+    fun backgroundEffectsDefaultToCleanLowDrift() {
         val effects = RoutingSettings.BackgroundEffects()
 
-        assertTrue(effects.enabled)
-        assertEquals(Style.SNOW, effects.style)
-        assertEquals(Intensity.MEDIUM, effects.intensity)
-        assertFalse(effects.copy(enabled = false).enabled)
+        assertFalse(effects.enabled)
+        assertEquals(Style.DRIFT, effects.style)
+        assertEquals(Intensity.LOW, effects.intensity)
+        assertTrue(effects.copy(enabled = true).enabled)
     }
 
     @Test
@@ -30,8 +30,10 @@ class BackgroundEffectsTest {
     }
 
     @Test
-    fun oldGlowSettingMigratesToDrift() {
+    fun legacyEffectsMigrateToDrift() {
         assertEquals(Style.DRIFT, parseBackgroundEffectStyle("GLOW"))
+        assertEquals(Style.DRIFT, parseBackgroundEffectStyle("SNOW"))
+        assertEquals(Style.DRIFT, parseBackgroundEffectStyle("RAIN"))
     }
 
     @Test

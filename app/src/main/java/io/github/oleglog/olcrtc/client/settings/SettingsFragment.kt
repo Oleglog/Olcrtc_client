@@ -107,26 +107,11 @@ class SettingsFragment : Fragment() {
         }
         binding.settingsDiagnosticsRow.setOnClickListener { showDiagnosticsMenu() }
         binding.settingsAboutRow.setOnClickListener { showAbout() }
-        binding.settingsAppearanceRow.text = settingsRowText(
-            R.string.settings_appearance_title,
-            getString(R.string.settings_appearance_summary),
-        )
-        binding.settingsSystemRow.text = settingsRowText(
-            R.string.settings_system_title,
-            getString(R.string.settings_system_row_summary),
-        )
-        binding.settingsUpdatesRow.text = settingsRowText(
-            R.string.settings_updates_title,
-            getString(R.string.settings_version_summary, BuildConfig.VERSION_NAME),
-        )
-        binding.settingsDiagnosticsRow.text = settingsRowText(
-            R.string.settings_diagnostics_title,
-            getString(R.string.settings_diagnostics_row_summary),
-        )
-        binding.settingsAboutRow.text = settingsRowText(
-            R.string.settings_about,
-            getString(R.string.settings_version_summary, BuildConfig.VERSION_NAME),
-        )
+        binding.settingsAppearanceSummary.setText(R.string.settings_appearance_summary)
+        binding.settingsSystemSummary.setText(R.string.settings_system_row_summary)
+        binding.settingsUpdatesSummary.text = getString(R.string.settings_version_summary, BuildConfig.VERSION_NAME)
+        binding.settingsDiagnosticsSummary.setText(R.string.settings_diagnostics_row_summary)
+        binding.settingsAboutSummary.text = getString(R.string.settings_version_summary, BuildConfig.VERSION_NAME)
     }
 
     override fun onStart() {
@@ -187,26 +172,17 @@ class SettingsFragment : Fragment() {
                     R.string.routing_russia_direct
                 },
             )
-            binding.settingsRoutingRow.text = settingsRowText(
-                R.string.settings_routing_title,
-                "$preset · ${getString(R.string.settings_routing_rules_summary, values.routingRules)}",
+            binding.settingsRoutingSummary.text = "$preset · ${getString(R.string.settings_routing_rules_summary, values.routingRules)}"
+            binding.settingsAppsSummary.text = getString(
+                R.string.settings_apps_row_summary,
+                getString(when (values.perAppPolicy.mode) {
+                    PerAppPolicy.Mode.ALL -> R.string.settings_per_app_all
+                    PerAppPolicy.Mode.EXCLUDE_SELECTED -> R.string.settings_per_app_exclude
+                    PerAppPolicy.Mode.ONLY_SELECTED -> R.string.settings_per_app_only
+                }),
+                values.perAppPolicy.packages.size,
             )
-            binding.settingsAppsRow.text = settingsRowText(
-                R.string.settings_per_app_title,
-                getString(
-                    R.string.settings_apps_row_summary,
-                    getString(when (values.perAppPolicy.mode) {
-                        PerAppPolicy.Mode.ALL -> R.string.settings_per_app_all
-                        PerAppPolicy.Mode.EXCLUDE_SELECTED -> R.string.settings_per_app_exclude
-                        PerAppPolicy.Mode.ONLY_SELECTED -> R.string.settings_per_app_only
-                    }),
-                    values.perAppPolicy.packages.size,
-                ),
-            )
-            binding.settingsDnsRow.text = settingsRowText(
-                R.string.dns_server,
-                values.dnsServer ?: "1.1.1.1:53",
-            )
+            binding.settingsDnsSummary.text = values.dnsServer ?: "1.1.1.1:53"
         }
     }
 
@@ -918,9 +894,6 @@ class SettingsFragment : Fragment() {
         VpnState.STOPPING -> R.string.vpn_notification_stopping
         VpnState.ERROR -> R.string.vpn_notification_error
     })
-
-    private fun settingsRowText(title: Int, summary: String): String =
-        getString(R.string.settings_row_summary, getString(title), summary)
 
     private fun copyDiagnostics() {
         viewLifecycleOwner.lifecycleScope.launch {

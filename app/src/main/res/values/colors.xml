@@ -1,4 +1,5 @@
 <resources>
+    <color name="launcher_background">#172022</color>
     <color name="olcrtc_primary">#56636C</color>
     <color name="olcrtc_on_primary">#FFFFFF</color>
     <color name="olcrtc_primary_container">#DCE3E7</color>

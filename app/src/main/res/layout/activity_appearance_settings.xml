@@ -132,6 +132,7 @@
                         android:orientation="vertical">
 
                         <TextView
+                            android:id="@+id/preview_label"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:letterSpacing="0.08"
@@ -141,6 +142,7 @@
                             android:textColor="?attr/colorOnSurfaceVariant" />
 
                         <TextView
+                            android:id="@+id/preview_profile"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="@dimen/space_1"
@@ -496,20 +498,6 @@
                         android:textAppearance="?attr/textAppearanceBodySmall"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
-                    <com.google.android.material.materialswitch.MaterialSwitch
-                        android:id="@+id/effects_enabled"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_3"
-                        android:text="@string/settings_background_effect_enabled" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_3"
-                        android:text="@string/settings_background_effect_style"
-                        android:textAppearance="?attr/textAppearanceLabelLarge" />
-
                     <com.google.android.material.button.MaterialButtonToggleGroup
                         android:id="@+id/effect_group"
                         android:layout_width="match_parent"
@@ -544,6 +532,7 @@
                     </com.google.android.material.button.MaterialButtonToggleGroup>
 
                     <TextView
+                        android:id="@+id/drift_intensity_label"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/space_3"

@@ -53,33 +53,120 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <com.google.android.material.button.MaterialButton
+                <LinearLayout
                     android:id="@+id/settings_routing_row"
                     style="@style/Widget.OlcrtcClient.SettingsRow"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/settings_routing_title"
-                    app:icon="@drawable/ic_chevron_right_24" />
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_routing_title"
+                            android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                        <TextView
+                            android:id="@+id/settings_routing_summary"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="@dimen/icon_touch_target"
+                        android:layout_height="@dimen/icon_touch_target"
+                        android:contentDescription="@null"
+                        android:importantForAccessibility="no"
+                        android:padding="12dp"
+                        android:src="@drawable/ic_chevron_right_24"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
 
                 <View style="@style/Widget.OlcrtcClient.SettingsDivider" />
 
-                <com.google.android.material.button.MaterialButton
+                <LinearLayout
                     android:id="@+id/settings_apps_row"
                     style="@style/Widget.OlcrtcClient.SettingsRow"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/settings_per_app_title"
-                    app:icon="@drawable/ic_chevron_right_24" />
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_per_app_title"
+                            android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                        <TextView
+                            android:id="@+id/settings_apps_summary"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="@dimen/icon_touch_target"
+                        android:layout_height="@dimen/icon_touch_target"
+                        android:contentDescription="@null"
+                        android:importantForAccessibility="no"
+                        android:padding="12dp"
+                        android:src="@drawable/ic_chevron_right_24"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
 
                 <View style="@style/Widget.OlcrtcClient.SettingsDivider" />
 
-                <com.google.android.material.button.MaterialButton
+                <LinearLayout
                     android:id="@+id/settings_dns_row"
                     style="@style/Widget.OlcrtcClient.SettingsRow"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/dns_server"
-                    app:icon="@drawable/ic_chevron_right_24" />
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/dns_server"
+                            android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                        <TextView
+                            android:id="@+id/settings_dns_summary"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="@dimen/icon_touch_target"
+                        android:layout_height="@dimen/icon_touch_target"
+                        android:contentDescription="@null"
+                        android:importantForAccessibility="no"
+                        android:padding="12dp"
+                        android:src="@drawable/ic_chevron_right_24"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -104,23 +191,81 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <com.google.android.material.button.MaterialButton
+                <LinearLayout
                     android:id="@+id/settings_appearance_row"
                     style="@style/Widget.OlcrtcClient.SettingsRow"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/settings_appearance_title"
-                    app:icon="@drawable/ic_chevron_right_24" />
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_appearance_title"
+                            android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                        <TextView
+                            android:id="@+id/settings_appearance_summary"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="@dimen/icon_touch_target"
+                        android:layout_height="@dimen/icon_touch_target"
+                        android:contentDescription="@null"
+                        android:importantForAccessibility="no"
+                        android:padding="12dp"
+                        android:src="@drawable/ic_chevron_right_24"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
 
                 <View style="@style/Widget.OlcrtcClient.SettingsDivider" />
 
-                <com.google.android.material.button.MaterialButton
+                <LinearLayout
                     android:id="@+id/settings_system_row"
                     style="@style/Widget.OlcrtcClient.SettingsRow"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/settings_system_title"
-                    app:icon="@drawable/ic_chevron_right_24" />
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_system_title"
+                            android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                        <TextView
+                            android:id="@+id/settings_system_summary"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="@dimen/icon_touch_target"
+                        android:layout_height="@dimen/icon_touch_target"
+                        android:contentDescription="@null"
+                        android:importantForAccessibility="no"
+                        android:padding="12dp"
+                        android:src="@drawable/ic_chevron_right_24"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
@@ -147,33 +292,120 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <com.google.android.material.button.MaterialButton
+                <LinearLayout
                     android:id="@+id/settings_updates_row"
                     style="@style/Widget.OlcrtcClient.SettingsRow"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/settings_updates_title"
-                    app:icon="@drawable/ic_chevron_right_24" />
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_updates_title"
+                            android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                        <TextView
+                            android:id="@+id/settings_updates_summary"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="@dimen/icon_touch_target"
+                        android:layout_height="@dimen/icon_touch_target"
+                        android:contentDescription="@null"
+                        android:importantForAccessibility="no"
+                        android:padding="12dp"
+                        android:src="@drawable/ic_chevron_right_24"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
 
                 <View style="@style/Widget.OlcrtcClient.SettingsDivider" />
 
-                <com.google.android.material.button.MaterialButton
+                <LinearLayout
                     android:id="@+id/settings_diagnostics_row"
                     style="@style/Widget.OlcrtcClient.SettingsRow"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/settings_diagnostics_title"
-                    app:icon="@drawable/ic_chevron_right_24" />
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_diagnostics_title"
+                            android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                        <TextView
+                            android:id="@+id/settings_diagnostics_summary"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="@dimen/icon_touch_target"
+                        android:layout_height="@dimen/icon_touch_target"
+                        android:contentDescription="@null"
+                        android:importantForAccessibility="no"
+                        android:padding="12dp"
+                        android:src="@drawable/ic_chevron_right_24"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
 
                 <View style="@style/Widget.OlcrtcClient.SettingsDivider" />
 
-                <com.google.android.material.button.MaterialButton
+                <LinearLayout
                     android:id="@+id/settings_about_row"
                     style="@style/Widget.OlcrtcClient.SettingsRow"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/settings_about"
-                    app:icon="@drawable/ic_chevron_right_24" />
+                    android:layout_height="wrap_content">
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="@string/settings_about"
+                            android:textAppearance="?attr/textAppearanceTitleSmall" />
+
+                        <TextView
+                            android:id="@+id/settings_about_summary"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="2dp"
+                            android:textAppearance="?attr/textAppearanceBodySmall"
+                            android:textColor="?attr/colorOnSurfaceVariant" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:layout_width="@dimen/icon_touch_target"
+                        android:layout_height="@dimen/icon_touch_target"
+                        android:contentDescription="@null"
+                        android:importantForAccessibility="no"
+                        android:padding="12dp"
+                        android:src="@drawable/ic_chevron_right_24"
+                        app:tint="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 

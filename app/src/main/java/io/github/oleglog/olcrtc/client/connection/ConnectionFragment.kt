@@ -24,13 +24,16 @@ import androidx.appcompat.widget.AppCompatImageButton
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
+import androidx.core.view.ViewCompat
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
+import androidx.recyclerview.widget.DiffUtil
+import androidx.recyclerview.widget.ListAdapter
+import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 import com.google.android.material.bottomsheet.BottomSheetDialog
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import com.google.android.material.progressindicator.CircularProgressIndicator
 import com.google.android.material.shape.CornerFamily
 import com.google.android.material.shape.MaterialShapeDrawable
 import com.google.android.material.shape.ShapeAppearanceModel
@@ -40,6 +43,7 @@ import io.github.oleglog.olcrtc.client.R
 import io.github.oleglog.olcrtc.client.data.ProfileConfig
 import io.github.oleglog.olcrtc.client.data.ProfileRepository
 import io.github.oleglog.olcrtc.client.databinding.FragmentConnectionBinding
+import io.github.oleglog.olcrtc.client.databinding.ItemConnectionProfileBinding
 import io.github.oleglog.olcrtc.client.importer.BundleImportDispatcher
 import io.github.oleglog.olcrtc.client.importer.BundleImportResult
 import io.github.oleglog.olcrtc.client.importer.DecodedImportPayload
@@ -84,6 +88,7 @@ class ConnectionFragment : Fragment() {
     private var lastLatencyMillis: Long? = null
     private var lastLatencyReference: String? = null
     private var connectionItems = emptyList<ConnectionListItem>()
+    private val connectionAdapter = ConnectionAdapter()
     private val profileProbeResults = mutableMapOf<String, Long?>()
     private val checkingProfiles = mutableSetOf<String>()
     private var profileProbeRequestId = 0L
@@ -133,14 +138,16 @@ class ConnectionFragment : Fragment() {
     }
 
     override fun onViewCreated(view: View, state: Bundle?) {
+        binding.profileList.adapter = connectionAdapter
         binding.connect.isEnabled = false
         binding.testSelected.isEnabled = false
         renderContentState(ConnectionContentState.LOADING)
         binding.connect.setOnClickListener {
-            if (currentState in BUSY_STATES || currentState == VpnState.CONNECTED) {
-                activityHost.stopVpn()
-            } else {
-                connectSelected()
+            when {
+                currentState in BUSY_STATES -> activityHost.stopVpn()
+                shouldSwitchProfile(currentState, hasPendingProfileSwitch()) -> connectSelected()
+                currentState == VpnState.CONNECTED -> activityHost.stopVpn()
+                else -> connectSelected()
             }
         }
         binding.addProfile.setOnClickListener { showAddConnectionMenu() }
@@ -182,6 +189,7 @@ class ConnectionFragment : Fragment() {
         pulseAnimator?.cancel()
         pulseAnimator = null
         ticker.removeCallbacks(dashboardTicker)
+        binding.profileList.adapter = null
         _binding = null
         super.onDestroyView()
     }
@@ -236,7 +244,6 @@ class ConnectionFragment : Fragment() {
             activity?.runOnUiThread {
                 if (_binding == null) return@runOnUiThread
                 result.onSuccess { model ->
-                    binding.profileList.removeAllViews()
                     val profilesChanged = connectionItems.isNotEmpty() &&
                         connectionItems.associate { it.reference to it.config } !=
                         model.profiles.associate { it.reference to it.config }
@@ -255,7 +262,7 @@ class ConnectionFragment : Fragment() {
                         }
                     }
                     val hasProfiles = model.profiles.isNotEmpty()
-                    model.profiles.forEach { binding.profileList.addView(profileCard(it)) }
+                    connectionAdapter.submitList(model.profiles)
                     profilesLoaded = true
                     updateLatencyAction()
                     renderContentState(
@@ -263,7 +270,7 @@ class ConnectionFragment : Fragment() {
                     )
                     updateActionAvailability()
                 }.onFailure { error ->
-                    if (profilesLoaded && binding.profileList.childCount > 0) {
+                    if (profilesLoaded && connectionAdapter.itemCount > 0) {
                         showStatus(error.message ?: getString(R.string.connection_error_message))
                     } else {
                         renderContentState(
@@ -281,119 +288,38 @@ class ConnectionFragment : Fragment() {
         else -> null
     }
 
-    private fun profileCard(item: ConnectionListItem): View {
-        val localId = item.localId
-        val subscriptionId = item.subscriptionProfileId
-        return connectionCard(
-            reference = item.reference,
-            name = item.name,
-            type = item.type,
-            onActions = { anchor -> showProfileActions(anchor, item) },
-            onSelect = {
-                if (localId != null) selectProfile(localId) else selectSubscriptionProfile(requireNotNull(subscriptionId))
+    private inner class ConnectionAdapter :
+        ListAdapter<ConnectionListItem, ConnectionViewHolder>(
+            object : DiffUtil.ItemCallback<ConnectionListItem>() {
+                override fun areItemsTheSame(old: ConnectionListItem, new: ConnectionListItem): Boolean =
+                    old.reference == new.reference
+
+                override fun areContentsTheSame(old: ConnectionListItem, new: ConnectionListItem): Boolean = old == new
             },
-        )
-    }
-
-    private fun connectionCard(
-        reference: String,
-        name: String,
-        type: String,
-        onActions: (View) -> Unit,
-        onSelect: () -> Unit,
-    ): MaterialCardView = MaterialCardView(requireContext()).apply {
-        layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT,
-            84.dp,
-        ).apply { bottomMargin = dimen(R.dimen.space_2) }
-        isClickable = true
-        isFocusable = true
-        radius = dimen(R.dimen.corner_card).toFloat()
-        cardElevation = 0f
-        setCardBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurfaceContainer))
-        val rippleValue = TypedValue()
-        requireContext().theme.resolveAttribute(
-            android.R.attr.selectableItemBackground,
-            rippleValue,
-            true,
-        )
-        foreground = ContextCompat.getDrawable(requireContext(), rippleValue.resourceId)
-
-        val detail = TextView(requireContext()).apply {
-            text = type
-            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
-            setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
-        }
-        val progress = CircularProgressIndicator(requireContext()).apply {
-            indicatorSize = 18.dp
-            trackThickness = 2.dp
-            isIndeterminate = true
-            isVisible = false
-        }
-        addView(LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(
-                dimen(R.dimen.space_4),
-                dimen(R.dimen.space_2),
-                dimen(R.dimen.space_2),
-                dimen(R.dimen.space_2),
+        ) {
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ConnectionViewHolder =
+            ConnectionViewHolder(
+                ItemConnectionProfileBinding.inflate(LayoutInflater.from(parent.context), parent, false),
             )
-            addView(LinearLayout(requireContext()).apply {
-                orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER_VERTICAL
-                addView(TextView(requireContext()).apply {
-                    text = name
-                    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium)
-                    maxLines = 1
-                    ellipsize = android.text.TextUtils.TruncateAt.END
-                })
-                addView(LinearLayout(requireContext()).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
-                    addView(detail, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                    addView(progress, LinearLayout.LayoutParams(18.dp, 18.dp).apply {
-                        marginStart = dimen(R.dimen.space_1)
-                    })
-                }, LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dimen(R.dimen.space_1) })
-            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            addView(profileActionsButton(name, onActions))
-        }, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT,
-        ))
-        tag = ConnectionCardViews(reference, name, type, detail, progress)
-        setOnClickListener { onSelect() }
-        applyCardAppearance(this, isReferenceSelected(reference), isReferenceConnected(reference))
+
+        override fun onBindViewHolder(holder: ConnectionViewHolder, position: Int) {
+            holder.bind(getItem(position))
+        }
     }
 
-    private fun profileActionsButton(
-        profileName: String,
-        onClick: (View) -> Unit,
-    ): AppCompatImageButton = AppCompatImageButton(requireContext()).apply {
-        layoutParams = LinearLayout.LayoutParams(
-            dimen(R.dimen.icon_touch_target),
-            dimen(R.dimen.icon_touch_target),
-        )
-        val backgroundValue = TypedValue()
-        requireContext().theme.resolveAttribute(
-            android.R.attr.selectableItemBackgroundBorderless,
-            backgroundValue,
-            true,
-        )
-        setBackgroundResource(backgroundValue.resourceId)
-        setImageResource(R.drawable.ic_more_vert_20)
-        imageTintList = ColorStateList.valueOf(
-            resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant),
-        )
-        val iconPadding = (dimen(R.dimen.icon_touch_target) - dimen(R.dimen.icon_action_size)) / 2
-        setPadding(iconPadding, iconPadding, iconPadding, iconPadding)
-        contentDescription = getString(R.string.connection_profile_actions, profileName)
-        setOnClickListener { onClick(it) }
+    private inner class ConnectionViewHolder(
+        private val views: ItemConnectionProfileBinding,
+    ) : RecyclerView.ViewHolder(views.root) {
+        fun bind(item: ConnectionListItem) {
+            views.profileName.text = item.name
+            views.profileActions.contentDescription = getString(R.string.connection_profile_actions, item.name)
+            views.profileActions.setOnClickListener { showProfileActions(it, item) }
+            views.root.setOnClickListener {
+                item.localId?.let(::selectProfile)
+                    ?: selectSubscriptionProfile(requireNotNull(item.subscriptionProfileId))
+            }
+            applyCardAppearance(views, item)
+        }
     }
 
     private fun showProfileActions(anchor: View, item: ConnectionListItem) {
@@ -418,10 +344,11 @@ class ConnectionFragment : Fragment() {
         }
     }
 
-    private fun applyCardAppearance(card: MaterialCardView, selected: Boolean, connected: Boolean) {
+    private fun applyCardAppearance(views: ItemConnectionProfileBinding, item: ConnectionListItem) {
+        val card = views.root
         val state = connectionCardState(
-            selected = selected,
-            connected = connected,
+            selected = isReferenceSelected(item.reference),
+            connected = isReferenceConnected(item.reference),
         )
         card.strokeColor = if (state == ConnectionCardState.INACTIVE) {
             resolveColor(com.google.android.material.R.attr.colorOutline)
@@ -449,7 +376,9 @@ class ConnectionFragment : Fragment() {
                 },
             ),
         )
-        updateCardContent(card, state)
+        card.isSelected = state != ConnectionCardState.INACTIVE
+        card.isActivated = state == ConnectionCardState.CONNECTED
+        updateCardContent(views, item, state)
     }
 
     private fun animateCardElevation(card: MaterialCardView, targetElevation: Float) {
@@ -471,20 +400,15 @@ class ConnectionFragment : Fragment() {
     }
 
     private fun refreshCardAppearance() {
-        for (i in 0 until binding.profileList.childCount) {
-            (binding.profileList.getChildAt(i) as? MaterialCardView)?.let { card ->
-                val views = card.tag as? ConnectionCardViews ?: return@let
-                applyCardAppearance(
-                    card,
-                    isReferenceSelected(views.reference),
-                    isReferenceConnected(views.reference),
-                )
-            }
-        }
+        connectionAdapter.notifyItemRangeChanged(0, connectionAdapter.itemCount)
     }
 
-    private fun updateCardContent(card: MaterialCardView, state: ConnectionCardState) {
-        val views = card.tag as? ConnectionCardViews ?: return
+    private fun updateCardContent(
+        views: ItemConnectionProfileBinding,
+        item: ConnectionListItem,
+        state: ConnectionCardState,
+    ) {
+        val card = views.root
         val connectionStatus = when {
             state == ConnectionCardState.CONNECTED && currentState == VpnState.CONNECTED ->
                 getString(R.string.connection_card_connected)
@@ -494,24 +418,26 @@ class ConnectionFragment : Fragment() {
             else -> null
         }
         val probeStatus = when {
-            checkingProfiles.contains(views.reference) -> null
-            !profileProbeResults.containsKey(views.reference) -> null
-            profileProbeResults[views.reference] == null -> getString(R.string.profile_test_unavailable)
-            else -> getString(R.string.connection_latency_value, profileProbeResults.getValue(views.reference))
+            checkingProfiles.contains(item.reference) -> null
+            !profileProbeResults.containsKey(item.reference) -> null
+            profileProbeResults[item.reference] == null -> getString(R.string.profile_test_unavailable)
+            else -> getString(R.string.connection_latency_value, profileProbeResults.getValue(item.reference))
         }
-        views.detail.text = listOfNotNull(
-            views.type,
+        views.profileDetail.text = listOfNotNull(
+            item.type,
             connectionStatus,
-            probeStatus,
         ).joinToString(" · ")
-        views.progress.isVisible = checkingProfiles.contains(views.reference) ||
+        views.profileLatency.text = probeStatus
+        views.profileLatency.isVisible = probeStatus != null
+        views.profileProgress.isVisible = checkingProfiles.contains(item.reference) ||
             connectionStatus != null && currentState in CARD_PROGRESS_STATES
         card.contentDescription = listOfNotNull(
-            views.name,
-            views.type,
+            item.name,
+            item.type,
             connectionStatus,
             probeStatus,
         ).joinToString(", ")
+        ViewCompat.setStateDescription(card, connectionStatus)
     }
 
     private fun isReferenceSelected(reference: String): Boolean = when {
@@ -823,10 +749,17 @@ class ConnectionFragment : Fragment() {
         when (state) {
             VpnState.CONNECTED -> {
                 val active = activityHost.activeProfileReference()
+                val activeChanged = active != when {
+                    connectedProfileId != null -> "local:$connectedProfileId"
+                    connectedSubscriptionProfileId != null -> "subscription:$connectedSubscriptionProfileId"
+                    else -> null
+                }
                 connectedProfileId = active?.removePrefix("local:")?.takeIf { it != active }?.toLongOrNull()
                 connectedSubscriptionProfileId = active?.removePrefix("subscription:")?.takeIf { it != active }
-                selectedProfileId = connectedProfileId
-                selectedSubscriptionProfileId = connectedSubscriptionProfileId
+                if (stateChanged || activeChanged) {
+                    selectedProfileId = connectedProfileId
+                    selectedSubscriptionProfileId = connectedSubscriptionProfileId
+                }
                 loadProfiles()
                 if (stateChanged) loadDashboardSummary()
             }
@@ -878,6 +811,7 @@ class ConnectionFragment : Fragment() {
         val text = getString(
             when {
                 currentState == VpnState.PREPARING || currentState == VpnState.CONNECTING -> R.string.cancel_connection
+                shouldSwitchProfile(currentState, hasPendingProfileSwitch()) -> R.string.switch_connection
                 currentState == VpnState.CONNECTED || currentState == VpnState.RECONNECTING -> R.string.disconnect
                 currentState == VpnState.STOPPING -> R.string.disconnecting
                 currentState == VpnState.ERROR -> R.string.retry
@@ -1354,7 +1288,7 @@ class ConnectionFragment : Fragment() {
             }
             .show()
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            .setTextColor(ContextCompat.getColor(requireContext(), R.color.olcrtc_error))
+            .setTextColor(resolveColor(com.google.android.material.R.attr.colorError))
     }
 
     private fun confirmDeleteProfile(profileId: Long, name: String) {
@@ -1383,7 +1317,7 @@ class ConnectionFragment : Fragment() {
             }
             .show()
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            .setTextColor(ContextCompat.getColor(requireContext(), R.color.olcrtc_error))
+            .setTextColor(resolveColor(com.google.android.material.R.attr.colorError))
     }
 
     private val activityHost get() = requireActivity() as MainActivity
@@ -1412,14 +1346,6 @@ class ConnectionFragment : Fragment() {
         val localId: Long? = null,
         val subscriptionProfileId: String? = null,
         val config: ProfileConfig? = null,
-    )
-
-    private data class ConnectionCardViews(
-        val reference: String,
-        val name: String,
-        val type: String,
-        val detail: TextView,
-        val progress: CircularProgressIndicator,
     )
 
     companion object {
@@ -1463,6 +1389,9 @@ internal fun canSelectProfile(state: VpnState): Boolean = when (state) {
     VpnState.PREPARING, VpnState.CONNECTING, VpnState.RECONNECTING, VpnState.STOPPING -> false
     else -> true
 }
+
+internal fun shouldSwitchProfile(state: VpnState, hasPendingProfileSwitch: Boolean): Boolean =
+    state == VpnState.CONNECTED && hasPendingProfileSwitch
 
 internal fun connectionGlowAlpha(intensity: Int, connected: Boolean): Float {
     val normalized = intensity.coerceIn(0, 100) / 100f

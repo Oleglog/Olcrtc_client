@@ -66,6 +66,8 @@
     <string name="profile_latency_no_active_session">Connect before checking ping</string>
     <string name="profile_latency_failed">Unable to check ping\nThe active VPN connection did not return a result</string>
     <string name="subscription_add">Add subscription</string>
+    <string name="subscription_loading">Loading subscriptions…</string>
+    <string name="subscription_load_failed">Could not load subscriptions</string>
     <string name="subscription_update_now">Update now</string>
     <string name="subscription_update_failed">Subscription update failed</string>
     <string name="subscription_updated">Subscription updated</string>
@@ -237,10 +239,10 @@
     <string name="settings_diagnostics_title">Diagnostics</string>
     <string name="settings_background_effect_enabled">Enable background particles</string>
     <string name="settings_background_effect_style">Effect</string>
-    <string name="settings_background_effect_snow">Snow</string>
-    <string name="settings_background_effect_rain">Rain</string>
+    <string name="settings_background_effect_snow">Clean</string>
+    <string name="settings_background_effect_rain">Glow</string>
     <string name="settings_background_effect_drift">Drift</string>
-    <string name="settings_background_effect_intensity">Intensity</string>
+    <string name="settings_background_effect_intensity">Drift intensity</string>
     <string name="settings_background_effect_intensity_low">Low</string>
     <string name="settings_background_effect_intensity_medium">Medium</string>
     <string name="settings_background_effect_intensity_high">High</string>
@@ -260,7 +262,7 @@
     <string name="appearance_palette_black">Black</string>
     <string name="appearance_palette_mono">Monochrome</string>
     <string name="appearance_accent_title">Accent color</string>
-    <string name="appearance_accent_summary">A color uses the neutral foundation. Select a palette again to restore its own colors.</string>
+    <string name="appearance_accent_summary">The palette controls surfaces; the accent colors actions, selection and connection glow.</string>
     <string name="appearance_accent_auto">From palette</string>
     <string name="appearance_accent_teal">Teal</string>
     <string name="appearance_accent_blue">Blue</string>
@@ -268,7 +270,7 @@
     <string name="appearance_accent_rose">Rose</string>
     <string name="appearance_accent_amber">Amber</string>
     <string name="appearance_atmosphere_title">Atmosphere</string>
-    <string name="appearance_atmosphere_summary">One calm background effect and a soft connection glow.</string>
+    <string name="appearance_atmosphere_summary">Choose a clean screen, connection glow or slow ambient drift.</string>
     <string name="appearance_glow_intensity">Connection glow</string>
     <string name="appearance_glow_value">%1$d%%</string>
     <string name="appearance_motion_title">Interface animations</string>
@@ -322,6 +324,7 @@
     <string name="no_profile">No profile imported</string>
     <string name="profile_select_required">Select a connection first</string>
     <string name="connect">Connect</string>
+    <string name="switch_connection">Switch</string>
     <string name="add_connection">Add connection</string>
     <string name="profile_add_favorite">Add to favorites</string>
     <string name="profile_remove_favorite">Remove from favorites</string>
@@ -398,6 +401,13 @@
     <string name="vpn_tile_connecting">Connecting</string>
     <string name="vpn_native_unavailable">Native VPN components are not installed</string>
     <string name="statistics_intro">A quiet record of the current connection and recent activity.</string>
+    <string name="statistics_sessions_label">Sessions</string>
+    <string name="statistics_duration_label">Duration</string>
+    <string name="statistics_total_label">Total</string>
+    <string name="statistics_speed_label">Speed</string>
+    <string name="statistics_active_meta">%1$s · %2$s</string>
+    <string name="statistics_speed_value">↓ %1$s · ↑ %2$s</string>
+    <string name="statistics_not_available" translatable="false">—</string>
     <string name="settings_intro">Connection behavior, appearance and app maintenance.</string>
     <string name="settings_group_connection">Connection</string>
     <string name="settings_group_interface">Interface</string>

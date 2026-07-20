@@ -67,6 +67,8 @@
     <string name="profile_latency_no_active_session">Сначала подключитесь, чтобы проверить пинг</string>
     <string name="profile_latency_failed">Не удалось проверить пинг\nАктивное VPN-подключение не вернуло результат</string>
     <string name="subscription_add">Добавить подписку по QR-коду</string>
+    <string name="subscription_loading">Загрузка подписок…</string>
+    <string name="subscription_load_failed">Не удалось загрузить подписки</string>
     <string name="subscription_update_now">Обновить</string>
     <string name="subscription_update_failed">Не удалось обновить подписку</string>
     <string name="subscription_updated">Подписка обновлена</string>
@@ -238,10 +240,10 @@
     <string name="settings_diagnostics_title">Диагностика</string>
     <string name="settings_background_effect_enabled">Включить частицы на фоне</string>
     <string name="settings_background_effect_style">Эффект</string>
-    <string name="settings_background_effect_snow">Снег</string>
-    <string name="settings_background_effect_rain">Дождь</string>
+    <string name="settings_background_effect_snow">Чисто</string>
+    <string name="settings_background_effect_rain">Свечение</string>
     <string name="settings_background_effect_drift">Дрейф</string>
-    <string name="settings_background_effect_intensity">Интенсивность</string>
+    <string name="settings_background_effect_intensity">Интенсивность дрейфа</string>
     <string name="settings_background_effect_intensity_low">Низкая</string>
     <string name="settings_background_effect_intensity_medium">Средняя</string>
     <string name="settings_background_effect_intensity_high">Высокая</string>
@@ -259,7 +261,7 @@
     <string name="appearance_palette_black">Чёрная</string>
     <string name="appearance_palette_mono">Чёрно-белая</string>
     <string name="appearance_accent_title">Акцентный цвет</string>
-    <string name="appearance_accent_summary">Цвет использует нейтральную основу. Повторный выбор палитры вернёт её родные цвета.</string>
+    <string name="appearance_accent_summary">Палитра задаёт поверхности, а акцент — действия, выбор и свечение подключения.</string>
     <string name="appearance_accent_auto">Из палитры</string>
     <string name="appearance_accent_teal">Бирюзовый</string>
     <string name="appearance_accent_blue">Синий</string>
@@ -267,7 +269,7 @@
     <string name="appearance_accent_rose">Розовый</string>
     <string name="appearance_accent_amber">Янтарный</string>
     <string name="appearance_atmosphere_title">Атмосфера</string>
-    <string name="appearance_atmosphere_summary">Один спокойный фоновый эффект и мягкое свечение подключения.</string>
+    <string name="appearance_atmosphere_summary">Выберите чистый экран, свечение подключения или медленный фоновый дрейф.</string>
     <string name="appearance_glow_intensity">Свечение подключения</string>
     <string name="appearance_glow_value">%1$d%%</string>
     <string name="appearance_motion_title">Анимации интерфейса</string>
@@ -318,6 +320,7 @@
     <string name="no_profile">Профиль не выбран</string>
     <string name="profile_select_required">Сначала выберите подключение</string>
     <string name="connect">Подключить</string>
+    <string name="switch_connection">Переключить</string>
     <string name="add_connection">Добавить подключение</string>
     <string name="profile_add_favorite">Добавить в избранное</string>
     <string name="profile_remove_favorite">Убрать из избранного</string>
@@ -394,6 +397,12 @@
     <string name="vpn_tile_connecting">Подключение</string>
     <string name="vpn_native_unavailable">Нативные компоненты VPN не установлены</string>
     <string name="statistics_intro">Спокойная сводка текущего подключения и недавней активности.</string>
+    <string name="statistics_sessions_label">Сеансы</string>
+    <string name="statistics_duration_label">Время</string>
+    <string name="statistics_total_label">Всего</string>
+    <string name="statistics_speed_label">Скорость</string>
+    <string name="statistics_active_meta">%1$s · %2$s</string>
+    <string name="statistics_speed_value">↓ %1$s · ↑ %2$s</string>
     <string name="settings_intro">Поведение подключения, оформление и обслуживание приложения.</string>
     <string name="settings_group_connection">Подключение</string>
     <string name="settings_group_interface">Интерфейс</string>

@@ -36,6 +36,13 @@ class ConnectionCardStateTest {
     }
 
     @Test
+    fun activeVpnSwitchesOnlyAfterExplicitPrimaryAction() {
+        assertTrue(shouldSwitchProfile(VpnState.CONNECTED, hasPendingProfileSwitch = true))
+        assertFalse(shouldSwitchProfile(VpnState.CONNECTED, hasPendingProfileSwitch = false))
+        assertFalse(shouldSwitchProfile(VpnState.DISCONNECTED, hasPendingProfileSwitch = true))
+    }
+
+    @Test
     fun defaultGlowIsVisibleAndDisconnectedGlowStaysQuiet() {
         val connected = connectionGlowAlpha(intensity = 60, connected = true)
         val disconnected = connectionGlowAlpha(intensity = 60, connected = false)

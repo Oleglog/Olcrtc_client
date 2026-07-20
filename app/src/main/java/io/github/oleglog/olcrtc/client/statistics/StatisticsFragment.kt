@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import com.google.android.material.card.MaterialCardView
 import io.github.oleglog.olcrtc.client.MainActivity
@@ -36,11 +37,11 @@ class StatisticsFragment : Fragment() {
             when {
                 currentSession != null && state in INACTIVE_STATES -> {
                     currentSession = null
-                    b.activeContent.setText(R.string.statistics_no_active_session)
+                    renderCurrentSession(null)
                     loadStatistics()
                 }
                 currentSession == null && state == VpnState.CONNECTED -> loadStatistics()
-                else -> currentSession?.let { b.activeContent.text = formatCurrentSession(it) }
+                else -> renderCurrentSession(currentSession)
             }
             ticker.postDelayed(this, CURRENT_SESSION_REFRESH_MILLIS)
         }
@@ -89,9 +90,10 @@ class StatisticsFragment : Fragment() {
                 val b = _binding ?: return@runOnUiThread
                 result.onSuccess(::showSummary).onFailure {
                     currentSession = null
-                    b.activeContent.text = it.message ?: getString(R.string.statistics_error)
-                    b.todayContent.text = ""
-                    b.monthContent.text = ""
+                    b.activeProfile.text = it.message ?: getString(R.string.statistics_error)
+                    b.activeMeta.isVisible = false
+                    b.activeMetrics.isVisible = false
+                    clearTotals()
                     b.clearHistory.visibility = View.GONE
                     b.historyEmpty.visibility = View.VISIBLE
                     b.historyList.removeAllViews()
@@ -103,9 +105,9 @@ class StatisticsFragment : Fragment() {
     private fun showSummary(summary: StatisticsSummary) {
         val b = binding
         currentSession = summary.current
-        b.activeContent.text = summary.current?.let(::formatCurrentSession) ?: getString(R.string.statistics_no_active_session)
-        b.todayContent.text = formatTotals(summary.today)
-        b.monthContent.text = formatTotals(summary.month)
+        renderCurrentSession(summary.current)
+        renderTotals(summary.today, b.todaySessions, b.todayDuration, b.todayDownload, b.todayUpload)
+        renderTotals(summary.month, b.monthSessions, b.monthDuration, b.monthDownload, b.monthUpload)
         b.historyList.removeAllViews()
         b.clearHistory.visibility = if (summary.recent.isEmpty()) View.GONE else View.VISIBLE
         if (summary.recent.isEmpty()) {
@@ -119,14 +121,6 @@ class StatisticsFragment : Fragment() {
     private fun recentSessionRow(session: ConnectionSessionEntity): View {
         val started = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(session.startedAt))
         val endedAt = session.endedAt ?: System.currentTimeMillis()
-        val text = getString(
-            R.string.statistics_recent_session_format,
-            started,
-            session.profileNameSnapshot,
-            formatDuration(endedAt - session.startedAt),
-            formatBytes(session.bytesUp + session.bytesDown),
-            disconnectReasonLabel(session.disconnectReason),
-        )
         return MaterialCardView(requireContext()).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -140,11 +134,35 @@ class StatisticsFragment : Fragment() {
                 resolveColor(com.google.android.material.R.attr.colorPrimaryContainer),
             ))
             setCardBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurfaceVariant))
-            addView(TextView(requireContext()).apply {
-                this.text = text
-                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
-                setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
+            addView(LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.VERTICAL
                 setPadding(12.dp, 12.dp, 12.dp, 12.dp)
+                addView(LinearLayout(requireContext()).apply {
+                    gravity = android.view.Gravity.CENTER_VERTICAL
+                    addView(TextView(requireContext()).apply {
+                        text = session.profileNameSnapshot
+                        setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall)
+                        setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurface))
+                    }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                    addView(TextView(requireContext()).apply {
+                        text = formatDuration(endedAt - session.startedAt)
+                        setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelLarge)
+                        typeface = android.graphics.Typeface.MONOSPACE
+                        setTextColor(resolveColor(com.google.android.material.R.attr.colorPrimary))
+                    })
+                })
+                addView(TextView(requireContext()).apply {
+                    text = "$started · ${disconnectReasonLabel(session.disconnectReason)}"
+                    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+                    setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
+                    setPadding(0, 4.dp, 0, 0)
+                })
+                addView(TextView(requireContext()).apply {
+                    text = "↑ ${formatBytes(session.bytesUp)} · ↓ ${formatBytes(session.bytesDown)}"
+                    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelSmall)
+                    setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
+                    setPadding(0, 4.dp, 0, 0)
+                })
             })
             setOnClickListener { showReasonDialog(session) }
         }
@@ -187,33 +205,62 @@ class StatisticsFragment : Fragment() {
 
     private val binding get() = requireNotNull(_binding)
 
-    private fun formatCurrentSession(session: ConnectionSessionEntity): String {
+    private fun renderCurrentSession(session: ConnectionSessionEntity?) {
+        val b = binding
+        if (session == null) {
+            b.activeProfile.setText(R.string.statistics_no_active_session)
+            b.activeMeta.isVisible = false
+            b.activeMetrics.isVisible = false
+            return
+        }
         val traffic = (activity as? MainActivity)?.trafficSnapshot()?.takeIf { it.size >= 4 }
         val bytesUp = traffic?.get(0) ?: session.bytesUp
         val bytesDown = traffic?.get(1) ?: session.bytesDown
         val connected = (activity as? MainActivity)?.currentVpnState() == VpnState.CONNECTED
         val upSpeed = if (connected) traffic?.get(2) ?: 0 else 0
         val downSpeed = if (connected) traffic?.get(3) ?: 0 else 0
-        return getString(
-            R.string.statistics_active_session_format,
-            session.profileNameSnapshot,
+        b.activeProfile.text = session.profileNameSnapshot
+        b.activeMeta.text = getString(
+            R.string.statistics_active_meta,
             session.protocolSnapshot,
-            formatDuration(System.currentTimeMillis() - session.startedAt),
             networkTypeLabel(session.networkType),
-            formatBytes(bytesUp),
-            formatBytes(bytesDown),
-            formatBytesPerSecond(upSpeed),
-            formatBytesPerSecond(downSpeed),
         )
+        b.activeDuration.text = formatDuration(System.currentTimeMillis() - session.startedAt)
+        b.activeTotal.text = formatBytes(bytesUp + bytesDown)
+        b.activeSpeed.text = getString(
+            R.string.statistics_speed_value,
+            formatBytesPerSecond(downSpeed),
+            formatBytesPerSecond(upSpeed),
+        )
+        b.activeMeta.isVisible = true
+        b.activeMetrics.isVisible = true
     }
 
-    private fun formatTotals(totals: StatisticsTotals): String = getString(
-        R.string.statistics_totals_format,
-        totals.sessions,
-        formatDuration(totals.durationMillis),
-        formatBytes(totals.bytesUp),
-        formatBytes(totals.bytesDown),
-    )
+    private fun renderTotals(
+        totals: StatisticsTotals,
+        sessions: TextView,
+        duration: TextView,
+        download: TextView,
+        upload: TextView,
+    ) {
+        sessions.text = totals.sessions.toString()
+        duration.text = formatDuration(totals.durationMillis)
+        download.text = formatBytes(totals.bytesDown)
+        upload.text = formatBytes(totals.bytesUp)
+    }
+
+    private fun clearTotals() {
+        listOf(
+            binding.todaySessions,
+            binding.todayDuration,
+            binding.todayDownload,
+            binding.todayUpload,
+            binding.monthSessions,
+            binding.monthDuration,
+            binding.monthDownload,
+            binding.monthUpload,
+        ).forEach { it.setText(R.string.statistics_not_available) }
+    }
 
     private fun formatDuration(durationMillis: Long): String {
         val seconds = (durationMillis.coerceAtLeast(0) / 1_000).toInt()

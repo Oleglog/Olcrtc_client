@@ -1181,7 +1181,7 @@ class OlcrtcVpnService : VpnService() {
     private fun notification(): android.app.Notification {
         val profile = activeProfileInfo
         val builder = NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification_vpn)
             .setOnlyAlertOnce(true)
             .setContentTitle(profile?.name ?: getString(R.string.vpn_notification_title))
             .setContentText(
@@ -1206,7 +1206,7 @@ class OlcrtcVpnService : VpnService() {
     private fun disconnectedNotification(): android.app.Notification {
         val profile = activeProfileInfo
         return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification_vpn)
             .setContentTitle(profile?.name ?: getString(R.string.vpn_notification_title))
             .setContentText(
                 profile?.let {

@@ -6,6 +6,11 @@ import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.button.MaterialButton
 import io.github.oleglog.olcrtc.client.R
@@ -25,8 +30,16 @@ class AppearanceSettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppearanceTheme.apply(this)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         binding = ActivityAppearanceSettingsBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout(),
+            )
+            view.updatePadding(left = bars.left, top = bars.top, right = bars.right, bottom = bars.bottom)
+            insets
+        }
 
         appearance = settings.getAppearance()
         effects = settings.getBackgroundEffects()
@@ -41,11 +54,11 @@ class AppearanceSettingsActivity : AppCompatActivity() {
         binding.glowSlider.stepSize = 5f
         setPaletteSelection(appearance.palette)
         setAccentSelection(appearance.accent)
-        binding.effectGroup.check(effectButton(effects.style))
+        binding.effectGroup.check(atmosphereButton())
         binding.intensityGroup.check(intensityButton(effects.intensity))
-        binding.effectsEnabled.isChecked = effects.enabled
         binding.glowSlider.value = appearance.glowIntensity.toFloat()
         binding.motionEnabled.isChecked = appearance.motionEnabled
+        updateAtmosphereControls()
     }
 
     private fun bindActions() {
@@ -58,12 +71,9 @@ class AppearanceSettingsActivity : AppCompatActivity() {
             binding.paletteMono to RoutingSettings.Appearance.Palette.MONO,
         ).forEach { (button, palette) ->
             button.setOnClickListener {
-                appearance = appearance.copy(
-                    palette = palette,
-                    accent = RoutingSettings.Appearance.Accent.AUTO,
-                )
-                setPaletteSelection(palette)
-                setAccentSelection(RoutingSettings.Appearance.Accent.AUTO)
+                appearance = appearance.copy(palette = palette).normalized()
+                setPaletteSelection(appearance.palette)
+                setAccentSelection(appearance.accent)
                 updatePreview()
             }
         }
@@ -78,21 +88,26 @@ class AppearanceSettingsActivity : AppCompatActivity() {
             button.setOnClickListener {
                 appearance = appearance.copy(accent = accent).normalized()
                 setPaletteSelection(appearance.palette)
-                setAccentSelection(accent)
+                setAccentSelection(appearance.accent)
                 updatePreview()
             }
         }
         binding.effectGroup.addOnButtonCheckedListener { _, checkedId, checked ->
-            if (checked) effects = effects.copy(style = effectForButton(checkedId))
+            if (checked) {
+                applyAtmosphere(checkedId)
+                updatePreview()
+            }
         }
         binding.intensityGroup.addOnButtonCheckedListener { _, checkedId, checked ->
             if (checked) effects = effects.copy(intensity = intensityForButton(checkedId))
         }
-        binding.effectsEnabled.setOnCheckedChangeListener { _, checked ->
-            effects = effects.copy(enabled = checked)
-        }
-        binding.glowSlider.addOnChangeListener { _, value, _ ->
+        binding.glowSlider.addOnChangeListener { _, value, fromUser ->
             appearance = appearance.copy(glowIntensity = value.toInt())
+            if (fromUser && !effects.enabled) {
+                binding.effectGroup.check(
+                    if (value == 0f) R.id.effect_snow else R.id.effect_rain,
+                )
+            }
             updatePreview()
         }
         binding.motionEnabled.setOnCheckedChangeListener { _, checked ->
@@ -108,6 +123,8 @@ class AppearanceSettingsActivity : AppCompatActivity() {
         binding.previewCard.strokeColor = color
         binding.previewConnect.setCardBackgroundColor(ColorUtils.blendARGB(surface, color, 0.14f))
         binding.previewIcon.imageTintList = ColorStateList.valueOf(color)
+        binding.previewProfile.setTextColor(previewOnSurfaceColor())
+        binding.previewLabel.setTextColor(previewOnSurfaceVariantColor())
         binding.previewStatus.setTextColor(color)
         binding.previewGlow.backgroundTintList = ColorStateList.valueOf(color)
         binding.previewGlow.alpha = 0.08f + appearance.glowIntensity / 100f * 0.32f
@@ -193,11 +210,6 @@ class AppearanceSettingsActivity : AppCompatActivity() {
 
     private fun previewSurfaceColor(): Int {
         val resource = when {
-            appearance.accent == RoutingSettings.Appearance.Accent.TEAL -> R.color.appearance_accent_teal_surface
-            appearance.accent == RoutingSettings.Appearance.Accent.BLUE -> R.color.appearance_accent_blue_surface
-            appearance.accent == RoutingSettings.Appearance.Accent.VIOLET -> R.color.appearance_accent_violet_surface
-            appearance.accent == RoutingSettings.Appearance.Accent.ROSE -> R.color.appearance_accent_rose_surface
-            appearance.accent == RoutingSettings.Appearance.Accent.AMBER -> R.color.appearance_accent_amber_surface
             appearance.palette == RoutingSettings.Appearance.Palette.NEUTRAL -> R.color.olcrtc_surface
             appearance.palette == RoutingSettings.Appearance.Palette.BRONZE -> R.color.olcrtc_bronze_surface
             appearance.palette == RoutingSettings.Appearance.Palette.BLACK -> R.color.olcrtc_black_surface
@@ -214,16 +226,63 @@ class AppearanceSettingsActivity : AppCompatActivity() {
         }
     }
 
-    private fun effectButton(value: RoutingSettings.BackgroundEffects.Style): Int = when (value) {
-        RoutingSettings.BackgroundEffects.Style.SNOW -> R.id.effect_snow
-        RoutingSettings.BackgroundEffects.Style.RAIN -> R.id.effect_rain
-        RoutingSettings.BackgroundEffects.Style.DRIFT -> R.id.effect_drift
+    private fun previewOnSurfaceColor(): Int = previewThemeColor(
+        neutral = R.color.olcrtc_on_surface,
+        bronze = R.color.olcrtc_bronze_on_surface,
+        black = R.color.olcrtc_black_on_surface,
+        mono = R.color.olcrtc_mono_on_surface,
+        systemAttribute = com.google.android.material.R.attr.colorOnSurface,
+    )
+
+    private fun previewOnSurfaceVariantColor(): Int = previewThemeColor(
+        neutral = R.color.olcrtc_on_surface_variant,
+        bronze = R.color.olcrtc_bronze_on_surface_variant,
+        black = R.color.olcrtc_black_on_surface_variant,
+        mono = R.color.olcrtc_mono_on_surface_variant,
+        systemAttribute = com.google.android.material.R.attr.colorOnSurfaceVariant,
+    )
+
+    private fun previewThemeColor(
+        neutral: Int,
+        bronze: Int,
+        black: Int,
+        mono: Int,
+        systemAttribute: Int,
+    ): Int {
+        val resource = when (appearance.palette) {
+            RoutingSettings.Appearance.Palette.NEUTRAL -> neutral
+            RoutingSettings.Appearance.Palette.BRONZE -> bronze
+            RoutingSettings.Appearance.Palette.BLACK -> black
+            RoutingSettings.Appearance.Palette.MONO -> mono
+            RoutingSettings.Appearance.Palette.SYSTEM -> 0
+        }
+        return if (resource != 0) ContextCompat.getColor(this, resource) else
+            com.google.android.material.color.MaterialColors.getColor(binding.root, systemAttribute)
     }
 
-    private fun effectForButton(id: Int): RoutingSettings.BackgroundEffects.Style = when (id) {
-        R.id.effect_rain -> RoutingSettings.BackgroundEffects.Style.RAIN
-        R.id.effect_drift -> RoutingSettings.BackgroundEffects.Style.DRIFT
-        else -> RoutingSettings.BackgroundEffects.Style.SNOW
+    private fun atmosphereButton(): Int = when {
+        effects.enabled -> R.id.effect_drift
+        appearance.glowIntensity == 0 -> R.id.effect_snow
+        else -> R.id.effect_rain
+    }
+
+    private fun applyAtmosphere(id: Int) {
+        val glow = when (id) {
+            R.id.effect_snow -> 0
+            else -> appearance.glowIntensity.takeIf { it > 0 } ?: 60
+        }
+        appearance = appearance.copy(glowIntensity = glow)
+        effects = effects.copy(
+            enabled = id == R.id.effect_drift,
+            style = RoutingSettings.BackgroundEffects.Style.DRIFT,
+        )
+        if (binding.glowSlider.value.toInt() != glow) binding.glowSlider.value = glow.toFloat()
+        updateAtmosphereControls()
+    }
+
+    private fun updateAtmosphereControls() {
+        binding.driftIntensityLabel.isVisible = effects.enabled
+        binding.intensityGroup.isVisible = effects.enabled
     }
 
     private fun intensityButton(value: RoutingSettings.BackgroundEffects.Intensity): Int = when (value) {

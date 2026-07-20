@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -14,6 +15,10 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updateLayoutParams
 import io.github.oleglog.olcrtc.client.R
 import io.github.oleglog.olcrtc.client.databinding.ActivityQrScannerBinding
 import io.github.oleglog.olcrtc.client.ui.AppearanceTheme
@@ -36,8 +41,26 @@ class QrScannerActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         AppearanceTheme.apply(this)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         binding = ActivityQrScannerBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout(),
+            )
+            binding.hint.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                topMargin = resources.getDimensionPixelSize(R.dimen.space_6) + bars.top
+                marginStart = resources.getDimensionPixelSize(R.dimen.page_padding) + bars.left
+                marginEnd = resources.getDimensionPixelSize(R.dimen.page_padding) + bars.right
+            }
+            binding.progress.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                bottomMargin = 88.dp + bars.bottom
+            }
+            binding.cancel.updateLayoutParams<ViewGroup.MarginLayoutParams> {
+                bottomMargin = resources.getDimensionPixelSize(R.dimen.space_6) + bars.bottom
+            }
+            insets
+        }
         binding.cancel.setOnClickListener { finish() }
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
             startCamera()
@@ -131,4 +154,6 @@ class QrScannerActivity : AppCompatActivity() {
         const val EXTRA_RESULT = "qr_result"
         const val EXTRA_ERROR = "qr_error"
     }
+
+    private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
 }

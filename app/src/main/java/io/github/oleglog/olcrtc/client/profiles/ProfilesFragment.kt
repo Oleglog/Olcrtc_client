@@ -1,6 +1,7 @@
 package io.github.oleglog.olcrtc.client.profiles
 
 import android.app.Activity
+import android.content.ClipboardManager
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.os.Bundle
@@ -15,6 +16,7 @@ import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.AppCompatImageButton
+import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
@@ -60,6 +62,18 @@ class ProfilesFragment : Fragment() {
         binding.addSubscription.setOnClickListener {
             qrScanner.launch(Intent(requireContext(), QrScannerActivity::class.java))
         }
+        binding.pasteSubscription.setOnClickListener {
+            val clipboard = requireContext().getSystemService(ClipboardManager::class.java)
+            val text = clipboard?.primaryClip
+                ?.takeIf { it.itemCount > 0 }
+                ?.getItemAt(0)
+                ?.coerceToText(requireContext())
+                ?.toString()
+                ?.trim()
+                ?.takeIf(String::isNotBlank)
+            if (text == null) showError(IllegalStateException(getString(R.string.clipboard_empty)))
+            else confirmExternalSubscription(text)
+        }
         return binding.root
     }
 
@@ -90,17 +104,26 @@ class ProfilesFragment : Fragment() {
 
     private fun loadSubscriptions() {
         if (storage.isShutdown) return
+        binding.subscriptionStatusRow.isVisible = true
+        binding.subscriptionProgress.isVisible = true
+        binding.subscriptionStatus.text = getString(R.string.subscription_loading)
         storage.execute {
             val result = runCatching { profiles.listSubscriptions() }
             activity?.runOnUiThread {
                 if (_binding == null) return@runOnUiThread
-                result.onSuccess(::showSubscriptions).onFailure(::showError)
+                result.onSuccess(::showSubscriptions).onFailure {
+                    binding.subscriptionProgress.isVisible = false
+                    binding.subscriptionStatus.text = it.message ?: getString(R.string.subscription_load_failed)
+                    showError(it)
+                }
             }
         }
     }
 
     private fun showSubscriptions(subscriptions: List<SubscriptionSummary>) {
         val binding = _binding ?: return
+        binding.subscriptionProgress.isVisible = false
+        binding.subscriptionStatusRow.isVisible = false
         binding.empty.visibility = if (subscriptions.isEmpty()) View.VISIBLE else View.GONE
         binding.profileList.removeAllViews()
         subscriptions.forEach { binding.profileList.addView(subscriptionCard(it)) }

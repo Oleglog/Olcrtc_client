@@ -26,7 +26,7 @@ internal class ConnectionGlowView @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas) {
-        val radius = minOf(width, height) * 0.5f
+        val radius = minOf(width, height) * 0.46f
         paint.shader = RadialGradient(
             width / 2f,
             height / 2f,

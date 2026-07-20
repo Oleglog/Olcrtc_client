@@ -16,10 +16,15 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
 import android.widget.Toast
+import androidx.activity.addCallback
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
+import androidx.core.view.updatePadding
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.viewpager2.adapter.FragmentStateAdapter
@@ -139,12 +144,28 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppearanceTheme.apply(this)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
+            val bars = insets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout(),
+            )
+            view.updatePadding(left = bars.left, top = bars.top, right = bars.right, bottom = bars.bottom)
+            insets
+        }
         pendingProfileId = savedInstanceState?.getLong(KEY_PENDING_PROFILE_ID)?.takeIf { it > 0 }
         pendingSubscriptionProfileId = savedInstanceState?.getString(KEY_PENDING_SUBSCRIPTION_PROFILE_ID)
             ?.takeIf(String::isNotBlank)
         setupMainPager()
+        onBackPressedDispatcher.addCallback(this) {
+            if (binding.mainPager.currentItem != 0) {
+                binding.mainPager.setCurrentItem(0, appearance.motionEnabled)
+            } else {
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+            }
+        }
         refreshBackgroundEffects()
         acceptExternalIntent(intent)
     }
@@ -174,10 +195,13 @@ class MainActivity : AppCompatActivity() {
             override fun onPageSelected(position: Int) {
                 navigationItems.forEachIndexed { page, item ->
                     item.isSelected = page == position
+                    item.isActivated = page == position
                 }
+                updateBackgroundEffectsVisibility()
             }
         })
         navigationItems.first().isSelected = true
+        navigationItems.first().isActivated = true
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -249,10 +273,15 @@ class MainActivity : AppCompatActivity() {
         val settings = RoutingSettings.open(applicationContext)
         backgroundEffects = settings.getBackgroundEffects()
         appearance = settings.getAppearance()
-        val effectsVisible = backgroundEffects.enabled && appearance.motionEnabled
         binding.backgroundEffects.configure(backgroundEffects)
-        binding.backgroundEffects.isVisible = effectsVisible
-        binding.backgroundEffects.setActive(effectsVisible)
+        updateBackgroundEffectsVisibility()
+    }
+
+    private fun updateBackgroundEffectsVisibility() {
+        val visible = backgroundEffects.enabled && appearance.motionEnabled &&
+            binding.mainPager.currentItem == 0 && lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+        binding.backgroundEffects.isVisible = visible
+        binding.backgroundEffects.setActive(visible)
     }
 
     internal fun currentAppearance(): RoutingSettings.Appearance = appearance
