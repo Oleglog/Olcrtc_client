@@ -253,9 +253,18 @@
     <string name="appearance_palette_title">Palette</string>
     <string name="appearance_palette_summary">Changes app colors without changing its layout.</string>
     <string name="appearance_palette_system">System</string>
-    <string name="appearance_palette_sage">Sage</string>
+    <string name="appearance_palette_neutral">Neutral</string>
     <string name="appearance_palette_bronze">Bronze</string>
-    <string name="appearance_palette_polar">Polar</string>
+    <string name="appearance_palette_black">Black</string>
+    <string name="appearance_palette_mono">Monochrome</string>
+    <string name="appearance_accent_title">Accent color</string>
+    <string name="appearance_accent_summary">Sets the app’s color mood. Auto follows the selected palette.</string>
+    <string name="appearance_accent_auto">Auto</string>
+    <string name="appearance_accent_teal">Teal</string>
+    <string name="appearance_accent_blue">Blue</string>
+    <string name="appearance_accent_violet">Violet</string>
+    <string name="appearance_accent_rose">Rose</string>
+    <string name="appearance_accent_amber">Amber</string>
     <string name="appearance_atmosphere_title">Atmosphere</string>
     <string name="appearance_atmosphere_summary">One calm background effect and a soft connection glow.</string>
     <string name="appearance_glow_intensity">Connection glow</string>
@@ -263,21 +272,18 @@
     <string name="appearance_motion_title">Interface animations</string>
     <string name="appearance_motion_summary">Slow motion only where it communicates connection state.</string>
     <string name="appearance_apply">Apply appearance</string>
-    <string name="connection_current_profile">Current profile</string>
-    <string name="connection_next_profile">Tap to switch to the next profile</string>
+    <string name="connection_profiles">Connections</string>
+    <string name="connection_profile_actions">Actions for %1$s</string>
     <string name="connection_latency_value">%1$d ms</string>
     <string name="connection_tap_to_start">Tap to start</string>
     <string name="brand_olc" translatable="false">olc</string>
     <string name="brand_rtc" translatable="false">RTC</string>
     <string name="connection_timer_zero" translatable="false">00:00</string>
-    <string name="connection_choose_profile">Choose profile</string>
     <string name="connection_today">Today</string>
     <string name="connection_download">Download</string>
     <string name="connection_upload">Upload</string>
     <string name="connection_total_today">Today</string>
     <string name="connection_protected">Connection protected</string>
-    <string name="connection_open_profiles">Open profile list</string>
-    <string name="connection_close_profiles">Close profile list</string>
     <string name="traffic_zero">0 B</string>
     <string name="traffic_zero_rate">0 B/s</string>
     <string name="traffic_rate_format">%1$s/s</string>
@@ -315,10 +321,6 @@
     <string name="profile_select_required">Select a connection first</string>
     <string name="connect">Connect</string>
     <string name="add_connection">Add connection</string>
-    <string name="connection_manual_profiles">My connections</string>
-    <string name="connection_subscription_profiles">From subscriptions</string>
-    <string name="connection_favorite_profiles">Favorites</string>
-    <string name="connection_last_successful">Last successful</string>
     <string name="profile_add_favorite">Add to favorites</string>
     <string name="profile_remove_favorite">Remove from favorites</string>
     <string name="connection_card_connected">Connected</string>

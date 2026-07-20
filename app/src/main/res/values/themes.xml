@@ -51,22 +51,78 @@
         <item name="android:navigationBarColor">@color/olcrtc_bronze_surface</item>
     </style>
 
-    <style name="ThemeOverlay.OlcrtcClient.Polar" parent="">
-        <item name="colorPrimary">@color/olcrtc_polar_primary</item>
-        <item name="colorOnPrimary">@color/olcrtc_polar_on_primary</item>
-        <item name="colorPrimaryContainer">@color/olcrtc_polar_primary_container</item>
-        <item name="colorOnPrimaryContainer">@color/olcrtc_polar_on_primary_container</item>
-        <item name="colorSecondary">@color/olcrtc_polar_secondary</item>
-        <item name="colorOnSecondary">@color/olcrtc_polar_on_secondary</item>
-        <item name="colorSurface">@color/olcrtc_polar_surface</item>
-        <item name="colorSurfaceContainer">@color/olcrtc_polar_surface_container</item>
-        <item name="colorSurfaceContainerHigh">@color/olcrtc_polar_surface_container_high</item>
-        <item name="colorOnSurface">@color/olcrtc_polar_on_surface</item>
-        <item name="colorSurfaceVariant">@color/olcrtc_polar_surface_variant</item>
-        <item name="colorOnSurfaceVariant">@color/olcrtc_polar_on_surface_variant</item>
-        <item name="colorOutline">@color/olcrtc_polar_outline</item>
-        <item name="android:colorBackground">@color/olcrtc_polar_surface</item>
-        <item name="android:navigationBarColor">@color/olcrtc_polar_surface</item>
+    <style name="ThemeOverlay.OlcrtcClient.Black" parent="">
+        <item name="colorPrimary">@color/olcrtc_black_primary</item>
+        <item name="colorOnPrimary">@color/olcrtc_black_on_primary</item>
+        <item name="colorPrimaryContainer">@color/olcrtc_black_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/olcrtc_black_on_primary_container</item>
+        <item name="colorSecondary">@color/olcrtc_black_secondary</item>
+        <item name="colorOnSecondary">@color/olcrtc_black_on_secondary</item>
+        <item name="colorSurface">@color/olcrtc_black_surface</item>
+        <item name="colorSurfaceContainer">@color/olcrtc_black_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/olcrtc_black_surface_container_high</item>
+        <item name="colorOnSurface">@color/olcrtc_black_on_surface</item>
+        <item name="colorSurfaceVariant">@color/olcrtc_black_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/olcrtc_black_on_surface_variant</item>
+        <item name="colorOutline">@color/olcrtc_black_outline</item>
+        <item name="android:colorBackground">@color/olcrtc_black_surface</item>
+        <item name="android:statusBarColor">@color/olcrtc_black_surface</item>
+        <item name="android:navigationBarColor">@color/olcrtc_black_surface</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <style name="ThemeOverlay.OlcrtcClient.Mono" parent="">
+        <item name="colorPrimary">@color/olcrtc_mono_primary</item>
+        <item name="colorOnPrimary">@color/olcrtc_mono_on_primary</item>
+        <item name="colorPrimaryContainer">@color/olcrtc_mono_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/olcrtc_mono_on_primary_container</item>
+        <item name="colorSecondary">@color/olcrtc_mono_secondary</item>
+        <item name="colorOnSecondary">@color/olcrtc_mono_on_secondary</item>
+        <item name="colorSurface">@color/olcrtc_mono_surface</item>
+        <item name="colorSurfaceContainer">@color/olcrtc_mono_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/olcrtc_mono_surface_container_high</item>
+        <item name="colorOnSurface">@color/olcrtc_mono_on_surface</item>
+        <item name="colorSurfaceVariant">@color/olcrtc_mono_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/olcrtc_mono_on_surface_variant</item>
+        <item name="colorOutline">@color/olcrtc_mono_outline</item>
+        <item name="android:colorBackground">@color/olcrtc_mono_surface</item>
+        <item name="android:navigationBarColor">@color/olcrtc_mono_surface</item>
+    </style>
+
+    <style name="ThemeOverlay.OlcrtcClient.Accent.Teal" parent="">
+        <item name="colorPrimary">@color/appearance_accent_teal</item>
+        <item name="colorOnPrimary">@color/appearance_accent_teal_on</item>
+        <item name="colorPrimaryContainer">@color/appearance_accent_teal_container</item>
+        <item name="colorOnPrimaryContainer">@color/appearance_accent_teal_on_container</item>
+    </style>
+
+    <style name="ThemeOverlay.OlcrtcClient.Accent.Blue" parent="">
+        <item name="colorPrimary">@color/appearance_accent_blue</item>
+        <item name="colorOnPrimary">@color/appearance_accent_blue_on</item>
+        <item name="colorPrimaryContainer">@color/appearance_accent_blue_container</item>
+        <item name="colorOnPrimaryContainer">@color/appearance_accent_blue_on_container</item>
+    </style>
+
+    <style name="ThemeOverlay.OlcrtcClient.Accent.Violet" parent="">
+        <item name="colorPrimary">@color/appearance_accent_violet</item>
+        <item name="colorOnPrimary">@color/appearance_accent_violet_on</item>
+        <item name="colorPrimaryContainer">@color/appearance_accent_violet_container</item>
+        <item name="colorOnPrimaryContainer">@color/appearance_accent_violet_on_container</item>
+    </style>
+
+    <style name="ThemeOverlay.OlcrtcClient.Accent.Rose" parent="">
+        <item name="colorPrimary">@color/appearance_accent_rose</item>
+        <item name="colorOnPrimary">@color/appearance_accent_rose_on</item>
+        <item name="colorPrimaryContainer">@color/appearance_accent_rose_container</item>
+        <item name="colorOnPrimaryContainer">@color/appearance_accent_rose_on_container</item>
+    </style>
+
+    <style name="ThemeOverlay.OlcrtcClient.Accent.Amber" parent="">
+        <item name="colorPrimary">@color/appearance_accent_amber</item>
+        <item name="colorOnPrimary">@color/appearance_accent_amber_on</item>
+        <item name="colorPrimaryContainer">@color/appearance_accent_amber_container</item>
+        <item name="colorOnPrimaryContainer">@color/appearance_accent_amber_on_container</item>
     </style>
 
     <style name="ShapeAppearance.OlcrtcClient.MediumComponent" parent="ShapeAppearance.Material3.MediumComponent">

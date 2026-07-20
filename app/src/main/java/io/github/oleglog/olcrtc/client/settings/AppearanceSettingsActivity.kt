@@ -7,6 +7,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.button.MaterialButton
 import io.github.oleglog.olcrtc.client.R
 import io.github.oleglog.olcrtc.client.databinding.ActivityAppearanceSettingsBinding
 import io.github.oleglog.olcrtc.client.routing.RoutingSettings
@@ -39,6 +40,7 @@ class AppearanceSettingsActivity : AppCompatActivity() {
         binding.glowSlider.valueTo = 100f
         binding.glowSlider.stepSize = 5f
         setPaletteSelection(appearance.palette)
+        setAccentSelection(appearance.accent)
         binding.effectGroup.check(effectButton(effects.style))
         binding.intensityGroup.check(intensityButton(effects.intensity))
         binding.effectsEnabled.isChecked = effects.enabled
@@ -50,13 +52,29 @@ class AppearanceSettingsActivity : AppCompatActivity() {
         binding.close.setOnClickListener { finish() }
         listOf(
             binding.paletteSystem to RoutingSettings.Appearance.Palette.SYSTEM,
-            binding.paletteSage to RoutingSettings.Appearance.Palette.SAGE,
+            binding.paletteNeutral to RoutingSettings.Appearance.Palette.NEUTRAL,
             binding.paletteBronze to RoutingSettings.Appearance.Palette.BRONZE,
-            binding.palettePolar to RoutingSettings.Appearance.Palette.POLAR,
+            binding.paletteBlack to RoutingSettings.Appearance.Palette.BLACK,
+            binding.paletteMono to RoutingSettings.Appearance.Palette.MONO,
         ).forEach { (button, palette) ->
             button.setOnClickListener {
                 appearance = appearance.copy(palette = palette)
                 setPaletteSelection(palette)
+                setAccentSelection(appearance.accent)
+                updatePreview()
+            }
+        }
+        listOf(
+            binding.accentAuto to RoutingSettings.Appearance.Accent.AUTO,
+            binding.accentTeal to RoutingSettings.Appearance.Accent.TEAL,
+            binding.accentBlue to RoutingSettings.Appearance.Accent.BLUE,
+            binding.accentViolet to RoutingSettings.Appearance.Accent.VIOLET,
+            binding.accentRose to RoutingSettings.Appearance.Accent.ROSE,
+            binding.accentAmber to RoutingSettings.Appearance.Accent.AMBER,
+        ).forEach { (button, accent) ->
+            button.setOnClickListener {
+                appearance = appearance.copy(accent = accent)
+                setAccentSelection(accent)
                 updatePreview()
             }
         }
@@ -80,12 +98,7 @@ class AppearanceSettingsActivity : AppCompatActivity() {
     }
 
     private fun updatePreview() {
-        val color = ContextCompat.getColor(this, when (appearance.palette) {
-            RoutingSettings.Appearance.Palette.SYSTEM -> R.color.appearance_preview_system
-            RoutingSettings.Appearance.Palette.SAGE -> R.color.appearance_preview_sage
-            RoutingSettings.Appearance.Palette.BRONZE -> R.color.appearance_preview_bronze
-            RoutingSettings.Appearance.Palette.POLAR -> R.color.appearance_preview_polar
-        })
+        val color = ContextCompat.getColor(this, previewColor())
         val surface = com.google.android.material.color.MaterialColors.getColor(
             binding.root,
             com.google.android.material.R.attr.colorSurface,
@@ -113,15 +126,67 @@ class AppearanceSettingsActivity : AppCompatActivity() {
 
     private fun paletteButton(value: RoutingSettings.Appearance.Palette): Int = when (value) {
         RoutingSettings.Appearance.Palette.SYSTEM -> R.id.palette_system
-        RoutingSettings.Appearance.Palette.SAGE -> R.id.palette_sage
+        RoutingSettings.Appearance.Palette.NEUTRAL -> R.id.palette_neutral
         RoutingSettings.Appearance.Palette.BRONZE -> R.id.palette_bronze
-        RoutingSettings.Appearance.Palette.POLAR -> R.id.palette_polar
+        RoutingSettings.Appearance.Palette.BLACK -> R.id.palette_black
+        RoutingSettings.Appearance.Palette.MONO -> R.id.palette_mono
     }
 
     private fun setPaletteSelection(value: RoutingSettings.Appearance.Palette) {
         val selected = paletteButton(value)
-        listOf(binding.paletteSystem, binding.paletteSage, binding.paletteBronze, binding.palettePolar)
+        listOf(
+            binding.paletteSystem,
+            binding.paletteNeutral,
+            binding.paletteBronze,
+            binding.paletteBlack,
+            binding.paletteMono,
+        )
             .forEach { it.isChecked = it.id == selected }
+    }
+
+    private fun accentButton(value: RoutingSettings.Appearance.Accent): Int = when (value) {
+        RoutingSettings.Appearance.Accent.AUTO -> R.id.accent_auto
+        RoutingSettings.Appearance.Accent.TEAL -> R.id.accent_teal
+        RoutingSettings.Appearance.Accent.BLUE -> R.id.accent_blue
+        RoutingSettings.Appearance.Accent.VIOLET -> R.id.accent_violet
+        RoutingSettings.Appearance.Accent.ROSE -> R.id.accent_rose
+        RoutingSettings.Appearance.Accent.AMBER -> R.id.accent_amber
+    }
+
+    private fun accentButtons(): List<MaterialButton> = listOf(
+        binding.accentAuto,
+        binding.accentTeal,
+        binding.accentBlue,
+        binding.accentViolet,
+        binding.accentRose,
+        binding.accentAmber,
+    )
+
+    private fun setAccentSelection(value: RoutingSettings.Appearance.Accent) {
+        val selected = accentButton(value)
+        val enabled = appearance.palette != RoutingSettings.Appearance.Palette.MONO
+        accentButtons().forEach { button ->
+            button.isChecked = button.id == selected
+            button.isEnabled = enabled
+            button.alpha = if (enabled) 1f else 0.4f
+            button.strokeWidth = resources.getDimensionPixelSize(
+                if (button.isChecked) R.dimen.card_border_active else R.dimen.card_border,
+            )
+        }
+    }
+
+    private fun previewColor(): Int = when {
+        appearance.palette == RoutingSettings.Appearance.Palette.MONO -> R.color.appearance_preview_mono
+        appearance.accent == RoutingSettings.Appearance.Accent.TEAL -> R.color.appearance_accent_teal
+        appearance.accent == RoutingSettings.Appearance.Accent.BLUE -> R.color.appearance_accent_blue
+        appearance.accent == RoutingSettings.Appearance.Accent.VIOLET -> R.color.appearance_accent_violet
+        appearance.accent == RoutingSettings.Appearance.Accent.ROSE -> R.color.appearance_accent_rose
+        appearance.accent == RoutingSettings.Appearance.Accent.AMBER -> R.color.appearance_accent_amber
+        appearance.palette == RoutingSettings.Appearance.Palette.SYSTEM -> R.color.appearance_preview_system
+        appearance.palette == RoutingSettings.Appearance.Palette.NEUTRAL -> R.color.appearance_preview_neutral
+        appearance.palette == RoutingSettings.Appearance.Palette.BRONZE -> R.color.appearance_preview_bronze
+        appearance.palette == RoutingSettings.Appearance.Palette.BLACK -> R.color.appearance_preview_black
+        else -> R.color.appearance_preview_mono
     }
 
     private fun effectButton(value: RoutingSettings.BackgroundEffects.Style): Int = when (value) {

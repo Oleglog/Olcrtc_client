@@ -39,8 +39,12 @@ class RoutingSettingsTest {
 
     @Test
     fun parsesAppearancePaletteAndRejectsInvalidGlowIntensity() {
-        assertEquals(RoutingSettings.Appearance.Palette.POLAR, parseAppearancePalette("POLAR"))
-        assertEquals(RoutingSettings.Appearance.Palette.SAGE, parseAppearancePalette("unknown"))
+        assertEquals(RoutingSettings.Appearance.Palette.NEUTRAL, parseAppearancePalette("SAGE"))
+        assertEquals(RoutingSettings.Appearance.Palette.NEUTRAL, parseAppearancePalette("POLAR"))
+        assertEquals(RoutingSettings.Appearance.Palette.BLACK, parseAppearancePalette("BLACK"))
+        assertEquals(RoutingSettings.Appearance.Palette.SYSTEM, parseAppearancePalette("unknown"))
+        assertEquals(RoutingSettings.Appearance.Accent.VIOLET, parseAppearanceAccent("VIOLET"))
+        assertEquals(RoutingSettings.Appearance.Accent.AUTO, parseAppearanceAccent("unknown"))
         assertThrows(IllegalArgumentException::class.java) {
             RoutingSettings.Appearance(glowIntensity = 101)
         }

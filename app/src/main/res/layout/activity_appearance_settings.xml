@@ -190,20 +190,26 @@
                         android:textAppearance="?attr/textAppearanceBodySmall"
                         android:textColor="?attr/colorOnSurfaceVariant" />
 
-                    <LinearLayout
+                    <HorizontalScrollView
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="@dimen/space_3"
-                        android:baselineAligned="false"
-                        android:orientation="horizontal">
+                        android:clipToPadding="false"
+                        android:overScrollMode="ifContentScrolls"
+                        android:scrollbars="none">
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:baselineAligned="false"
+                            android:orientation="horizontal">
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/palette_system"
                             style="?attr/materialButtonOutlinedStyle"
-                            android:layout_width="0dp"
+                            android:layout_width="96dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginEnd="3dp"
-                            android:layout_weight="1"
+                            android:layout_marginEnd="6dp"
                             android:checkable="true"
                             android:gravity="center"
                             android:insetTop="0dp"
@@ -227,13 +233,11 @@
                             app:strokeWidth="1dp" />
 
                         <com.google.android.material.button.MaterialButton
-                            android:id="@+id/palette_sage"
+                            android:id="@+id/palette_neutral"
                             style="?attr/materialButtonOutlinedStyle"
-                            android:layout_width="0dp"
+                            android:layout_width="96dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="3dp"
-                            android:layout_marginEnd="3dp"
-                            android:layout_weight="1"
+                            android:layout_marginEnd="6dp"
                             android:checkable="true"
                             android:gravity="center"
                             android:insetTop="0dp"
@@ -243,12 +247,12 @@
                             android:minWidth="0dp"
                             android:paddingStart="2dp"
                             android:paddingEnd="2dp"
-                            android:text="@string/appearance_palette_sage"
+                            android:text="@string/appearance_palette_neutral"
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="11sp"
                             app:backgroundTint="@color/appearance_palette_background"
                             app:cornerRadius="14dp"
-                            app:icon="@drawable/swatch_palette_sage"
+                            app:icon="@drawable/swatch_palette_neutral"
                             app:iconGravity="textTop"
                             app:iconPadding="6dp"
                             app:iconSize="28dp"
@@ -259,11 +263,9 @@
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/palette_bronze"
                             style="?attr/materialButtonOutlinedStyle"
-                            android:layout_width="0dp"
+                            android:layout_width="96dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="3dp"
-                            android:layout_marginEnd="3dp"
-                            android:layout_weight="1"
+                            android:layout_marginEnd="6dp"
                             android:checkable="true"
                             android:gravity="center"
                             android:insetTop="0dp"
@@ -287,12 +289,11 @@
                             app:strokeWidth="1dp" />
 
                         <com.google.android.material.button.MaterialButton
-                            android:id="@+id/palette_polar"
+                            android:id="@+id/palette_black"
                             style="?attr/materialButtonOutlinedStyle"
-                            android:layout_width="0dp"
+                            android:layout_width="96dp"
                             android:layout_height="wrap_content"
-                            android:layout_marginStart="3dp"
-                            android:layout_weight="1"
+                            android:layout_marginEnd="6dp"
                             android:checkable="true"
                             android:gravity="center"
                             android:insetTop="0dp"
@@ -302,19 +303,166 @@
                             android:minWidth="0dp"
                             android:paddingStart="2dp"
                             android:paddingEnd="2dp"
-                            android:text="@string/appearance_palette_polar"
+                            android:text="@string/appearance_palette_black"
                             android:textColor="?attr/colorOnSurface"
                             android:textSize="11sp"
                             app:backgroundTint="@color/appearance_palette_background"
                             app:cornerRadius="14dp"
-                            app:icon="@drawable/swatch_palette_polar"
+                            app:icon="@drawable/swatch_palette_black"
                             app:iconGravity="textTop"
                             app:iconPadding="6dp"
                             app:iconSize="28dp"
                             app:iconTint="@null"
                             app:strokeColor="@color/appearance_palette_stroke"
                             app:strokeWidth="1dp" />
-                    </LinearLayout>
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/palette_mono"
+                            style="?attr/materialButtonOutlinedStyle"
+                            android:layout_width="96dp"
+                            android:layout_height="wrap_content"
+                            android:checkable="true"
+                            android:gravity="center"
+                            android:insetTop="0dp"
+                            android:insetBottom="0dp"
+                            android:maxLines="2"
+                            android:minHeight="72dp"
+                            android:minWidth="0dp"
+                            android:paddingStart="2dp"
+                            android:paddingEnd="2dp"
+                            android:text="@string/appearance_palette_mono"
+                            android:textColor="?attr/colorOnSurface"
+                            android:textSize="11sp"
+                            app:backgroundTint="@color/appearance_palette_background"
+                            app:cornerRadius="14dp"
+                            app:icon="@drawable/swatch_palette_mono"
+                            app:iconGravity="textTop"
+                            app:iconPadding="6dp"
+                            app:iconSize="28dp"
+                            app:iconTint="@null"
+                            app:strokeColor="@color/appearance_palette_stroke"
+                            app:strokeWidth="1dp" />
+                        </LinearLayout>
+                    </HorizontalScrollView>
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_4"
+                        android:text="@string/appearance_accent_title"
+                        android:textAppearance="?attr/textAppearanceLabelLarge" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_1"
+                        android:text="@string/appearance_accent_summary"
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+
+                    <HorizontalScrollView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="@dimen/space_3"
+                        android:clipToPadding="false"
+                        android:overScrollMode="ifContentScrolls"
+                        android:scrollbars="none">
+
+                        <LinearLayout
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:gravity="center_vertical"
+                            android:orientation="horizontal">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/accent_auto"
+                                style="?attr/materialButtonOutlinedStyle"
+                                android:layout_width="72dp"
+                                android:layout_height="48dp"
+                                android:layout_marginEnd="@dimen/space_2"
+                                android:checkable="true"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:minWidth="0dp"
+                                android:text="@string/appearance_accent_auto"
+                                app:backgroundTint="?attr/colorSurfaceContainerHigh"
+                                app:cornerRadius="16dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/accent_teal"
+                                style="?attr/materialButtonOutlinedStyle"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:layout_marginEnd="@dimen/space_2"
+                                android:checkable="true"
+                                android:contentDescription="@string/appearance_accent_teal"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:minWidth="0dp"
+                                android:text=""
+                                app:backgroundTint="@color/appearance_accent_teal"
+                                app:cornerRadius="16dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/accent_blue"
+                                style="?attr/materialButtonOutlinedStyle"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:layout_marginEnd="@dimen/space_2"
+                                android:checkable="true"
+                                android:contentDescription="@string/appearance_accent_blue"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:minWidth="0dp"
+                                android:text=""
+                                app:backgroundTint="@color/appearance_accent_blue"
+                                app:cornerRadius="16dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/accent_violet"
+                                style="?attr/materialButtonOutlinedStyle"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:layout_marginEnd="@dimen/space_2"
+                                android:checkable="true"
+                                android:contentDescription="@string/appearance_accent_violet"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:minWidth="0dp"
+                                android:text=""
+                                app:backgroundTint="@color/appearance_accent_violet"
+                                app:cornerRadius="16dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/accent_rose"
+                                style="?attr/materialButtonOutlinedStyle"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:layout_marginEnd="@dimen/space_2"
+                                android:checkable="true"
+                                android:contentDescription="@string/appearance_accent_rose"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:minWidth="0dp"
+                                android:text=""
+                                app:backgroundTint="@color/appearance_accent_rose"
+                                app:cornerRadius="16dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/accent_amber"
+                                style="?attr/materialButtonOutlinedStyle"
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:checkable="true"
+                                android:contentDescription="@string/appearance_accent_amber"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:minWidth="0dp"
+                                android:text=""
+                                app:backgroundTint="@color/appearance_accent_amber"
+                                app:cornerRadius="16dp" />
+                        </LinearLayout>
+                    </HorizontalScrollView>
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

@@ -1,9 +1,10 @@
 package io.github.oleglog.olcrtc.client.ui
 
 import android.content.Context
-import android.graphics.BlurMaskFilter
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.RadialGradient
+import android.graphics.Shader
 import android.util.AttributeSet
 import android.view.View
 
@@ -21,14 +22,24 @@ internal class ConnectionGlowView @JvmOverloads constructor(
     ).run { getColor(0, 0).also { recycle() } }
 
     init {
-        setLayerType(LAYER_TYPE_SOFTWARE, null)
         importantForAccessibility = IMPORTANT_FOR_ACCESSIBILITY_NO
     }
 
     override fun onDraw(canvas: Canvas) {
-        val radius = minOf(width, height) * 0.31f
-        paint.color = accentColor
-        paint.maskFilter = BlurMaskFilter(minOf(width, height) * 0.15f, BlurMaskFilter.Blur.NORMAL)
+        val radius = minOf(width, height) * 0.5f
+        paint.shader = RadialGradient(
+            width / 2f,
+            height / 2f,
+            radius,
+            intArrayOf(
+                (0xCC shl 24) or (accentColor and 0xFFFFFF),
+                (0x78 shl 24) or (accentColor and 0xFFFFFF),
+                (0x20 shl 24) or (accentColor and 0xFFFFFF),
+                accentColor and 0xFFFFFF,
+            ),
+            floatArrayOf(0f, 0.42f, 0.78f, 1f),
+            Shader.TileMode.CLAMP,
+        )
         canvas.drawCircle(width / 2f, height / 2f, radius, paint)
     }
 }
