@@ -213,14 +213,47 @@
         <item name="android:background">?attr/colorOutline</item>
     </style>
 
-    <style name="Widget.OlcrtcClient.BottomNavigation.ActiveIndicator"
-        parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
-        <item name="android:color">?attr/colorPrimaryContainer</item>
+    <style name="Widget.OlcrtcClient.BottomNavigation.Item" parent="">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:background">@android:color/transparent</item>
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="android:foreground">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:gravity">center</item>
+        <item name="android:orientation">vertical</item>
+        <item name="android:paddingTop">8dp</item>
+        <item name="android:paddingBottom">8dp</item>
     </style>
 
-    <style name="TextAppearance.Olcrtc.BottomNavigation" parent="TextAppearance.Material3.LabelMedium">
+    <style name="Widget.OlcrtcClient.BottomNavigation.Indicator" parent="">
+        <item name="android:layout_width">56dp</item>
+        <item name="android:layout_height">40dp</item>
+        <item name="android:background">@drawable/bg_main_navigation_indicator</item>
+        <item name="android:duplicateParentState">true</item>
+    </style>
+
+    <style name="Widget.OlcrtcClient.BottomNavigation.Icon" parent="">
+        <item name="android:layout_width">@dimen/icon_navigation_size</item>
+        <item name="android:layout_height">@dimen/icon_navigation_size</item>
+        <item name="android:layout_gravity">center</item>
+        <item name="android:duplicateParentState">true</item>
+        <item name="android:importantForAccessibility">no</item>
+        <item name="android:tint">@color/main_navigation_item</item>
+    </style>
+
+    <style name="Widget.OlcrtcClient.BottomNavigation.Label" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">2dp</item>
+        <item name="android:duplicateParentState">true</item>
         <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:gravity">center</item>
+        <item name="android:importantForAccessibility">no</item>
         <item name="android:includeFontPadding">false</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textColor">@color/main_navigation_item</item>
         <item name="android:textSize">11sp</item>
     </style>
 

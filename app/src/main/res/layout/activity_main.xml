@@ -38,20 +38,88 @@
         app:strokeColor="?attr/colorOutline"
         app:strokeWidth="1dp">
 
-        <com.google.android.material.bottomnavigation.BottomNavigationView
+        <LinearLayout
             android:id="@+id/bottom_navigation"
             android:layout_width="match_parent"
             android:layout_height="92dp"
             android:background="@android:color/transparent"
-            android:elevation="0dp"
-            app:itemActiveIndicatorStyle="@style/Widget.OlcrtcClient.BottomNavigation.ActiveIndicator"
-            app:itemIconSize="@dimen/icon_navigation_size"
-            app:itemPaddingBottom="8dp"
-            app:itemPaddingTop="8dp"
-            app:itemTextAppearanceActive="@style/TextAppearance.Olcrtc.BottomNavigation"
-            app:itemTextAppearanceInactive="@style/TextAppearance.Olcrtc.BottomNavigation"
-            app:labelVisibilityMode="labeled"
-            app:menu="@menu/main_navigation" />
+            android:baselineAligned="false"
+            android:orientation="horizontal"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp">
+
+            <LinearLayout
+                android:id="@+id/navigation_connection"
+                style="@style/Widget.OlcrtcClient.BottomNavigation.Item"
+                android:contentDescription="@string/navigation_connection">
+
+                <FrameLayout
+                    style="@style/Widget.OlcrtcClient.BottomNavigation.Indicator">
+
+                    <ImageView
+                        style="@style/Widget.OlcrtcClient.BottomNavigation.Icon"
+                        android:src="@drawable/ic_nav_connection_24" />
+                </FrameLayout>
+
+                <TextView
+                    style="@style/Widget.OlcrtcClient.BottomNavigation.Label"
+                    android:text="@string/navigation_connection" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/navigation_profiles"
+                style="@style/Widget.OlcrtcClient.BottomNavigation.Item"
+                android:contentDescription="@string/navigation_profiles">
+
+                <FrameLayout
+                    style="@style/Widget.OlcrtcClient.BottomNavigation.Indicator">
+
+                    <ImageView
+                        style="@style/Widget.OlcrtcClient.BottomNavigation.Icon"
+                        android:src="@drawable/ic_nav_subscriptions_24" />
+                </FrameLayout>
+
+                <TextView
+                    style="@style/Widget.OlcrtcClient.BottomNavigation.Label"
+                    android:text="@string/navigation_profiles" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/navigation_statistics"
+                style="@style/Widget.OlcrtcClient.BottomNavigation.Item"
+                android:contentDescription="@string/navigation_statistics">
+
+                <FrameLayout
+                    style="@style/Widget.OlcrtcClient.BottomNavigation.Indicator">
+
+                    <ImageView
+                        style="@style/Widget.OlcrtcClient.BottomNavigation.Icon"
+                        android:src="@drawable/ic_nav_statistics_24" />
+                </FrameLayout>
+
+                <TextView
+                    style="@style/Widget.OlcrtcClient.BottomNavigation.Label"
+                    android:text="@string/navigation_statistics" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/navigation_settings"
+                style="@style/Widget.OlcrtcClient.BottomNavigation.Item"
+                android:contentDescription="@string/navigation_settings">
+
+                <FrameLayout
+                    style="@style/Widget.OlcrtcClient.BottomNavigation.Indicator">
+
+                    <ImageView
+                        style="@style/Widget.OlcrtcClient.BottomNavigation.Icon"
+                        android:src="@drawable/ic_nav_settings_24" />
+                </FrameLayout>
+
+                <TextView
+                    style="@style/Widget.OlcrtcClient.BottomNavigation.Label"
+                    android:text="@string/navigation_settings" />
+            </LinearLayout>
+        </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
 </LinearLayout>

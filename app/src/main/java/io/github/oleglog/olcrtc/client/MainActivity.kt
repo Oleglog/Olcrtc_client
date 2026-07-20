@@ -157,22 +157,27 @@ class MainActivity : AppCompatActivity() {
             page.alpha = 1f - distance * 0.12f
             page.scaleY = 1f - distance * 0.015f
         }
-        binding.bottomNavigation.setOnItemSelectedListener { item ->
-            val page = MAIN_DESTINATIONS.indexOf(item.itemId)
-            if (page < 0) return@setOnItemSelectedListener false
-            if (binding.mainPager.currentItem != page) {
-                binding.mainPager.setCurrentItem(page, appearance.motionEnabled)
+        val navigationItems = listOf(
+            binding.navigationConnection,
+            binding.navigationProfiles,
+            binding.navigationStatistics,
+            binding.navigationSettings,
+        )
+        navigationItems.forEachIndexed { page, item ->
+            item.setOnClickListener {
+                if (binding.mainPager.currentItem != page) {
+                    binding.mainPager.setCurrentItem(page, appearance.motionEnabled)
+                }
             }
-            true
         }
         binding.mainPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {
-                val destination = MAIN_DESTINATIONS.getOrNull(position) ?: return
-                if (binding.bottomNavigation.selectedItemId != destination) {
-                    binding.bottomNavigation.selectedItemId = destination
+                navigationItems.forEachIndexed { page, item ->
+                    item.isSelected = page == position
                 }
             }
         })
+        navigationItems.first().isSelected = true
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -541,8 +546,8 @@ class MainActivity : AppCompatActivity() {
         private val EXTERNAL_PROFILE_SCHEMES = setOf("olcrtc", "vless", "vmess", "trojan", "ss")
         private val MAIN_DESTINATIONS = intArrayOf(
             R.id.connectionFragment,
-            R.id.statisticsFragment,
             R.id.profilesFragment,
+            R.id.statisticsFragment,
             R.id.settingsFragment,
         )
     }
@@ -557,8 +562,8 @@ class MainActivity : AppCompatActivity() {
 
         override fun createFragment(position: Int): Fragment = when (position) {
             0 -> ConnectionFragment()
-            1 -> StatisticsFragment()
-            2 -> ProfilesFragment()
+            1 -> ProfilesFragment()
+            2 -> StatisticsFragment()
             else -> SettingsFragment()
         }
     }

@@ -14,7 +14,7 @@
     <dimen name="button_secondary_height">56dp</dimen>
     <dimen name="icon_touch_target">48dp</dimen>
     <dimen name="icon_action_size">22dp</dimen>
-    <dimen name="icon_navigation_size">34dp</dimen>
+    <dimen name="icon_navigation_size">36dp</dimen>
     <dimen name="card_border">1dp</dimen>
     <dimen name="card_border_active">2dp</dimen>
     <dimen name="card_elevation_connected">2dp</dimen>
