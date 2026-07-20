@@ -24,8 +24,8 @@ import (
 )
 
 var (
-	errAlreadyRunning = errors.New("mobilecore already running")
-	errNotRunning     = errors.New("mobilecore is not running")
+	errAlreadyRunning  = errors.New("mobilecore already running")
+	errNotRunning      = errors.New("mobilecore is not running")
 	mu                 sync.Mutex
 	protector          SocketProtector
 	xrayInstance       *core.Instance
