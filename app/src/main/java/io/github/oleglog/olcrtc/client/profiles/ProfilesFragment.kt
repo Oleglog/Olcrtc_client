@@ -65,13 +65,17 @@ class ProfilesFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
-        (activity as? MainActivity)?.setImportListener(R.id.profilesFragment, ::confirmExternalSubscription)
         loadSubscriptions()
     }
 
-    override fun onStop() {
+    override fun onResume() {
+        super.onResume()
+        (activity as? MainActivity)?.setImportListener(R.id.profilesFragment, ::confirmExternalSubscription)
+    }
+
+    override fun onPause() {
         (activity as? MainActivity)?.setImportListener(R.id.profilesFragment, null)
-        super.onStop()
+        super.onPause()
     }
 
     override fun onDestroyView() {

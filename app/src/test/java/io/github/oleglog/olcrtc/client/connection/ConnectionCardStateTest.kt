@@ -35,6 +35,15 @@ class ConnectionCardStateTest {
     }
 
     @Test
+    fun defaultGlowIsVisibleAndDisconnectedGlowStaysQuiet() {
+        val connected = connectionGlowAlpha(intensity = 60, connected = true)
+        val disconnected = connectionGlowAlpha(intensity = 60, connected = false)
+        assertTrue(connected > 0.5f)
+        assertTrue(disconnected in 0.05f..0.1f)
+        assertEquals(0f, connectionGlowAlpha(intensity = 0, connected = true), 0f)
+    }
+
+    @Test
     fun contentStateDistinguishesLoadingEmptyAndFailure() {
         assertEquals(
             ConnectionContentState.LOADING,

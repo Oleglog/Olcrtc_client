@@ -22,8 +22,8 @@ android {
         applicationId = "io.github.oleglog.olcrtc.client"
         minSdk = 26
         targetSdk = 36
-        versionCode = 52
-        versionName = "1.2.9"
+        versionCode = 53
+        versionName = "1.3.0"
         val expectedSigningCertSha256 = providers.gradleProperty("androidSigningCertSha256")
             .orElse(providers.environmentVariable("ANDROID_SIGNING_CERT_SHA256"))
             .orNull
@@ -129,6 +129,7 @@ dependencies {
     implementation(libs.navigation.ui.ktx)
     implementation(libs.fragment.ktx)
     implementation(libs.recyclerview)
+    implementation(libs.viewpager2)
     ksp(libs.room.compiler)
 
     testImplementation(libs.junit)

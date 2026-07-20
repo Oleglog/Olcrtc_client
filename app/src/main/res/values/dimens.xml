@@ -6,7 +6,7 @@
     <dimen name="space_5">20dp</dimen>
     <dimen name="space_6">24dp</dimen>
     <dimen name="page_padding">20dp</dimen>
-    <dimen name="corner_card">8dp</dimen>
+    <dimen name="corner_card">20dp</dimen>
     <dimen name="corner_button">8dp</dimen>
     <dimen name="corner_sheet">16dp</dimen>
     <dimen name="corner_quiet">20dp</dimen>

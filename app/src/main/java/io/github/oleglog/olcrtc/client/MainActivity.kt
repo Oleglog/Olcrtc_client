@@ -20,14 +20,20 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.isVisible
+import androidx.fragment.app.Fragment
+import androidx.fragment.app.FragmentActivity
+import androidx.viewpager2.adapter.FragmentStateAdapter
+import androidx.viewpager2.widget.ViewPager2
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.fragment.NavHostFragment
-import androidx.navigation.ui.setupWithNavController
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import io.github.oleglog.olcrtc.client.connection.ConnectionFragment
 import io.github.oleglog.olcrtc.client.databinding.ActivityMainBinding
 import io.github.oleglog.olcrtc.client.importer.SubscriptionDeepLinkParser
+import io.github.oleglog.olcrtc.client.profiles.ProfilesFragment
 import io.github.oleglog.olcrtc.client.routing.RoutingSettings
+import io.github.oleglog.olcrtc.client.settings.SettingsFragment
+import io.github.oleglog.olcrtc.client.statistics.StatisticsFragment
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import io.github.oleglog.olcrtc.client.ui.AppearanceTheme
 import io.github.oleglog.olcrtc.client.updater.ApkUpdateInstaller
@@ -47,6 +53,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.abs
 
 class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
@@ -137,10 +144,35 @@ class MainActivity : AppCompatActivity() {
         pendingProfileId = savedInstanceState?.getLong(KEY_PENDING_PROFILE_ID)?.takeIf { it > 0 }
         pendingSubscriptionProfileId = savedInstanceState?.getString(KEY_PENDING_SUBSCRIPTION_PROFILE_ID)
             ?.takeIf(String::isNotBlank)
-        val navHost = supportFragmentManager.findFragmentById(R.id.nav_host) as NavHostFragment
-        binding.bottomNavigation.setupWithNavController(navHost.navController)
+        setupMainPager()
         refreshBackgroundEffects()
         acceptExternalIntent(intent)
+    }
+
+    private fun setupMainPager() {
+        binding.mainPager.adapter = MainPagerAdapter(this)
+        binding.mainPager.offscreenPageLimit = 1
+        binding.mainPager.setPageTransformer { page, position ->
+            val distance = if (appearance.motionEnabled) abs(position).coerceIn(0f, 1f) else 0f
+            page.alpha = 1f - distance * 0.12f
+            page.scaleY = 1f - distance * 0.015f
+        }
+        binding.bottomNavigation.setOnItemSelectedListener { item ->
+            val page = MAIN_DESTINATIONS.indexOf(item.itemId)
+            if (page < 0) return@setOnItemSelectedListener false
+            if (binding.mainPager.currentItem != page) {
+                binding.mainPager.setCurrentItem(page, appearance.motionEnabled)
+            }
+            true
+        }
+        binding.mainPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                val destination = MAIN_DESTINATIONS.getOrNull(position) ?: return
+                if (binding.bottomNavigation.selectedItemId != destination) {
+                    binding.bottomNavigation.selectedItemId = destination
+                }
+            }
+        })
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -448,10 +480,15 @@ class MainActivity : AppCompatActivity() {
     private fun routeExternalImport(raw: String, destinationId: Int) {
         pendingImport = raw
         pendingImportDestinationId = destinationId
-        if (::binding.isInitialized) binding.bottomNavigation.selectedItemId = destinationId
+        if (::binding.isInitialized) selectMainDestination(destinationId, smooth = false)
         if (shouldDeliverExternalImportImmediately(destinationId, importListenerDestinationId, importListener != null)) {
             consumeExternalImport(destinationId)?.let { importListener?.invoke(it) }
         }
+    }
+
+    private fun selectMainDestination(destinationId: Int, smooth: Boolean) {
+        val page = MAIN_DESTINATIONS.indexOf(destinationId)
+        if (page >= 0) binding.mainPager.setCurrentItem(page, smooth && appearance.motionEnabled)
     }
 
     private fun startVpn(profileId: Long) {
@@ -502,12 +539,29 @@ class MainActivity : AppCompatActivity() {
         private const val SYSTEM_PREFERENCES = "system"
         private const val KEY_BATTERY_PROMPT_HANDLED = "battery_prompt_handled"
         private val EXTERNAL_PROFILE_SCHEMES = setOf("olcrtc", "vless", "vmess", "trojan", "ss")
+        private val MAIN_DESTINATIONS = intArrayOf(
+            R.id.connectionFragment,
+            R.id.profilesFragment,
+            R.id.statisticsFragment,
+            R.id.settingsFragment,
+        )
     }
 
     private data class PendingInstall(
         val release: GitHubRelease,
         val asset: GitHubRelease.ReleaseAsset,
     )
+
+    private class MainPagerAdapter(activity: FragmentActivity) : FragmentStateAdapter(activity) {
+        override fun getItemCount(): Int = MAIN_DESTINATIONS.size
+
+        override fun createFragment(position: Int): Fragment = when (position) {
+            0 -> ConnectionFragment()
+            1 -> ProfilesFragment()
+            2 -> StatisticsFragment()
+            else -> SettingsFragment()
+        }
+    }
 }
 
 internal fun shouldShowBatteryOptimizationPrompt(

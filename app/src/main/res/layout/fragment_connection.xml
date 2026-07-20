@@ -24,23 +24,41 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:minHeight="64dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingTop="@dimen/space_4"
                 android:paddingBottom="@dimen/space_3">
 
-                <ImageView
-                    android:layout_width="36dp"
-                    android:layout_height="36dp"
-                    android:contentDescription="@null"
-                    android:src="@drawable/ic_launcher_foreground" />
-
-                <TextView
-                    android:layout_width="wrap_content"
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:layout_marginStart="@dimen/space_2"
-                    android:text="@string/app_name"
-                    android:textAppearance="?attr/textAppearanceTitleLarge" />
+                    android:layout_weight="1"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/brand_olc"
+                        android:textAppearance="@style/TextAppearance.Olcrtc.Wordmark" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/brand_rtc"
+                        android:textAppearance="@style/TextAppearance.Olcrtc.Wordmark"
+                        android:textColor="?attr/colorPrimary" />
+                </LinearLayout>
+
+                <androidx.appcompat.widget.AppCompatImageButton
+                    android:id="@+id/add_profile"
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/add_connection"
+                    android:padding="10dp"
+                    android:src="@drawable/ic_add_24"
+                    app:tint="?attr/colorOnSurfaceVariant" />
             </LinearLayout>
 
             <LinearLayout
@@ -100,39 +118,64 @@
                 android:orientation="vertical"
                 android:visibility="gone">
 
-                <TextView
-                    android:id="@+id/connection_summary"
-                    android:layout_width="match_parent"
+                <LinearLayout
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:gravity="center"
-                    android:text="@string/vpn_notification_disconnected"
-                    android:textAppearance="?attr/textAppearanceTitleMedium"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
-
-                <FrameLayout
-                    android:layout_width="232dp"
-                    android:layout_height="232dp"
-                    android:layout_marginTop="@dimen/space_2">
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
                     <View
+                        android:id="@+id/connection_status_dot"
+                        android:layout_width="16dp"
+                        android:layout_height="16dp"
+                        android:background="@drawable/bg_connection_status_dot" />
+
+                    <TextView
+                        android:id="@+id/connection_summary"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="@dimen/space_2"
+                        android:gravity="center"
+                        android:text="@string/vpn_notification_disconnected"
+                        android:textAppearance="?attr/textAppearanceLabelLarge"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
+                </LinearLayout>
+
+                <FrameLayout
+                    android:layout_width="238dp"
+                    android:layout_height="238dp"
+                    android:layout_marginTop="@dimen/space_1"
+                    android:clipChildren="false"
+                    android:clipToPadding="false">
+
+                    <io.github.oleglog.olcrtc.client.ui.ConnectionGlowView
                         android:id="@+id/connection_halo"
-                        android:layout_width="232dp"
-                        android:layout_height="232dp"
-                        android:background="@drawable/bg_connection_halo"
+                        android:layout_width="280dp"
+                        android:layout_height="280dp"
+                        android:layout_gravity="center" />
+
+                    <View
+                        android:layout_width="218dp"
+                        android:layout_height="218dp"
+                        android:layout_gravity="center"
+                        android:alpha="0.48"
+                        android:background="@drawable/bg_connection_ring"
                         android:importantForAccessibility="no" />
 
                     <com.google.android.material.card.MaterialCardView
                         android:id="@+id/connect"
-                        android:layout_width="168dp"
-                        android:layout_height="168dp"
+                        android:layout_width="198dp"
+                        android:layout_height="198dp"
                         android:layout_gravity="center"
                         android:clickable="true"
                         android:focusable="true"
                         android:foreground="?attr/selectableItemBackground"
-                        app:cardBackgroundColor="?attr/colorPrimary"
-                        app:cardCornerRadius="84dp"
+                        app:cardBackgroundColor="?attr/colorSurfaceContainer"
+                        app:cardCornerRadius="99dp"
                         app:cardElevation="3dp"
-                        app:rippleColor="?attr/colorOnPrimary">
+                        app:rippleColor="?attr/colorPrimary"
+                        app:strokeColor="?attr/colorOutline"
+                        app:strokeWidth="1dp">
 
                         <LinearLayout
                             android:layout_width="match_parent"
@@ -141,13 +184,22 @@
                             android:orientation="vertical"
                             android:padding="@dimen/space_4">
 
-                            <ImageView
-                                android:id="@+id/connect_icon"
-                                android:layout_width="38dp"
-                                android:layout_height="38dp"
-                                android:contentDescription="@null"
-                                android:src="@drawable/ic_power_24"
-                                app:tint="?attr/colorOnPrimary" />
+                            <com.google.android.material.card.MaterialCardView
+                                android:layout_width="52dp"
+                                android:layout_height="52dp"
+                                app:cardBackgroundColor="?attr/colorPrimary"
+                                app:cardCornerRadius="26dp"
+                                app:cardElevation="0dp">
+
+                                <ImageView
+                                    android:id="@+id/connect_icon"
+                                    android:layout_width="26dp"
+                                    android:layout_height="26dp"
+                                    android:layout_gravity="center"
+                                    android:contentDescription="@null"
+                                    android:src="@drawable/ic_power_24"
+                                    app:tint="?attr/colorOnPrimary" />
+                            </com.google.android.material.card.MaterialCardView>
 
                             <TextView
                                 android:id="@+id/connect_title"
@@ -156,20 +208,21 @@
                                 android:layout_marginTop="@dimen/space_3"
                                 android:gravity="center"
                                 android:text="@string/connect"
-                                android:textAppearance="?attr/textAppearanceTitleMedium"
-                                android:textColor="?attr/colorOnPrimary" />
+                                android:textAppearance="@style/TextAppearance.Olcrtc.TitleLarge"
+                                android:textSize="23sp"
+                                android:textColor="?attr/colorOnSurface" />
+
+                            <TextView
+                                android:id="@+id/connection_timer"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="@dimen/space_1"
+                                android:text="@string/connection_timer_zero"
+                                android:textAppearance="@style/TextAppearance.Olcrtc.Data"
+                                android:textColor="?attr/colorOnSurfaceVariant" />
                         </LinearLayout>
                     </com.google.android.material.card.MaterialCardView>
                 </FrameLayout>
-
-                <TextView
-                    android:id="@+id/connection_timer"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="-8dp"
-                    android:text="00:00"
-                    android:textAppearance="?attr/textAppearanceLabelLarge"
-                    android:textColor="?attr/colorOnSurfaceVariant" />
 
                 <TextView
                     android:id="@+id/status"
@@ -191,22 +244,40 @@
                     android:contentDescription="@string/connection_open_profiles"
                     android:focusable="true"
                     android:foreground="?attr/selectableItemBackground"
-                    app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                    app:cardBackgroundColor="?attr/colorSurfaceContainer"
                     app:cardCornerRadius="@dimen/corner_quiet"
-                    app:cardElevation="0dp"
+                    app:cardElevation="2dp"
                     app:strokeColor="?attr/colorOutline"
                     app:strokeWidth="1dp">
 
                     <LinearLayout
+                        android:id="@+id/selected_profile_content"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:gravity="center_vertical"
                         android:orientation="horizontal"
-                        android:padding="@dimen/space_4">
+                        android:padding="14dp">
+
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="44dp"
+                            android:layout_height="44dp"
+                            app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
+                            app:cardCornerRadius="14dp"
+                            app:cardElevation="0dp">
+
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:layout_gravity="center"
+                                android:contentDescription="@null"
+                                android:src="@drawable/ic_shield_24"
+                                app:tint="?attr/colorPrimary" />
+                        </com.google.android.material.card.MaterialCardView>
 
                         <LinearLayout
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
+                            android:layout_marginStart="@dimen/space_3"
                             android:layout_weight="1"
                             android:orientation="vertical">
 
@@ -222,7 +293,8 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/space_1"
-                                android:maxLines="2"
+                                android:ellipsize="end"
+                                android:maxLines="1"
                                 android:text="@string/connection_choose_profile"
                                 android:textAppearance="?attr/textAppearanceTitleMedium" />
 
@@ -231,17 +303,48 @@
                                 android:layout_width="match_parent"
                                 android:layout_height="wrap_content"
                                 android:layout_marginTop="@dimen/space_1"
-                                android:maxLines="2"
+                                android:ellipsize="end"
+                                android:maxLines="1"
                                 android:textAppearance="?attr/textAppearanceBodySmall"
                                 android:textColor="?attr/colorOnSurfaceVariant" />
                         </LinearLayout>
 
-                        <ImageView
+                        <FrameLayout
+                            android:layout_width="72dp"
+                            android:layout_height="48dp"
+                            android:layout_marginStart="@dimen/space_1">
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/test_selected"
+                                style="@style/Widget.Material3.Button.TextButton"
+                                android:layout_width="match_parent"
+                                android:layout_height="match_parent"
+                                android:fontFamily="monospace"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:minWidth="0dp"
+                                android:text="@string/profile_test_latency"
+                                android:textColor="?attr/colorPrimary"
+                                app:cornerRadius="12dp" />
+
+                            <com.google.android.material.progressindicator.CircularProgressIndicator
+                                android:id="@+id/ping_progress"
+                                android:layout_width="22dp"
+                                android:layout_height="22dp"
+                                android:layout_gravity="center"
+                                android:indeterminate="true"
+                                android:visibility="gone"
+                                app:indicatorSize="22dp"
+                                app:trackThickness="2dp" />
+                        </FrameLayout>
+
+                        <androidx.appcompat.widget.AppCompatImageButton
                             android:id="@+id/profile_picker_chevron"
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:layout_marginStart="@dimen/space_3"
-                            android:contentDescription="@null"
+                            android:layout_width="40dp"
+                            android:layout_height="40dp"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="@string/connection_open_profiles"
+                            android:padding="8dp"
                             android:src="@drawable/ic_chevron_right_24"
                             app:tint="?attr/colorOnSurfaceVariant" />
                     </LinearLayout>
@@ -260,56 +363,15 @@
                         android:layout_height="wrap_content"
                         android:orientation="vertical" />
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="@dimen/space_3"
-                        android:gravity="center_vertical"
-                        android:orientation="horizontal">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/add_profile"
-                            style="@style/Widget.Material3.Button.TextButton"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="@string/add_connection"
-                            app:icon="@drawable/ic_add_24" />
-
-                        <FrameLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_marginStart="@dimen/space_2"
-                            android:layout_weight="1">
-
-                            <com.google.android.material.button.MaterialButton
-                                android:id="@+id/test_selected"
-                                style="@style/Widget.Material3.Button.TextButton"
-                                android:layout_width="match_parent"
-                                android:layout_height="wrap_content"
-                                android:text="@string/profile_test_latency"
-                                app:icon="@drawable/ic_ping_24" />
-
-                            <com.google.android.material.progressindicator.CircularProgressIndicator
-                                android:id="@+id/ping_progress"
-                                android:layout_width="24dp"
-                                android:layout_height="24dp"
-                                android:layout_gravity="center"
-                                android:indeterminate="true"
-                                android:visibility="gone"
-                                app:indicatorSize="24dp"
-                                app:trackThickness="2dp" />
-                        </FrameLayout>
-                    </LinearLayout>
                 </LinearLayout>
 
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_4"
-                    app:cardBackgroundColor="?attr/colorSurface"
+                    android:layout_marginTop="@dimen/space_3"
+                    app:cardBackgroundColor="?attr/colorSurfaceContainer"
                     app:cardCornerRadius="@dimen/corner_quiet"
-                    app:cardElevation="0dp"
+                    app:cardElevation="2dp"
                     app:strokeColor="?attr/colorOutline"
                     app:strokeWidth="1dp">
 
@@ -338,42 +400,60 @@
                                 android:orientation="vertical">
 
                                 <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="@string/connection_download"
-                                    android:textAppearance="?attr/textAppearanceLabelMedium"
-                                    android:textColor="?attr/colorOnSurfaceVariant" />
-
-                                <TextView
                                     android:id="@+id/today_download"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:layout_marginTop="@dimen/space_1"
                                     android:text="@string/traffic_zero_rate"
-                                    android:textAppearance="?attr/textAppearanceTitleSmall" />
+                                    android:textAppearance="@style/TextAppearance.Olcrtc.Data"
+                                    android:textSize="13sp" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="@dimen/space_1"
+                                    android:text="@string/connection_download"
+                                    android:textAppearance="?attr/textAppearanceLabelSmall"
+                                    android:textColor="?attr/colorOnSurfaceVariant" />
                             </LinearLayout>
+
+                            <View
+                                android:layout_width="1dp"
+                                android:layout_height="match_parent"
+                                android:layout_marginEnd="@dimen/space_3"
+                                android:alpha="0.35"
+                                android:background="?attr/colorOutline"
+                                android:importantForAccessibility="no" />
 
                             <LinearLayout
                                 android:layout_width="0dp"
                                 android:layout_height="wrap_content"
                                 android:layout_weight="1"
                                 android:orientation="vertical">
-
-                                <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="@string/connection_upload"
-                                    android:textAppearance="?attr/textAppearanceLabelMedium"
-                                    android:textColor="?attr/colorOnSurfaceVariant" />
 
                                 <TextView
                                     android:id="@+id/today_upload"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:layout_marginTop="@dimen/space_1"
                                     android:text="@string/traffic_zero_rate"
-                                    android:textAppearance="?attr/textAppearanceTitleSmall" />
+                                    android:textAppearance="@style/TextAppearance.Olcrtc.Data"
+                                    android:textSize="13sp" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="@dimen/space_1"
+                                    android:text="@string/connection_upload"
+                                    android:textAppearance="?attr/textAppearanceLabelSmall"
+                                    android:textColor="?attr/colorOnSurfaceVariant" />
                             </LinearLayout>
+
+                            <View
+                                android:layout_width="1dp"
+                                android:layout_height="match_parent"
+                                android:layout_marginEnd="@dimen/space_3"
+                                android:alpha="0.35"
+                                android:background="?attr/colorOutline"
+                                android:importantForAccessibility="no" />
 
                             <LinearLayout
                                 android:layout_width="0dp"
@@ -382,19 +462,20 @@
                                 android:orientation="vertical">
 
                                 <TextView
-                                    android:layout_width="wrap_content"
-                                    android:layout_height="wrap_content"
-                                    android:text="@string/connection_total_today"
-                                    android:textAppearance="?attr/textAppearanceLabelMedium"
-                                    android:textColor="?attr/colorOnSurfaceVariant" />
-
-                                <TextView
                                     android:id="@+id/today_total"
                                     android:layout_width="wrap_content"
                                     android:layout_height="wrap_content"
-                                    android:layout_marginTop="@dimen/space_1"
                                     android:text="@string/traffic_zero"
-                                    android:textAppearance="?attr/textAppearanceTitleSmall" />
+                                    android:textAppearance="@style/TextAppearance.Olcrtc.Data"
+                                    android:textSize="13sp" />
+
+                                <TextView
+                                    android:layout_width="wrap_content"
+                                    android:layout_height="wrap_content"
+                                    android:layout_marginTop="@dimen/space_1"
+                                    android:text="@string/connection_total_today"
+                                    android:textAppearance="?attr/textAppearanceLabelSmall"
+                                    android:textColor="?attr/colorOnSurfaceVariant" />
                             </LinearLayout>
                         </LinearLayout>
                     </LinearLayout>

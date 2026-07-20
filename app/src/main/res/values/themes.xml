@@ -8,6 +8,8 @@
         <item name="colorSecondary">@color/olcrtc_secondary</item>
         <item name="colorOnSecondary">@color/olcrtc_on_secondary</item>
         <item name="colorSurface">@color/olcrtc_surface</item>
+        <item name="colorSurfaceContainer">@color/olcrtc_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/olcrtc_surface_container_high</item>
         <item name="colorOnSurface">@color/olcrtc_on_surface</item>
         <item name="colorSurfaceVariant">@color/olcrtc_surface_variant</item>
         <item name="colorOnSurfaceVariant">@color/olcrtc_on_surface_variant</item>
@@ -17,6 +19,10 @@
         <item name="android:colorBackground">@color/olcrtc_surface</item>
         <item name="android:navigationBarColor">@color/olcrtc_surface</item>
         <item name="android:windowActionModeOverlay">true</item>
+        <item name="textAppearanceHeadlineSmall">@style/TextAppearance.Olcrtc.Headline</item>
+        <item name="textAppearanceTitleLarge">@style/TextAppearance.Olcrtc.TitleLarge</item>
+        <item name="textAppearanceTitleMedium">@style/TextAppearance.Olcrtc.TitleMedium</item>
+        <item name="textAppearanceTitleSmall">@style/TextAppearance.Olcrtc.TitleSmall</item>
         <item name="shapeAppearanceMediumComponent">@style/ShapeAppearance.OlcrtcClient.MediumComponent</item>
         <item name="shapeAppearanceLargeComponent">@style/ShapeAppearance.OlcrtcClient.LargeComponent</item>
     </style>
@@ -35,6 +41,8 @@
         <item name="colorSecondary">@color/olcrtc_bronze_secondary</item>
         <item name="colorOnSecondary">@color/olcrtc_bronze_on_secondary</item>
         <item name="colorSurface">@color/olcrtc_bronze_surface</item>
+        <item name="colorSurfaceContainer">@color/olcrtc_bronze_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/olcrtc_bronze_surface_container_high</item>
         <item name="colorOnSurface">@color/olcrtc_bronze_on_surface</item>
         <item name="colorSurfaceVariant">@color/olcrtc_bronze_surface_variant</item>
         <item name="colorOnSurfaceVariant">@color/olcrtc_bronze_on_surface_variant</item>
@@ -51,6 +59,8 @@
         <item name="colorSecondary">@color/olcrtc_polar_secondary</item>
         <item name="colorOnSecondary">@color/olcrtc_polar_on_secondary</item>
         <item name="colorSurface">@color/olcrtc_polar_surface</item>
+        <item name="colorSurfaceContainer">@color/olcrtc_polar_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/olcrtc_polar_surface_container_high</item>
         <item name="colorOnSurface">@color/olcrtc_polar_on_surface</item>
         <item name="colorSurfaceVariant">@color/olcrtc_polar_surface_variant</item>
         <item name="colorOnSurfaceVariant">@color/olcrtc_polar_on_surface_variant</item>
@@ -94,5 +104,41 @@
 
     <style name="ShapeAppearance.OlcrtcClient.LargeComponent" parent="ShapeAppearance.Material3.LargeComponent">
         <item name="cornerSize">8dp</item>
+    </style>
+
+    <style name="TextAppearance.Olcrtc.Wordmark" parent="TextAppearance.Material3.HeadlineMedium">
+        <item name="android:fontFamily">sans-serif-condensed</item>
+        <item name="android:textSize">28sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">-0.04</item>
+    </style>
+
+    <style name="TextAppearance.Olcrtc.Headline" parent="TextAppearance.Material3.HeadlineSmall">
+        <item name="android:fontFamily">sans-serif-condensed</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">-0.02</item>
+    </style>
+
+    <style name="TextAppearance.Olcrtc.TitleLarge" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:fontFamily">sans-serif-condensed</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">-0.015</item>
+    </style>
+
+    <style name="TextAppearance.Olcrtc.TitleMedium" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:fontFamily">sans-serif-condensed</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">-0.01</item>
+    </style>
+
+    <style name="TextAppearance.Olcrtc.TitleSmall" parent="TextAppearance.Material3.TitleSmall">
+        <item name="android:fontFamily">sans-serif-condensed</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TextAppearance.Olcrtc.Data" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textStyle">bold</item>
     </style>
 </resources>

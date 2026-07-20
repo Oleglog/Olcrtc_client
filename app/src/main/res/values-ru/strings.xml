@@ -246,7 +246,9 @@
     <string name="settings_appearance_title">Оформление</string>
     <string name="settings_appearance_summary">Палитра, свечение подключения, фоновые эффекты и движение</string>
     <string name="appearance_preview">Предпросмотр</string>
-    <string name="appearance_preview_connected">Подключено · Finland — Reality</string>
+    <string name="appearance_header_subtitle">Предпросмотр сразу</string>
+    <string name="appearance_navigate_back">Вернуться назад</string>
+    <string name="appearance_preview_connected">Подключено · 42 мс</string>
     <string name="appearance_palette_title">Палитра</string>
     <string name="appearance_palette_summary">Меняет цвета приложения, но не расположение элементов.</string>
     <string name="appearance_palette_system">Система</string>
@@ -261,11 +263,14 @@
     <string name="appearance_motion_summary">Медленное движение только там, где оно показывает состояние.</string>
     <string name="appearance_apply">Применить оформление</string>
     <string name="connection_current_profile">Текущий профиль</string>
+    <string name="connection_next_profile">Нажмите, чтобы переключиться на следующий профиль</string>
+    <string name="connection_latency_value">%1$d мс</string>
+    <string name="connection_tap_to_start">Нажмите для запуска</string>
     <string name="connection_choose_profile">Выбрать профиль</string>
     <string name="connection_today">Сегодня</string>
     <string name="connection_download">Получение</string>
     <string name="connection_upload">Отправка</string>
-    <string name="connection_total_today">Трафик</string>
+    <string name="connection_total_today">Сегодня</string>
     <string name="connection_protected">Соединение защищено</string>
     <string name="connection_open_profiles">Открыть список профилей</string>
     <string name="connection_close_profiles">Закрыть список профилей</string>

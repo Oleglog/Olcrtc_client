@@ -2,7 +2,6 @@ package io.github.oleglog.olcrtc.client.settings
 
 import android.app.Activity
 import android.content.res.ColorStateList
-import android.graphics.Color
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -39,7 +38,7 @@ class AppearanceSettingsActivity : AppCompatActivity() {
         binding.glowSlider.valueFrom = 0f
         binding.glowSlider.valueTo = 100f
         binding.glowSlider.stepSize = 5f
-        binding.paletteGroup.check(paletteButton(appearance.palette))
+        setPaletteSelection(appearance.palette)
         binding.effectGroup.check(effectButton(effects.style))
         binding.intensityGroup.check(intensityButton(effects.intensity))
         binding.effectsEnabled.isChecked = effects.enabled
@@ -49,10 +48,17 @@ class AppearanceSettingsActivity : AppCompatActivity() {
 
     private fun bindActions() {
         binding.close.setOnClickListener { finish() }
-        binding.paletteGroup.addOnButtonCheckedListener { _, checkedId, checked ->
-            if (!checked) return@addOnButtonCheckedListener
-            appearance = appearance.copy(palette = paletteForButton(checkedId))
-            updatePreview()
+        listOf(
+            binding.paletteSystem to RoutingSettings.Appearance.Palette.SYSTEM,
+            binding.paletteSage to RoutingSettings.Appearance.Palette.SAGE,
+            binding.paletteBronze to RoutingSettings.Appearance.Palette.BRONZE,
+            binding.palettePolar to RoutingSettings.Appearance.Palette.POLAR,
+        ).forEach { (button, palette) ->
+            button.setOnClickListener {
+                appearance = appearance.copy(palette = palette)
+                setPaletteSelection(palette)
+                updatePreview()
+            }
         }
         binding.effectGroup.addOnButtonCheckedListener { _, checkedId, checked ->
             if (checked) effects = effects.copy(style = effectForButton(checkedId))
@@ -80,10 +86,13 @@ class AppearanceSettingsActivity : AppCompatActivity() {
             RoutingSettings.Appearance.Palette.BRONZE -> R.color.appearance_preview_bronze
             RoutingSettings.Appearance.Palette.POLAR -> R.color.appearance_preview_polar
         })
-        val onColor = if (ColorUtils.calculateLuminance(color) > 0.46) Color.BLACK else Color.WHITE
+        val surface = com.google.android.material.color.MaterialColors.getColor(
+            binding.root,
+            com.google.android.material.R.attr.colorSurface,
+        )
         binding.previewCard.strokeColor = color
-        binding.previewConnect.setCardBackgroundColor(color)
-        binding.previewIcon.imageTintList = ColorStateList.valueOf(onColor)
+        binding.previewConnect.setCardBackgroundColor(ColorUtils.blendARGB(surface, color, 0.14f))
+        binding.previewIcon.imageTintList = ColorStateList.valueOf(color)
         binding.previewStatus.setTextColor(color)
         binding.previewGlow.backgroundTintList = ColorStateList.valueOf(color)
         binding.previewGlow.alpha = 0.08f + appearance.glowIntensity / 100f * 0.32f
@@ -109,11 +118,10 @@ class AppearanceSettingsActivity : AppCompatActivity() {
         RoutingSettings.Appearance.Palette.POLAR -> R.id.palette_polar
     }
 
-    private fun paletteForButton(id: Int): RoutingSettings.Appearance.Palette = when (id) {
-        R.id.palette_system -> RoutingSettings.Appearance.Palette.SYSTEM
-        R.id.palette_bronze -> RoutingSettings.Appearance.Palette.BRONZE
-        R.id.palette_polar -> RoutingSettings.Appearance.Palette.POLAR
-        else -> RoutingSettings.Appearance.Palette.SAGE
+    private fun setPaletteSelection(value: RoutingSettings.Appearance.Palette) {
+        val selected = paletteButton(value)
+        listOf(binding.paletteSystem, binding.paletteSage, binding.paletteBronze, binding.palettePolar)
+            .forEach { it.isChecked = it.id == selected }
     }
 
     private fun effectButton(value: RoutingSettings.BackgroundEffects.Style): Int = when (value) {

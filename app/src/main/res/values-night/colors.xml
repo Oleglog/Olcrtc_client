@@ -6,6 +6,8 @@
     <color name="olcrtc_secondary">#B9CCC3</color>
     <color name="olcrtc_on_secondary">#22352E</color>
     <color name="olcrtc_surface">#0D1315</color>
+    <color name="olcrtc_surface_container">#151D20</color>
+    <color name="olcrtc_surface_container_high">#1D282C</color>
     <color name="olcrtc_on_surface">#EFF5F2</color>
     <color name="olcrtc_surface_variant">#1D282C</color>
     <color name="olcrtc_on_surface_variant">#C3D0CB</color>
@@ -20,6 +22,8 @@
     <color name="olcrtc_bronze_secondary">#C2B8A8</color>
     <color name="olcrtc_bronze_on_secondary">#2E2820</color>
     <color name="olcrtc_bronze_surface">#1A1714</color>
+    <color name="olcrtc_bronze_surface_container">#201A14</color>
+    <color name="olcrtc_bronze_surface_container_high">#2D241B</color>
     <color name="olcrtc_bronze_on_surface">#EDE7DE</color>
     <color name="olcrtc_bronze_surface_variant">#3A342D</color>
     <color name="olcrtc_bronze_on_surface_variant">#CFC6B8</color>
@@ -32,6 +36,8 @@
     <color name="olcrtc_polar_secondary">#ACCBD8</color>
     <color name="olcrtc_polar_on_secondary">#19333D</color>
     <color name="olcrtc_polar_surface">#09141C</color>
+    <color name="olcrtc_polar_surface_container">#10222D</color>
+    <color name="olcrtc_polar_surface_container_high">#19313E</color>
     <color name="olcrtc_polar_on_surface">#EDF8FC</color>
     <color name="olcrtc_polar_surface_variant">#19313E</color>
     <color name="olcrtc_polar_on_surface_variant">#C4D8E1</color>

@@ -8,6 +8,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.text.format.Formatter
+import android.transition.AutoTransition
+import android.transition.TransitionManager
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -74,6 +76,8 @@ class ConnectionFragment : Fragment() {
     private var vpnStateRevision = 0L
     private var latencyRequestId = 0L
     private var latencyInProgress = false
+    private var lastLatencyMillis: Long? = null
+    private var lastLatencyReference: String? = null
     private var profilesLoaded = false
     private var availableProfiles = emptyList<ConnectionListItem>()
     private var profilePickerExpanded = false
@@ -125,6 +129,9 @@ class ConnectionFragment : Fragment() {
         binding.contentStateAction.setOnClickListener { showAddConnectionMenu() }
         binding.testSelected.setOnClickListener { testSelectedProfile() }
         binding.selectedProfileCard.setOnClickListener {
+            selectAdjacentProfile(1)
+        }
+        binding.profilePickerChevron.setOnClickListener {
             setProfilePickerExpanded(!profilePickerExpanded)
         }
         updateConnectPulse()
@@ -132,19 +139,23 @@ class ConnectionFragment : Fragment() {
 
     override fun onStart() {
         super.onStart()
-        activityHost.setVpnStateListener(::showVpnState)
-        activityHost.setImportListener(R.id.connectionFragment) { validatePreview(it, R.string.source_deep_link) }
         loadProfiles()
         loadDashboardSummary()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        activityHost.setVpnStateListener(::showVpnState)
+        activityHost.setImportListener(R.id.connectionFragment) { validatePreview(it, R.string.source_deep_link) }
         ticker.removeCallbacks(dashboardTicker)
         ticker.post(dashboardTicker)
     }
 
-    override fun onStop() {
+    override fun onPause() {
         activityHost.setImportListener(R.id.connectionFragment, null)
         activityHost.setVpnStateListener(null)
         ticker.removeCallbacks(dashboardTicker)
-        super.onStop()
+        super.onPause()
     }
 
     override fun onDestroyView() {
@@ -280,21 +291,65 @@ class ConnectionFragment : Fragment() {
         }
         binding.selectedProfileName.text = selected?.name ?: getString(R.string.connection_choose_profile)
         binding.selectedProfileDetail.text = selected?.let { item ->
-            listOfNotNull(item.type, item.subscriptionName).joinToString(" В· ")
+            listOfNotNull(item.type, item.subscriptionName).joinToString(" · ")
         }.orEmpty()
+        updateLatencyAction()
         binding.selectedProfileCard.contentDescription = listOfNotNull(
             selected?.name,
-            getString(
-                if (profilePickerExpanded) R.string.connection_close_profiles
-                else R.string.connection_open_profiles,
-            ),
+            getString(R.string.connection_next_profile),
         ).joinToString(", ")
+    }
+
+    private fun selectAdjacentProfile(direction: Int) {
+        if (currentState in BUSY_STATES || availableProfiles.size < 2) return
+        val selectedIndex = availableProfiles.indexOfFirst { it.reference == selectedReference() }
+            .takeIf { it >= 0 } ?: 0
+        val next = availableProfiles[(selectedIndex + direction).mod(availableProfiles.size)]
+        val select = {
+            lastLatencyMillis = null
+            lastLatencyReference = null
+            next.localId?.let(::selectProfile)
+                ?: selectSubscriptionProfile(requireNotNull(next.subscriptionProfileId))
+        }
+        if (!animationsEnabled()) {
+            select()
+            return
+        }
+        val content = binding.selectedProfileContent
+        content.animate().cancel()
+        content.animate()
+            .alpha(0f)
+            .translationX((-direction * 20).dp.toFloat())
+            .setDuration(100L)
+            .withEndAction {
+                if (_binding != null) {
+                    select()
+                    content.translationX = (direction * 20).dp.toFloat()
+                    content.animate().cancel()
+                    content.animate().alpha(1f).translationX(0f).setDuration(160L).start()
+                }
+            }
+            .start()
+    }
+
+    private fun selectedReference(): String? = when {
+        selectedProfileId != null -> "local:$selectedProfileId"
+        selectedSubscriptionProfileId != null -> "subscription:$selectedSubscriptionProfileId"
+        else -> null
     }
 
     private fun setProfilePickerExpanded(expanded: Boolean, animate: Boolean = true) {
         if (_binding == null) return
         profilePickerExpanded = expanded && availableProfiles.isNotEmpty()
-        binding.profilePickerPanel.isVisible = profilePickerExpanded
+        val panel = binding.profilePickerPanel
+        TransitionManager.endTransitions(binding.actionArea)
+        if (animate && animationsEnabled()) {
+            TransitionManager.beginDelayedTransition(
+                binding.actionArea,
+                AutoTransition().setDuration(if (profilePickerExpanded) 240L else 180L),
+            )
+        }
+        panel.isVisible = profilePickerExpanded
         val rotation = if (profilePickerExpanded) 90f else 0f
         binding.profilePickerChevron.animate().cancel()
         if (animate && animationsEnabled()) {
@@ -302,6 +357,12 @@ class ConnectionFragment : Fragment() {
         } else {
             binding.profilePickerChevron.rotation = rotation
         }
+        binding.profilePickerChevron.setContentDescription(
+            getString(
+                if (profilePickerExpanded) R.string.connection_close_profiles
+                else R.string.connection_open_profiles,
+            ),
+        )
         updateSelectedProfile()
     }
 
@@ -636,7 +697,12 @@ class ConnectionFragment : Fragment() {
                 if (!shouldShowLatencyResult(stateRevision, vpnStateRevision, currentState == VpnState.CONNECTED)) {
                     return@runOnUiThread
                 }
-                result.onSuccess { showStatus(getString(R.string.profile_latency_result, it)) }
+                result.onSuccess {
+                    lastLatencyMillis = it
+                    lastLatencyReference = selectedReference()
+                    updateLatencyAction()
+                    showStatus(getString(R.string.profile_latency_result, it))
+                }
                     .onFailure { showStatus(getString(latencyErrorText(latencyErrorKind(it)))) }
             }
         }
@@ -792,6 +858,7 @@ class ConnectionFragment : Fragment() {
         } else {
             vpnStateText(state, stage, reconnectAttempt)
         }
+        binding.connectionStatusDot.alpha = if (state == VpnState.CONNECTED) 1f else 0.45f
         showStatus(error ?: if (state == VpnState.ERROR) getString(R.string.vpn_notification_error) else null)
         updateConnectButtonText()
         applyingPulse = state == VpnState.CONNECTED
@@ -859,15 +926,22 @@ class ConnectionFragment : Fragment() {
         val halo = binding.connectionHalo
         pulseAnimator?.cancel()
         pulseAnimator = null
-        val glow = activityHost.currentAppearance().glowIntensity / 100f
-        val connectedAlpha = glow * 0.68f
-        if (!applyingPulse || !animationsEnabled() || connectedAlpha == 0f) {
-            halo.alpha = if (applyingPulse) connectedAlpha else connectedAlpha * 0.18f
+        val intensity = activityHost.currentAppearance().glowIntensity
+        val targetAlpha = connectionGlowAlpha(intensity, applyingPulse)
+        if (!applyingPulse || !animationsEnabled() || targetAlpha == 0f) {
+            halo.alpha = targetAlpha
+            halo.scaleX = 1f
+            halo.scaleY = 1f
             return
         }
         // ponytail: ObjectAnimator used because ViewPropertyAnimator has no repeat.
-        android.animation.ObjectAnimator.ofFloat(halo, View.ALPHA, connectedAlpha * 0.45f, connectedAlpha).apply {
-            duration = 2_400L
+        android.animation.ObjectAnimator.ofPropertyValuesHolder(
+            halo,
+            android.animation.PropertyValuesHolder.ofFloat(View.ALPHA, targetAlpha * 0.62f, targetAlpha),
+            android.animation.PropertyValuesHolder.ofFloat(View.SCALE_X, 0.94f, 1.06f),
+            android.animation.PropertyValuesHolder.ofFloat(View.SCALE_Y, 0.94f, 1.06f),
+        ).apply {
+            duration = 2_800L
             repeatMode = android.animation.ValueAnimator.REVERSE
             repeatCount = android.animation.ValueAnimator.INFINITE
             start()
@@ -948,11 +1022,17 @@ class ConnectionFragment : Fragment() {
         binding.pingProgress.isVisible = latencyInProgress
         if (latencyInProgress) {
             binding.testSelected.text = ""
-            binding.testSelected.icon = null
         } else {
-            binding.testSelected.setText(R.string.profile_test_latency)
-            binding.testSelected.setIconResource(R.drawable.ic_ping_24)
+            updateLatencyAction()
         }
+    }
+
+    private fun updateLatencyAction() {
+        if (_binding == null || latencyInProgress) return
+        binding.testSelected.text = lastLatencyMillis
+            ?.takeIf { lastLatencyReference == selectedReference() }
+            ?.let { getString(R.string.connection_latency_value, it) }
+            ?: getString(R.string.profile_test_latency)
     }
 
     private fun loadDashboardSummary() {
@@ -992,7 +1072,11 @@ class ConnectionFragment : Fragment() {
         binding.connectionTimer.text = currentSessionStartedAt
             ?.takeIf { sessionActive }
             ?.let { formatDuration(System.currentTimeMillis() - it) }
-            ?: "00:00"
+            ?: if (currentState in BUSY_STATES || currentState in ACTIVE_SESSION_STATES) {
+                getString(R.string.connection_timer_zero)
+            } else {
+                getString(R.string.connection_tap_to_start)
+            }
     }
 
     private fun formatBytes(bytes: Long): String = Formatter.formatShortFileSize(
@@ -1386,6 +1470,13 @@ internal fun connectionCardState(
 
 internal fun shouldAutoConnectSelectedProfile(state: VpnState, targetAlreadyConnected: Boolean): Boolean =
     state == VpnState.CONNECTED && !targetAlreadyConnected
+
+internal fun connectionGlowAlpha(intensity: Int, connected: Boolean): Float {
+    val normalized = intensity.coerceIn(0, 100) / 100f
+    if (normalized == 0f) return 0f
+    val active = 0.24f + normalized * 0.56f
+    return if (connected) active else active * 0.14f
+}
 
 internal enum class ConnectionContentState {
     LOADING,
