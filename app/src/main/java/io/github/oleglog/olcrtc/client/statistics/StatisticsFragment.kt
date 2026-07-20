@@ -148,7 +148,7 @@ class StatisticsFragment : Fragment() {
                         text = formatDuration(endedAt - session.startedAt)
                         setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelLarge)
                         typeface = android.graphics.Typeface.MONOSPACE
-                        setTextColor(resolveColor(com.google.android.material.R.attr.colorPrimary))
+                        setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary))
                     })
                 })
                 addView(TextView(requireContext()).apply {

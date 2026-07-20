@@ -1288,7 +1288,7 @@ class ConnectionFragment : Fragment() {
             }
             .show()
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            .setTextColor(resolveColor(com.google.android.material.R.attr.colorError))
+            .setTextColor(resolveColor(androidx.appcompat.R.attr.colorError))
     }
 
     private fun confirmDeleteProfile(profileId: Long, name: String) {
@@ -1317,7 +1317,7 @@ class ConnectionFragment : Fragment() {
             }
             .show()
         dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-            .setTextColor(resolveColor(com.google.android.material.R.attr.colorError))
+            .setTextColor(resolveColor(androidx.appcompat.R.attr.colorError))
     }
 
     private val activityHost get() = requireActivity() as MainActivity

@@ -45,7 +45,7 @@ internal object ProfileEditorDialog {
         val error = TextView(context).apply {
             setTextColor(com.google.android.material.color.MaterialColors.getColor(
                 this,
-                com.google.android.material.R.attr.colorError,
+                androidx.appcompat.R.attr.colorError,
             ))
             visibility = View.GONE
         }.also(form::addView)
