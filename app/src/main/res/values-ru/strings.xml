@@ -257,8 +257,8 @@
     <string name="appearance_palette_black">Чёрная</string>
     <string name="appearance_palette_mono">Чёрно-белая</string>
     <string name="appearance_accent_title">Акцентный цвет</string>
-    <string name="appearance_accent_summary">Задаёт общее цветовое настроение. Авто использует акцент выбранной палитры.</string>
-    <string name="appearance_accent_auto">Авто</string>
+    <string name="appearance_accent_summary">Цвет использует нейтральную основу. Повторный выбор палитры вернёт её родные цвета.</string>
+    <string name="appearance_accent_auto">Из палитры</string>
     <string name="appearance_accent_teal">Бирюзовый</string>
     <string name="appearance_accent_blue">Синий</string>
     <string name="appearance_accent_violet">Фиолетовый</string>

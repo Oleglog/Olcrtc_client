@@ -58,9 +58,12 @@ class AppearanceSettingsActivity : AppCompatActivity() {
             binding.paletteMono to RoutingSettings.Appearance.Palette.MONO,
         ).forEach { (button, palette) ->
             button.setOnClickListener {
-                appearance = appearance.copy(palette = palette)
+                appearance = appearance.copy(
+                    palette = palette,
+                    accent = RoutingSettings.Appearance.Accent.AUTO,
+                )
                 setPaletteSelection(palette)
-                setAccentSelection(appearance.accent)
+                setAccentSelection(RoutingSettings.Appearance.Accent.AUTO)
                 updatePreview()
             }
         }
@@ -73,7 +76,8 @@ class AppearanceSettingsActivity : AppCompatActivity() {
             binding.accentAmber to RoutingSettings.Appearance.Accent.AMBER,
         ).forEach { (button, accent) ->
             button.setOnClickListener {
-                appearance = appearance.copy(accent = accent)
+                appearance = appearance.copy(accent = accent).normalized()
+                setPaletteSelection(appearance.palette)
                 setAccentSelection(accent)
                 updatePreview()
             }
@@ -99,10 +103,8 @@ class AppearanceSettingsActivity : AppCompatActivity() {
 
     private fun updatePreview() {
         val color = ContextCompat.getColor(this, previewColor())
-        val surface = com.google.android.material.color.MaterialColors.getColor(
-            binding.root,
-            com.google.android.material.R.attr.colorSurface,
-        )
+        val surface = previewSurfaceColor()
+        binding.previewCard.setCardBackgroundColor(surface)
         binding.previewCard.strokeColor = color
         binding.previewConnect.setCardBackgroundColor(ColorUtils.blendARGB(surface, color, 0.14f))
         binding.previewIcon.imageTintList = ColorStateList.valueOf(color)
@@ -187,6 +189,29 @@ class AppearanceSettingsActivity : AppCompatActivity() {
         appearance.palette == RoutingSettings.Appearance.Palette.BRONZE -> R.color.appearance_preview_bronze
         appearance.palette == RoutingSettings.Appearance.Palette.BLACK -> R.color.appearance_preview_black
         else -> R.color.appearance_preview_mono
+    }
+
+    private fun previewSurfaceColor(): Int {
+        val resource = when {
+            appearance.accent == RoutingSettings.Appearance.Accent.TEAL -> R.color.appearance_accent_teal_surface
+            appearance.accent == RoutingSettings.Appearance.Accent.BLUE -> R.color.appearance_accent_blue_surface
+            appearance.accent == RoutingSettings.Appearance.Accent.VIOLET -> R.color.appearance_accent_violet_surface
+            appearance.accent == RoutingSettings.Appearance.Accent.ROSE -> R.color.appearance_accent_rose_surface
+            appearance.accent == RoutingSettings.Appearance.Accent.AMBER -> R.color.appearance_accent_amber_surface
+            appearance.palette == RoutingSettings.Appearance.Palette.NEUTRAL -> R.color.olcrtc_surface
+            appearance.palette == RoutingSettings.Appearance.Palette.BRONZE -> R.color.olcrtc_bronze_surface
+            appearance.palette == RoutingSettings.Appearance.Palette.BLACK -> R.color.olcrtc_black_surface
+            appearance.palette == RoutingSettings.Appearance.Palette.MONO -> R.color.olcrtc_mono_surface
+            else -> 0
+        }
+        return if (resource == 0) {
+            com.google.android.material.color.MaterialColors.getColor(
+                binding.root,
+                com.google.android.material.R.attr.colorSurface,
+            )
+        } else {
+            ContextCompat.getColor(this, resource)
+        }
     }
 
     private fun effectButton(value: RoutingSettings.BackgroundEffects.Style): Int = when (value) {

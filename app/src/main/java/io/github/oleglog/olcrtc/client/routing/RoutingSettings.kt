@@ -50,7 +50,7 @@ internal class RoutingSettings private constructor(
             accent = parseAppearanceAccent(preferences[APPEARANCE_ACCENT]),
             glowIntensity = (preferences[APPEARANCE_GLOW_INTENSITY] ?: 60).coerceIn(0, 100),
             motionEnabled = preferences[APPEARANCE_MOTION] ?: true,
-        )
+        ).normalized()
     }
 
     fun getPerAppPolicy(): PerAppPolicy = runBlocking {
@@ -100,11 +100,12 @@ internal class RoutingSettings private constructor(
     }
 
     suspend fun setAppearance(value: Appearance) {
+        val normalized = value.normalized()
         store.edit { preferences ->
-            preferences[APPEARANCE_PALETTE] = value.palette.name
-            preferences[APPEARANCE_ACCENT] = value.accent.name
-            preferences[APPEARANCE_GLOW_INTENSITY] = value.glowIntensity
-            preferences[APPEARANCE_MOTION] = value.motionEnabled
+            preferences[APPEARANCE_PALETTE] = normalized.palette.name
+            preferences[APPEARANCE_ACCENT] = normalized.accent.name
+            preferences[APPEARANCE_GLOW_INTENSITY] = normalized.glowIntensity
+            preferences[APPEARANCE_MOTION] = normalized.motionEnabled
         }
     }
 
@@ -187,6 +188,12 @@ internal class RoutingSettings private constructor(
     ) {
         init {
             require(glowIntensity in 0..100) { "Glow intensity must be between 0 and 100" }
+        }
+
+        fun normalized(): Appearance = when {
+            palette == Palette.MONO && accent != Accent.AUTO -> copy(accent = Accent.AUTO)
+            accent != Accent.AUTO && palette != Palette.NEUTRAL -> copy(palette = Palette.NEUTRAL)
+            else -> this
         }
 
         enum class Palette { SYSTEM, NEUTRAL, BRONZE, BLACK, MONO }

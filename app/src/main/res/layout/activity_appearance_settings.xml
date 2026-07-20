@@ -377,7 +377,7 @@
                             <com.google.android.material.button.MaterialButton
                                 android:id="@+id/accent_auto"
                                 style="?attr/materialButtonOutlinedStyle"
-                                android:layout_width="72dp"
+                                android:layout_width="96dp"
                                 android:layout_height="48dp"
                                 android:layout_marginEnd="@dimen/space_2"
                                 android:checkable="true"

@@ -95,6 +95,18 @@
         <item name="colorOnPrimary">@color/appearance_accent_teal_on</item>
         <item name="colorPrimaryContainer">@color/appearance_accent_teal_container</item>
         <item name="colorOnPrimaryContainer">@color/appearance_accent_teal_on_container</item>
+        <item name="colorSecondary">@color/appearance_accent_teal_secondary</item>
+        <item name="colorOnSecondary">@color/appearance_accent_teal_on</item>
+        <item name="colorSurface">@color/appearance_accent_teal_surface</item>
+        <item name="colorSurfaceContainer">@color/appearance_accent_teal_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/appearance_accent_teal_surface_container_high</item>
+        <item name="colorOnSurface">@color/appearance_accent_teal_on_surface</item>
+        <item name="colorSurfaceVariant">@color/appearance_accent_teal_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/appearance_accent_teal_on_surface_variant</item>
+        <item name="colorOutline">@color/appearance_accent_teal_outline</item>
+        <item name="android:colorBackground">@color/appearance_accent_teal_surface</item>
+        <item name="android:statusBarColor">@color/appearance_accent_teal_surface</item>
+        <item name="android:navigationBarColor">@color/appearance_accent_teal_surface</item>
     </style>
 
     <style name="ThemeOverlay.OlcrtcClient.Accent.Blue" parent="">
@@ -102,6 +114,18 @@
         <item name="colorOnPrimary">@color/appearance_accent_blue_on</item>
         <item name="colorPrimaryContainer">@color/appearance_accent_blue_container</item>
         <item name="colorOnPrimaryContainer">@color/appearance_accent_blue_on_container</item>
+        <item name="colorSecondary">@color/appearance_accent_blue_secondary</item>
+        <item name="colorOnSecondary">@color/appearance_accent_blue_on</item>
+        <item name="colorSurface">@color/appearance_accent_blue_surface</item>
+        <item name="colorSurfaceContainer">@color/appearance_accent_blue_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/appearance_accent_blue_surface_container_high</item>
+        <item name="colorOnSurface">@color/appearance_accent_blue_on_surface</item>
+        <item name="colorSurfaceVariant">@color/appearance_accent_blue_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/appearance_accent_blue_on_surface_variant</item>
+        <item name="colorOutline">@color/appearance_accent_blue_outline</item>
+        <item name="android:colorBackground">@color/appearance_accent_blue_surface</item>
+        <item name="android:statusBarColor">@color/appearance_accent_blue_surface</item>
+        <item name="android:navigationBarColor">@color/appearance_accent_blue_surface</item>
     </style>
 
     <style name="ThemeOverlay.OlcrtcClient.Accent.Violet" parent="">
@@ -109,6 +133,18 @@
         <item name="colorOnPrimary">@color/appearance_accent_violet_on</item>
         <item name="colorPrimaryContainer">@color/appearance_accent_violet_container</item>
         <item name="colorOnPrimaryContainer">@color/appearance_accent_violet_on_container</item>
+        <item name="colorSecondary">@color/appearance_accent_violet_secondary</item>
+        <item name="colorOnSecondary">@color/appearance_accent_violet_on</item>
+        <item name="colorSurface">@color/appearance_accent_violet_surface</item>
+        <item name="colorSurfaceContainer">@color/appearance_accent_violet_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/appearance_accent_violet_surface_container_high</item>
+        <item name="colorOnSurface">@color/appearance_accent_violet_on_surface</item>
+        <item name="colorSurfaceVariant">@color/appearance_accent_violet_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/appearance_accent_violet_on_surface_variant</item>
+        <item name="colorOutline">@color/appearance_accent_violet_outline</item>
+        <item name="android:colorBackground">@color/appearance_accent_violet_surface</item>
+        <item name="android:statusBarColor">@color/appearance_accent_violet_surface</item>
+        <item name="android:navigationBarColor">@color/appearance_accent_violet_surface</item>
     </style>
 
     <style name="ThemeOverlay.OlcrtcClient.Accent.Rose" parent="">
@@ -116,6 +152,18 @@
         <item name="colorOnPrimary">@color/appearance_accent_rose_on</item>
         <item name="colorPrimaryContainer">@color/appearance_accent_rose_container</item>
         <item name="colorOnPrimaryContainer">@color/appearance_accent_rose_on_container</item>
+        <item name="colorSecondary">@color/appearance_accent_rose_secondary</item>
+        <item name="colorOnSecondary">@color/appearance_accent_rose_on</item>
+        <item name="colorSurface">@color/appearance_accent_rose_surface</item>
+        <item name="colorSurfaceContainer">@color/appearance_accent_rose_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/appearance_accent_rose_surface_container_high</item>
+        <item name="colorOnSurface">@color/appearance_accent_rose_on_surface</item>
+        <item name="colorSurfaceVariant">@color/appearance_accent_rose_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/appearance_accent_rose_on_surface_variant</item>
+        <item name="colorOutline">@color/appearance_accent_rose_outline</item>
+        <item name="android:colorBackground">@color/appearance_accent_rose_surface</item>
+        <item name="android:statusBarColor">@color/appearance_accent_rose_surface</item>
+        <item name="android:navigationBarColor">@color/appearance_accent_rose_surface</item>
     </style>
 
     <style name="ThemeOverlay.OlcrtcClient.Accent.Amber" parent="">
@@ -123,6 +171,18 @@
         <item name="colorOnPrimary">@color/appearance_accent_amber_on</item>
         <item name="colorPrimaryContainer">@color/appearance_accent_amber_container</item>
         <item name="colorOnPrimaryContainer">@color/appearance_accent_amber_on_container</item>
+        <item name="colorSecondary">@color/appearance_accent_amber_secondary</item>
+        <item name="colorOnSecondary">@color/appearance_accent_amber_on</item>
+        <item name="colorSurface">@color/appearance_accent_amber_surface</item>
+        <item name="colorSurfaceContainer">@color/appearance_accent_amber_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/appearance_accent_amber_surface_container_high</item>
+        <item name="colorOnSurface">@color/appearance_accent_amber_on_surface</item>
+        <item name="colorSurfaceVariant">@color/appearance_accent_amber_surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/appearance_accent_amber_on_surface_variant</item>
+        <item name="colorOutline">@color/appearance_accent_amber_outline</item>
+        <item name="android:colorBackground">@color/appearance_accent_amber_surface</item>
+        <item name="android:statusBarColor">@color/appearance_accent_amber_surface</item>
+        <item name="android:navigationBarColor">@color/appearance_accent_amber_surface</item>
     </style>
 
     <style name="ShapeAppearance.OlcrtcClient.MediumComponent" parent="ShapeAppearance.Material3.MediumComponent">

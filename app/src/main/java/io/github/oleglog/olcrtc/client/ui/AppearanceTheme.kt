@@ -10,7 +10,8 @@ internal object AppearanceTheme {
         activity: AppCompatActivity,
         appearance: RoutingSettings.Appearance = RoutingSettings.open(activity.applicationContext).getAppearance(),
     ) {
-        when (appearance.palette) {
+        val normalized = appearance.normalized()
+        when (normalized.palette) {
             RoutingSettings.Appearance.Palette.SYSTEM -> DynamicColors.applyToActivityIfAvailable(activity)
             RoutingSettings.Appearance.Palette.NEUTRAL -> Unit
             RoutingSettings.Appearance.Palette.BRONZE ->
@@ -20,8 +21,8 @@ internal object AppearanceTheme {
             RoutingSettings.Appearance.Palette.MONO ->
                 activity.theme.applyStyle(R.style.ThemeOverlay_OlcrtcClient_Mono, true)
         }
-        if (appearance.palette != RoutingSettings.Appearance.Palette.MONO) {
-            val accentOverlay = when (appearance.accent) {
+        if (normalized.palette != RoutingSettings.Appearance.Palette.MONO) {
+            val accentOverlay = when (normalized.accent) {
                 RoutingSettings.Appearance.Accent.AUTO -> 0
                 RoutingSettings.Appearance.Accent.TEAL -> R.style.ThemeOverlay_OlcrtcClient_Accent_Teal
                 RoutingSettings.Appearance.Accent.BLUE -> R.style.ThemeOverlay_OlcrtcClient_Accent_Blue

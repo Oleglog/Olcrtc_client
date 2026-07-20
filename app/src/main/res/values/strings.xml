@@ -258,8 +258,8 @@
     <string name="appearance_palette_black">Black</string>
     <string name="appearance_palette_mono">Monochrome</string>
     <string name="appearance_accent_title">Accent color</string>
-    <string name="appearance_accent_summary">Sets the app’s color mood. Auto follows the selected palette.</string>
-    <string name="appearance_accent_auto">Auto</string>
+    <string name="appearance_accent_summary">A color uses the neutral foundation. Select a palette again to restore its own colors.</string>
+    <string name="appearance_accent_auto">From palette</string>
     <string name="appearance_accent_teal">Teal</string>
     <string name="appearance_accent_blue">Blue</string>
     <string name="appearance_accent_violet">Violet</string>

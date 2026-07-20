@@ -49,4 +49,21 @@ class RoutingSettingsTest {
             RoutingSettings.Appearance(glowIntensity = 101)
         }
     }
+
+    @Test
+    fun normalizesAppearancePaletteAndAccentAsOneTheme() {
+        val custom = RoutingSettings.Appearance(
+            palette = RoutingSettings.Appearance.Palette.BRONZE,
+            accent = RoutingSettings.Appearance.Accent.ROSE,
+        ).normalized()
+        assertEquals(RoutingSettings.Appearance.Palette.NEUTRAL, custom.palette)
+        assertEquals(RoutingSettings.Appearance.Accent.ROSE, custom.accent)
+
+        val mono = RoutingSettings.Appearance(
+            palette = RoutingSettings.Appearance.Palette.MONO,
+            accent = RoutingSettings.Appearance.Accent.BLUE,
+        ).normalized()
+        assertEquals(RoutingSettings.Appearance.Palette.MONO, mono.palette)
+        assertEquals(RoutingSettings.Appearance.Accent.AUTO, mono.accent)
+    }
 }
