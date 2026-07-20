@@ -45,6 +45,33 @@ internal object GomobileCore : NativeCore {
 
     fun urlTest(url: String, timeoutMillis: Int): Long = Mobilecore.urlTest(url, timeoutMillis.toLong())
 
+    fun startProfileProbe(assetDirectory: String, configJson: String) {
+        Mobilecore.startProfileProbe(assetDirectory, configJson)
+    }
+
+    fun profileProbeUrlTest(url: String, timeoutMillis: Int, inboundTag: String): Long =
+        Mobilecore.profileProbeUrlTest(url, timeoutMillis.toLong(), inboundTag)
+
+    fun startProfileProbeOlcrtc(config: NativeOlcrtcConfig) {
+        Mobilecore.startProfileProbeOlcrtc(
+            config.provider,
+            config.transport,
+            config.roomId,
+            config.clientId,
+            config.keyHex,
+            config.authToken,
+            config.dnsServer,
+            config.vp8Fps.toLong(),
+            config.vp8BatchSize.toLong(),
+            config.keepaliveSeconds.toLong(),
+            config.socksPort.toLong(),
+        )
+    }
+
+    fun stopProfileProbe() {
+        Mobilecore.stopProfileProbe()
+    }
+
     fun validateXrayConfig(assetDirectory: String, configJson: String) {
         Mobilecore.validateXrayConfig(assetDirectory, configJson)
     }

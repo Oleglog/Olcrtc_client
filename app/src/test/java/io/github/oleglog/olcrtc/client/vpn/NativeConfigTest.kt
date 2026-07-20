@@ -66,6 +66,28 @@ class NativeConfigTest {
     }
 
     @Test
+    fun buildsFourIndependentProfileProbeRoutes() {
+        val profiles = (0 until 4).map { index ->
+            StandardProfile(
+                name = "VLESS $index",
+                protocol = StandardProfile.Protocol.VLESS,
+                address = "server-$index.example",
+                port = 443,
+                uuid = UUID,
+            )
+        }
+
+        val json = NativeConfig.profileProbe(profiles)
+
+        profiles.indices.forEach { index ->
+            val tag = NativeConfig.profileProbeTag(index)
+            assertTrue(json.contains("\"tag\": \"$tag\""))
+            assertTrue(json.contains("\"inboundTag\": [\"$tag\"], \"outboundTag\": \"$tag\""))
+        }
+        assertFalse(json.contains("\"inbounds\""))
+    }
+
+    @Test
     fun escapesProfileValues() {
         val json = NativeConfig.xray(1080, StandardProfile(
             name = "Test",

@@ -5,13 +5,13 @@
         android:icon="@drawable/ic_nav_connection_24"
         android:title="@string/navigation_connection" />
     <item
-        android:id="@+id/profilesFragment"
-        android:icon="@drawable/ic_nav_subscriptions_24"
-        android:title="@string/navigation_profiles" />
-    <item
         android:id="@+id/statisticsFragment"
         android:icon="@drawable/ic_nav_statistics_24"
         android:title="@string/navigation_statistics" />
+    <item
+        android:id="@+id/profilesFragment"
+        android:icon="@drawable/ic_nav_subscriptions_24"
+        android:title="@string/navigation_profiles" />
     <item
         android:id="@+id/settingsFragment"
         android:icon="@drawable/ic_nav_settings_24"

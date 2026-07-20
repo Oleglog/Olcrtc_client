@@ -41,13 +41,15 @@
         <com.google.android.material.bottomnavigation.BottomNavigationView
             android:id="@+id/bottom_navigation"
             android:layout_width="match_parent"
-            android:layout_height="84dp"
+            android:layout_height="92dp"
             android:background="@android:color/transparent"
             android:elevation="0dp"
             app:itemActiveIndicatorStyle="@style/Widget.OlcrtcClient.BottomNavigation.ActiveIndicator"
             app:itemIconSize="@dimen/icon_navigation_size"
-            app:itemPaddingBottom="10dp"
-            app:itemPaddingTop="10dp"
+            app:itemPaddingBottom="8dp"
+            app:itemPaddingTop="8dp"
+            app:itemTextAppearanceActive="@style/TextAppearance.Olcrtc.BottomNavigation"
+            app:itemTextAppearanceInactive="@style/TextAppearance.Olcrtc.BottomNavigation"
             app:labelVisibilityMode="labeled"
             app:menu="@menu/main_navigation" />
     </com.google.android.material.card.MaterialCardView>

@@ -49,6 +49,12 @@ func TestStopXrayIsIdempotent(t *testing.T) {
 	}
 }
 
+func TestStopProfileProbeIsIdempotent(t *testing.T) {
+	if err := StopProfileProbe(); err != nil {
+		t.Fatalf("StopProfileProbe returned an error: %v", err)
+	}
+}
+
 func TestWaitXrayReadyRejectsInvalidArguments(t *testing.T) {
 	if err := WaitXrayReady(0, 100); err == nil {
 		t.Fatal("WaitXrayReady accepted an invalid port")
@@ -87,6 +93,27 @@ func TestURLTestUsesDedicatedInboundAndHead(t *testing.T) {
 	}
 }
 
+func TestProfileProbeURLTestUsesRequestedInbound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
+		response.WriteHeader(http.StatusNoContent)
+	}))
+	defer server.Close()
+
+	inboundTag := ""
+	_, err := runURLTestWithInboundTag(server.URL, 1000, "profile-probe-2", func(ctx context.Context, destination xraynet.Destination) (net.Conn, error) {
+		if inbound := session.InboundFromContext(ctx); inbound != nil {
+			inboundTag = inbound.Tag
+		}
+		return (&net.Dialer{}).DialContext(ctx, "tcp", destination.NetAddr())
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if inboundTag != "profile-probe-2" {
+		t.Fatalf("inbound tag = %q, want %q", inboundTag, "profile-probe-2")
+	}
+}
+
 func TestURLTestRejectsNonNoContentResponse(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(response http.ResponseWriter, _ *http.Request) {
 		response.WriteHeader(http.StatusBadGateway)
@@ -107,6 +134,9 @@ func TestURLTestRejectsInvalidArguments(t *testing.T) {
 	}
 	if _, err := UrlTest("https://example.com", 0); err == nil {
 		t.Fatal("UrlTest accepted an invalid timeout")
+	}
+	if _, err := ProfileProbeUrlTest("https://example.com", 1000, ""); err == nil {
+		t.Fatal("ProfileProbeUrlTest accepted an empty inbound tag")
 	}
 }
 

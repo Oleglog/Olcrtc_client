@@ -28,10 +28,11 @@ class ConnectionCardStateTest {
     }
 
     @Test
-    fun selectingAnotherProfileWhileConnectedStartsImmediately() {
-        assertTrue(shouldAutoConnectSelectedProfile(VpnState.CONNECTED, targetAlreadyConnected = false))
-        assertFalse(shouldAutoConnectSelectedProfile(VpnState.CONNECTED, targetAlreadyConnected = true))
-        assertFalse(shouldAutoConnectSelectedProfile(VpnState.DISCONNECTED, targetAlreadyConnected = false))
+    fun profileTapSelectsWithoutStartingAReconnect() {
+        assertTrue(canSelectProfile(VpnState.CONNECTED))
+        assertTrue(canSelectProfile(VpnState.DISCONNECTED))
+        assertFalse(canSelectProfile(VpnState.CONNECTING))
+        assertFalse(canSelectProfile(VpnState.RECONNECTING))
     }
 
     @Test

@@ -230,29 +230,53 @@
                     android:textColor="?attr/colorOnSurfaceVariant"
                     android:visibility="gone" />
 
-                <TextView
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_5"
-                    android:text="@string/connection_profiles"
-                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
 
-                <HorizontalScrollView
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/connection_profiles"
+                        android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                    <FrameLayout
+                        android:layout_width="@dimen/icon_touch_target"
+                        android:layout_height="@dimen/icon_touch_target">
+
+                        <androidx.appcompat.widget.AppCompatImageButton
+                            android:id="@+id/test_all_profiles"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent"
+                            android:background="?attr/selectableItemBackgroundBorderless"
+                            android:contentDescription="@string/profile_test_all"
+                            android:padding="12dp"
+                            android:src="@drawable/ic_ping_24"
+                            app:tint="?attr/colorPrimary" />
+
+                        <com.google.android.material.progressindicator.CircularProgressIndicator
+                            android:id="@+id/all_profiles_progress"
+                            android:layout_width="22dp"
+                            android:layout_height="22dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@string/profile_latency_checking"
+                            android:indeterminate="true"
+                            android:visibility="gone"
+                            app:indicatorSize="22dp"
+                            app:trackThickness="2dp" />
+                    </FrameLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/profile_list"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="@dimen/space_2"
-                    android:clipToPadding="false"
-                    android:fillViewport="true"
-                    android:overScrollMode="ifContentScrolls"
-                    android:scrollbars="none">
-
-                    <LinearLayout
-                        android:id="@+id/profile_list"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal" />
-
-                </HorizontalScrollView>
+                    android:orientation="vertical" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -262,10 +286,12 @@
                     android:orientation="horizontal">
 
                     <FrameLayout
+                        android:id="@+id/test_selected_container"
                         android:layout_width="0dp"
                         android:layout_height="@dimen/button_secondary_height"
                         android:layout_marginEnd="@dimen/space_2"
-                        android:layout_weight="1">
+                        android:layout_weight="1"
+                        android:visibility="gone">
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/test_selected"
@@ -276,7 +302,7 @@
                             android:insetTop="0dp"
                             android:insetBottom="0dp"
                             android:minWidth="0dp"
-                            android:text="@string/profile_test_latency"
+                            android:text="@string/profile_ping_vpn"
                             app:cornerRadius="@dimen/corner_button"
                             app:icon="@drawable/ic_ping_24"
                             app:iconGravity="textStart" />

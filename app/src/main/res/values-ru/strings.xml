@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">olcRTC Client</string>
-    <string name="navigation_connection">Подключение</string>
+    <string name="navigation_connection">VPN</string>
     <string name="navigation_profiles">Подписки</string>
-    <string name="navigation_statistics">Статистика</string>
+    <string name="navigation_statistics">Трафик</string>
     <string name="navigation_settings">Настройки</string>
     <string name="profiles_placeholder">Сохранённых подключений нет</string>
     <string name="connection_loading_title">Загрузка подключений</string>
@@ -56,7 +56,9 @@
     <string name="profiles_count_suffix">профилей</string>
     <string name="profile_locally_modified">изменён</string>
     <string name="profile_reset">Сбросить</string>
-    <string name="profile_test_latency">Пинг</string>
+    <string name="profile_ping_vpn">Пинг VPN</string>
+    <string name="profile_test_all">Проверить все подключения</string>
+    <string name="profile_test_unavailable">Недоступно</string>
     <string name="profile_latency_checking">Проверка задержки…</string>
     <string name="profile_latency_result">Пинг: %1$d мс\nПроверено только что</string>
     <string name="profile_latency_connect_first">Сначала подключите этот профиль olcRTC</string>

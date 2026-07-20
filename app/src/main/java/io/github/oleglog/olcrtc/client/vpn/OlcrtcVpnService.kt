@@ -819,6 +819,7 @@ class OlcrtcVpnService : VpnService() {
         attempt: ConnectionAttempt,
     ): StartedSession {
         attempt.requireActive()
+        GomobileCore.stopProfileProbe()
         val routingRules = profiles.getEnabledRoutingRules()
         val requestedRoutingPolicy = routingSettings.get()
         val preparedGeoAssets = if (requiresGeoAssets(requestedRoutingPolicy)) {

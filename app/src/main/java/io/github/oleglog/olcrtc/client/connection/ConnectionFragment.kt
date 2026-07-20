@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.res.ColorStateList
 import android.content.ClipboardManager
 import android.content.Intent
+import android.net.ConnectivityManager
+import android.net.Network
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -50,9 +52,12 @@ import io.github.oleglog.olcrtc.client.routing.RoutingSettings
 import io.github.oleglog.olcrtc.client.statistics.ConnectionSessionRepository
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
 import io.github.oleglog.olcrtc.client.vpn.ConnectionStage
+import io.github.oleglog.olcrtc.client.vpn.ProfileLatencyProbe
+import io.github.oleglog.olcrtc.client.vpn.ProfileProbeTarget
 import io.github.oleglog.olcrtc.client.vpn.VpnState
 import java.util.Locale
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
 class ConnectionFragment : Fragment() {
     private var _binding: FragmentConnectionBinding? = null
@@ -60,8 +65,10 @@ class ConnectionFragment : Fragment() {
     private val profiles by lazy { ProfileRepository.open(requireContext().applicationContext) }
     private val settings by lazy { RoutingSettings.open(requireContext().applicationContext) }
     private val statistics by lazy { ConnectionSessionRepository.open(requireContext().applicationContext) }
+    private val connectivity by lazy { requireContext().getSystemService(ConnectivityManager::class.java) }
     private val storage = Executors.newSingleThreadExecutor()
     private val latency = Executors.newSingleThreadExecutor()
+    private val profileProbeWorkers = Executors.newFixedThreadPool(4)
     private val ticker = Handler(Looper.getMainLooper())
     private val bundleImports = BundleImportDispatcher()
     private var currentState = VpnState.NO_PROFILE
@@ -76,6 +83,14 @@ class ConnectionFragment : Fragment() {
     private var latencyInProgress = false
     private var lastLatencyMillis: Long? = null
     private var lastLatencyReference: String? = null
+    private var connectionItems = emptyList<ConnectionListItem>()
+    private val profileProbeResults = mutableMapOf<String, Long?>()
+    private val checkingProfiles = mutableSetOf<String>()
+    private var profileProbeRequestId = 0L
+    private var profileProbeInProgress = false
+    private var profileProbeTask: Future<*>? = null
+    @Volatile private var activeProfileProbe: ProfileLatencyProbe? = null
+    @Volatile private var defaultNetwork: Network? = null
     private var profilesLoaded = false
     private var currentSessionStartedAt: Long? = null
     private var todayBytesUp = 0L
@@ -88,6 +103,13 @@ class ConnectionFragment : Fragment() {
             }
             updateDashboard()
             ticker.postDelayed(this, DASHBOARD_REFRESH_MILLIS)
+        }
+    }
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) = handleDefaultNetwork(network)
+
+        override fun onLost(network: Network) {
+            if (defaultNetwork == network) handleDefaultNetwork(null)
         }
     }
 
@@ -124,13 +146,21 @@ class ConnectionFragment : Fragment() {
         binding.addProfile.setOnClickListener { showAddConnectionMenu() }
         binding.contentStateAction.setOnClickListener { showAddConnectionMenu() }
         binding.testSelected.setOnClickListener { testSelectedProfile() }
+        binding.testAllProfiles.setOnClickListener { testAllProfiles() }
         updateConnectPulse()
     }
 
     override fun onStart() {
         super.onStart()
+        handleDefaultNetwork(connectivity.activeNetwork)
+        connectivity.registerDefaultNetworkCallback(networkCallback)
         loadProfiles()
         loadDashboardSummary()
+    }
+
+    override fun onStop() {
+        runCatching { connectivity.unregisterNetworkCallback(networkCallback) }
+        super.onStop()
     }
 
     override fun onResume() {
@@ -157,8 +187,10 @@ class ConnectionFragment : Fragment() {
     }
 
     override fun onDestroy() {
+        cancelProfileProbe(clearResults = true)
         storage.shutdownNow()
         latency.shutdownNow()
+        profileProbeWorkers.shutdownNow()
         super.onDestroy()
     }
 
@@ -176,6 +208,7 @@ class ConnectionFragment : Fragment() {
                         type = connectionTypeLabel(profile.type, profile.endpoint),
                         favorite = profile.id in localFavorites,
                         localId = profile.id,
+                        config = profiles.get(profile.id),
                     )
                 }
                 val subscription = profiles.listSubscriptions().flatMap { source ->
@@ -186,6 +219,7 @@ class ConnectionFragment : Fragment() {
                             type = connectionTypeLabel(profile.type, profile.endpoint),
                             favorite = profile.favorite,
                             subscriptionProfileId = profile.id,
+                            config = profiles.getSubscriptionProfile(profile.id),
                         )
                     }
                 }
@@ -203,6 +237,11 @@ class ConnectionFragment : Fragment() {
                 if (_binding == null) return@runOnUiThread
                 result.onSuccess { model ->
                     binding.profileList.removeAllViews()
+                    val profilesChanged = connectionItems.isNotEmpty() &&
+                        connectionItems.associate { it.reference to it.config } !=
+                        model.profiles.associate { it.reference to it.config }
+                    if (profilesChanged) cancelProfileProbe(clearResults = true)
+                    connectionItems = model.profiles
                     if (currentState != VpnState.CONNECTED) {
                         selectedProfileId = selectedProfileId?.takeIf { selected ->
                             model.profiles.any { it.localId == selected }
@@ -264,9 +303,9 @@ class ConnectionFragment : Fragment() {
         onSelect: () -> Unit,
     ): MaterialCardView = MaterialCardView(requireContext()).apply {
         layoutParams = LinearLayout.LayoutParams(
-            168.dp,
-            96.dp,
-        ).apply { marginEnd = dimen(R.dimen.space_2) }
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            84.dp,
+        ).apply { bottomMargin = dimen(R.dimen.space_2) }
         isClickable = true
         isFocusable = true
         radius = dimen(R.dimen.corner_card).toFloat()
@@ -294,39 +333,36 @@ class ConnectionFragment : Fragment() {
             isVisible = false
         }
         addView(LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.VERTICAL
+            orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(
-                dimen(R.dimen.space_3),
-                dimen(R.dimen.space_3),
-                dimen(R.dimen.space_3),
-                dimen(R.dimen.space_3),
+                dimen(R.dimen.space_4),
+                dimen(R.dimen.space_2),
+                dimen(R.dimen.space_2),
+                dimen(R.dimen.space_2),
             )
             addView(LinearLayout(requireContext()).apply {
+                orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_VERTICAL
-                orientation = LinearLayout.HORIZONTAL
                 addView(TextView(requireContext()).apply {
                     text = name
                     setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleMedium)
                     maxLines = 1
                     ellipsize = android.text.TextUtils.TruncateAt.END
-                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                addView(profileActionsButton(name, onActions))
-            }, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dimen(R.dimen.icon_touch_target),
-            ))
-            addView(LinearLayout(requireContext()).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                addView(detail, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                addView(progress, LinearLayout.LayoutParams(18.dp, 18.dp).apply {
-                    marginStart = dimen(R.dimen.space_1)
                 })
-            }, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = dimen(R.dimen.space_1) })
+                addView(LinearLayout(requireContext()).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    gravity = Gravity.CENTER_VERTICAL
+                    addView(detail, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                    addView(progress, LinearLayout.LayoutParams(18.dp, 18.dp).apply {
+                        marginStart = dimen(R.dimen.space_1)
+                    })
+                }, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { topMargin = dimen(R.dimen.space_1) })
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            addView(profileActionsButton(name, onActions))
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT,
         ))
@@ -449,7 +485,7 @@ class ConnectionFragment : Fragment() {
 
     private fun updateCardContent(card: MaterialCardView, state: ConnectionCardState) {
         val views = card.tag as? ConnectionCardViews ?: return
-        val status = when {
+        val connectionStatus = when {
             state == ConnectionCardState.CONNECTED && currentState == VpnState.CONNECTED ->
                 getString(R.string.connection_card_connected)
             (state == ConnectionCardState.CONNECTED || state == ConnectionCardState.SELECTED) &&
@@ -457,12 +493,25 @@ class ConnectionFragment : Fragment() {
             state == ConnectionCardState.SELECTED -> getString(R.string.connection_card_selected)
             else -> null
         }
+        val probeStatus = when {
+            checkingProfiles.contains(views.reference) -> null
+            !profileProbeResults.containsKey(views.reference) -> null
+            profileProbeResults[views.reference] == null -> getString(R.string.profile_test_unavailable)
+            else -> getString(R.string.connection_latency_value, profileProbeResults.getValue(views.reference))
+        }
         views.detail.text = listOfNotNull(
             views.type,
-            status,
+            connectionStatus,
+            probeStatus,
         ).joinToString(" · ")
-        views.progress.isVisible = status != null && currentState in CARD_PROGRESS_STATES
-        card.contentDescription = listOfNotNull(views.name, views.type, status).joinToString(", ")
+        views.progress.isVisible = checkingProfiles.contains(views.reference) ||
+            connectionStatus != null && currentState in CARD_PROGRESS_STATES
+        card.contentDescription = listOfNotNull(
+            views.name,
+            views.type,
+            connectionStatus,
+            probeStatus,
+        ).joinToString(", ")
     }
 
     private fun isReferenceSelected(reference: String): Boolean = when {
@@ -478,27 +527,23 @@ class ConnectionFragment : Fragment() {
     }
 
     private fun selectSubscriptionProfile(id: String) {
-        if (currentState in BUSY_STATES) return
-        val autoConnect = shouldAutoConnectSelectedProfile(currentState, connectedSubscriptionProfileId == id)
+        if (!canSelectProfile(currentState)) return
         selectedProfileId = null
         selectedSubscriptionProfileId = id
         showStatus(null)
         updateConnectButtonText()
         updateActionAvailability()
         refreshCardAppearance()
-        if (autoConnect) connectSelected()
     }
 
     private fun selectProfile(id: Long) {
-        if (currentState in BUSY_STATES) return
-        val autoConnect = shouldAutoConnectSelectedProfile(currentState, connectedProfileId == id)
+        if (!canSelectProfile(currentState)) return
         selectedSubscriptionProfileId = null
         selectedProfileId = id
         showStatus(null)
         updateConnectButtonText()
         updateActionAvailability()
         refreshCardAppearance()
-        if (autoConnect) connectSelected()
     }
 
     private fun setFavorite(item: ConnectionListItem, favorite: Boolean) {
@@ -550,6 +595,97 @@ class ConnectionFragment : Fragment() {
                 }
                     .onFailure { showStatus(getString(latencyErrorText(latencyErrorKind(it)))) }
             }
+        }
+    }
+
+    private fun testAllProfiles() {
+        if (profileProbeInProgress || currentState !in PROFILE_PROBE_IDLE_STATES) return
+        val targets = connectionItems.mapNotNull { item ->
+            item.config?.let { ProfileProbeTarget(item.reference, it) }
+        }
+        profileProbeResults.clear()
+        checkingProfiles.clear()
+        if (targets.isEmpty()) {
+            connectionItems.forEach { profileProbeResults[it.reference] = null }
+            refreshCardAppearance()
+            return
+        }
+
+        val requestId = ++profileProbeRequestId
+        val probe = ProfileLatencyProbe(
+            requireContext().applicationContext,
+            settings.getDnsServer(),
+            profileProbeWorkers,
+        )
+        activeProfileProbe = probe
+        profileProbeInProgress = true
+        updateActionAvailability()
+        refreshCardAppearance()
+        profileProbeTask = latency.submit {
+            runCatching {
+                probe.testAll(
+                    targets = targets,
+                    onStarted = { references ->
+                        activity?.runOnUiThread {
+                            if (requestId != profileProbeRequestId) return@runOnUiThread
+                            checkingProfiles.addAll(references)
+                            if (_binding != null) refreshCardAppearance()
+                        }
+                    },
+                    onResult = { reference, result ->
+                        activity?.runOnUiThread {
+                            if (requestId != profileProbeRequestId) return@runOnUiThread
+                            checkingProfiles.remove(reference)
+                            profileProbeResults[reference] = result.getOrNull()
+                            if (_binding != null) refreshCardAppearance()
+                        }
+                    },
+                )
+            }
+            activity?.runOnUiThread {
+                if (requestId != profileProbeRequestId) return@runOnUiThread
+                connectionItems.forEach { item ->
+                    if (!profileProbeResults.containsKey(item.reference)) {
+                        profileProbeResults[item.reference] = null
+                    }
+                }
+                checkingProfiles.clear()
+                profileProbeInProgress = false
+                profileProbeTask = null
+                activeProfileProbe = null
+                if (_binding != null) {
+                    updateActionAvailability()
+                    refreshCardAppearance()
+                }
+            }
+        }
+    }
+
+    private fun cancelProfileProbe(clearResults: Boolean) {
+        if (!profileProbeInProgress && !clearResults) return
+        profileProbeRequestId++
+        profileProbeTask?.cancel(true)
+        profileProbeTask = null
+        val probe = activeProfileProbe
+        activeProfileProbe = null
+        profileProbeInProgress = false
+        checkingProfiles.clear()
+        if (clearResults) profileProbeResults.clear()
+        if (probe != null && !storage.isShutdown) {
+            storage.execute { runCatching { probe.stop() } }
+        }
+        if (_binding != null) {
+            updateActionAvailability()
+            refreshCardAppearance()
+        }
+    }
+
+    private fun handleDefaultNetwork(network: Network?) {
+        activity?.runOnUiThread {
+            val changed = defaultNetwork != null && defaultNetwork != network
+            defaultNetwork = network
+            if (changed) cancelProfileProbe(clearResults = true)
+            else if (_binding != null) updateActionAvailability()
         }
     }
 
@@ -677,6 +813,9 @@ class ConnectionFragment : Fragment() {
         currentState = state
         currentStage = stage
         currentReconnectAttempt = reconnectAttempt
+        if (state !in PROFILE_PROBE_IDLE_STATES && profileProbeInProgress) {
+            cancelProfileProbe(clearResults = false)
+        }
         if (state != VpnState.CONNECTED && latencyInProgress) {
             latencyRequestId++
             latencyInProgress = false
@@ -857,13 +996,20 @@ class ConnectionFragment : Fragment() {
 
     private fun updateActionAvailability() {
         if (_binding == null) return
-        binding.connect.isEnabled = currentState != VpnState.STOPPING && (
+        binding.connect.isEnabled = !profileProbeInProgress && currentState != VpnState.STOPPING && (
             currentState == VpnState.CONNECTED || currentState in BUSY_STATES ||
                 selectedProfileId != null || selectedSubscriptionProfileId != null
             )
         binding.connect.alpha = if (binding.connect.isEnabled) 1f else 0.55f
+        binding.testSelectedContainer.isVisible = currentState == VpnState.CONNECTED
         binding.testSelected.isEnabled = currentState == VpnState.CONNECTED && !hasPendingProfileSwitch() && !latencyInProgress
         binding.pingProgress.isVisible = latencyInProgress
+        binding.addProfile.isEnabled = !profileProbeInProgress
+        binding.testAllProfiles.isEnabled = currentState in PROFILE_PROBE_IDLE_STATES &&
+            defaultNetwork != null && connectionItems.isNotEmpty() && !profileProbeInProgress
+        binding.testAllProfiles.alpha = if (binding.testAllProfiles.isEnabled) 1f else 0.38f
+        binding.testAllProfiles.isVisible = !profileProbeInProgress
+        binding.allProfilesProgress.isVisible = profileProbeInProgress
         if (latencyInProgress) {
             binding.testSelected.text = ""
         } else {
@@ -876,7 +1022,7 @@ class ConnectionFragment : Fragment() {
         binding.testSelected.text = lastLatencyMillis
             ?.takeIf { lastLatencyReference == selectedReference() }
             ?.let { getString(R.string.connection_latency_value, it) }
-            ?: getString(R.string.profile_test_latency)
+            ?: getString(R.string.profile_ping_vpn)
     }
 
     private fun loadDashboardSummary() {
@@ -1265,6 +1411,7 @@ class ConnectionFragment : Fragment() {
         val favorite: Boolean,
         val localId: Long? = null,
         val subscriptionProfileId: String? = null,
+        val config: ProfileConfig? = null,
     )
 
     private data class ConnectionCardViews(
@@ -1288,6 +1435,11 @@ class ConnectionFragment : Fragment() {
             VpnState.RECONNECTING,
             VpnState.STOPPING,
         )
+        private val PROFILE_PROBE_IDLE_STATES = setOf(
+            VpnState.NO_PROFILE,
+            VpnState.DISCONNECTED,
+            VpnState.ERROR,
+        )
         private const val DASHBOARD_REFRESH_MILLIS = 1_000L
     }
 }
@@ -1307,8 +1459,10 @@ internal fun connectionCardState(
     else -> ConnectionCardState.INACTIVE
 }
 
-internal fun shouldAutoConnectSelectedProfile(state: VpnState, targetAlreadyConnected: Boolean): Boolean =
-    state == VpnState.CONNECTED && !targetAlreadyConnected
+internal fun canSelectProfile(state: VpnState): Boolean = when (state) {
+    VpnState.PREPARING, VpnState.CONNECTING, VpnState.RECONNECTING, VpnState.STOPPING -> false
+    else -> true
+}
 
 internal fun connectionGlowAlpha(intensity: Int, connected: Boolean): Float {
     val normalized = intensity.coerceIn(0, 100) / 100f

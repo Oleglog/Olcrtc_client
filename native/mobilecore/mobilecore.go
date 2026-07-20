@@ -26,9 +26,12 @@ import (
 var (
 	errAlreadyRunning = errors.New("mobilecore already running")
 	errNotRunning     = errors.New("mobilecore is not running")
-	mu                sync.Mutex
-	protector         SocketProtector
-	xrayInstance      *core.Instance
+	mu                 sync.Mutex
+	protector          SocketProtector
+	xrayInstance       *core.Instance
+	profileProbe       *core.Instance
+	profileProbeOlcrtc bool
+	profileProbeMu     sync.Mutex
 )
 
 type SocketProtector interface {
@@ -60,24 +63,10 @@ func StartXray(assetDirectory string, configJSON string) error {
 	if xrayInstance != nil {
 		return errAlreadyRunning
 	}
-	if err := setXrayAssetDirectory(assetDirectory); err != nil {
+	instance, err := newXrayInstance(assetDirectory, configJSON)
+	if err != nil {
 		return err
 	}
-
-	config, err := core.LoadConfig("json", bytes.NewBufferString(configJSON))
-	if err != nil {
-		return fmt.Errorf("load Xray config: %w", err)
-	}
-
-	instance, err := core.New(config)
-	if err != nil {
-		return fmt.Errorf("create Xray instance: %w", err)
-	}
-	if err := instance.Start(); err != nil {
-		_ = instance.Close()
-		return fmt.Errorf("start Xray instance: %w", err)
-	}
-
 	xrayInstance = instance
 	return nil
 }
@@ -153,12 +142,8 @@ func WaitXrayReady(socksPort int, timeoutMillis int) error {
 }
 
 func UrlTest(link string, timeoutMillis int) (int64, error) {
-	if timeoutMillis <= 0 {
-		return 0, errors.New("URL test timeout must be positive")
-	}
-	parsed, err := url.ParseRequestURI(link)
-	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
-		return 0, errors.New("URL test requires an HTTP(S) URL")
+	if err := validateURLTest(link, timeoutMillis); err != nil {
+		return 0, err
 	}
 
 	mu.Lock()
@@ -173,9 +158,131 @@ func UrlTest(link string, timeoutMillis int) (int64, error) {
 	})
 }
 
+func StartProfileProbe(assetDirectory string, configJSON string) error {
+	mu.Lock()
+	defer mu.Unlock()
+	if profileProbe != nil {
+		return errAlreadyRunning
+	}
+	instance, err := newXrayInstance(assetDirectory, configJSON)
+	if err != nil {
+		return err
+	}
+	profileProbe = instance
+	return nil
+}
+
+func ProfileProbeUrlTest(link string, timeoutMillis int, inboundTag string) (int64, error) {
+	if err := validateURLTest(link, timeoutMillis); err != nil {
+		return 0, err
+	}
+	if strings.TrimSpace(inboundTag) == "" {
+		return 0, errors.New("profile probe inbound tag is required")
+	}
+	mu.Lock()
+	instance := profileProbe
+	mu.Unlock()
+	if instance == nil {
+		return 0, errNotRunning
+	}
+	return runURLTestWithInboundTag(link, timeoutMillis, inboundTag, func(ctx context.Context, destination xraynet.Destination) (net.Conn, error) {
+		return core.Dial(ctx, instance, destination)
+	})
+}
+
+func validateURLTest(link string, timeoutMillis int) error {
+	if timeoutMillis <= 0 {
+		return errors.New("URL test timeout must be positive")
+	}
+	parsed, err := url.ParseRequestURI(link)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return errors.New("URL test requires an HTTP(S) URL")
+	}
+	return nil
+}
+
+func StartProfileProbeOlcrtc(
+	provider string,
+	transport string,
+	roomID string,
+	clientID string,
+	keyHex string,
+	authToken string,
+	dnsServer string,
+	vp8FPS int,
+	vp8BatchSize int,
+	keepaliveSeconds int,
+	socksPort int,
+) error {
+	profileProbeMu.Lock()
+	defer profileProbeMu.Unlock()
+	if err := StartOlcrtc(
+		provider,
+		transport,
+		roomID,
+		clientID,
+		keyHex,
+		authToken,
+		dnsServer,
+		vp8FPS,
+		vp8BatchSize,
+		keepaliveSeconds,
+		socksPort,
+	); err != nil {
+		return err
+	}
+	mu.Lock()
+	profileProbeOlcrtc = true
+	mu.Unlock()
+	return nil
+}
+
+func StopProfileProbe() error {
+	profileProbeMu.Lock()
+	defer profileProbeMu.Unlock()
+	mu.Lock()
+	instance := profileProbe
+	profileProbe = nil
+	stopOlcrtc := profileProbeOlcrtc
+	profileProbeOlcrtc = false
+	mu.Unlock()
+	if stopOlcrtc {
+		olcrtc.Stop()
+	}
+	if instance != nil {
+		if err := instance.Close(); err != nil {
+			return fmt.Errorf("stop profile probe: %w", err)
+		}
+	}
+	return nil
+}
+
+func newXrayInstance(assetDirectory string, configJSON string) (*core.Instance, error) {
+	if err := setXrayAssetDirectory(assetDirectory); err != nil {
+		return nil, err
+	}
+	config, err := core.LoadConfig("json", bytes.NewBufferString(configJSON))
+	if err != nil {
+		return nil, fmt.Errorf("load Xray config: %w", err)
+	}
+	instance, err := core.New(config)
+	if err != nil {
+		return nil, fmt.Errorf("create Xray instance: %w", err)
+	}
+	if err := instance.Start(); err != nil {
+		_ = instance.Close()
+		return nil, fmt.Errorf("start Xray instance: %w", err)
+	}
+	return instance, nil
+}
+
 type destinationDialer func(context.Context, xraynet.Destination) (net.Conn, error)
 
 func runURLTest(link string, timeoutMillis int, dial destinationDialer) (int64, error) {
+	return runURLTestWithInboundTag(link, timeoutMillis, latencyTestInboundTag, dial)
+}
+
+func runURLTestWithInboundTag(link string, timeoutMillis int, inboundTag string, dial destinationDialer) (int64, error) {
 	timeout := time.Duration(timeoutMillis) * time.Millisecond
 	transport := &http.Transport{
 		DisableKeepAlives:   true,
@@ -186,7 +293,7 @@ func runURLTest(link string, timeoutMillis int, dial destinationDialer) (int64, 
 			if err != nil {
 				return nil, err
 			}
-			ctx = session.ContextWithInbound(ctx, &session.Inbound{Tag: latencyTestInboundTag})
+			ctx = session.ContextWithInbound(ctx, &session.Inbound{Tag: inboundTag})
 			return dial(ctx, destination)
 		},
 	}

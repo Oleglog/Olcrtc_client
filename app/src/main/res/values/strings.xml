@@ -1,8 +1,8 @@
 <resources>
     <string name="app_name">olcRTC Client</string>
-    <string name="navigation_connection">Connection</string>
+    <string name="navigation_connection">VPN</string>
     <string name="navigation_profiles">Subscriptions</string>
-    <string name="navigation_statistics">Statistics</string>
+    <string name="navigation_statistics">Traffic</string>
     <string name="navigation_settings">Settings</string>
     <string name="profiles_placeholder">No saved connections</string>
     <string name="connection_loading_title">Loading connections</string>
@@ -55,7 +55,9 @@
     <string name="profiles_count_suffix">profiles</string>
     <string name="profile_locally_modified">modified</string>
     <string name="profile_reset">Reset</string>
-    <string name="profile_test_latency">Ping</string>
+    <string name="profile_ping_vpn">Ping VPN</string>
+    <string name="profile_test_all">Check all connections</string>
+    <string name="profile_test_unavailable">Unavailable</string>
     <string name="profile_latency_checking">Checking latency…</string>
     <string name="profile_latency_result">Ping: %1$d ms\nChecked just now</string>
     <string name="profile_latency_connect_first">Connect this olcRTC profile before testing it</string>

@@ -33,6 +33,30 @@ internal object NativeConfig {
         routingPolicy: RoutingPolicy = RoutingPolicy(),
     ): String = config(socksPort, standardOutbound(profile), dns, routingRules, routingPolicy)
 
+    fun profileProbe(profiles: List<StandardProfile>): String {
+        require(profiles.isNotEmpty()) { "At least one profile is required" }
+        require(profiles.size <= MAX_PARALLEL_PROBES) { "At most $MAX_PARALLEL_PROBES profiles can be tested at once" }
+        val outbounds = profiles.mapIndexed { index, profile ->
+            standardOutbound(profile, profileProbeTag(index))
+        }
+        val rules = profiles.indices.map { index ->
+            val tag = profileProbeTag(index)
+            """{ "type": "field", "inboundTag": ["$tag"], "outboundTag": "$tag" }"""
+        }
+        return """
+            {
+              "log": { "loglevel": "warning" },
+              "outbounds": [${outbounds.joinToString(",")}],
+              "routing": { "domainStrategy": "AsIs", "rules": [${rules.joinToString(",")}] }
+            }
+        """.trimIndent()
+    }
+
+    fun profileProbeTag(index: Int): String {
+        require(index in 0 until MAX_PARALLEL_PROBES) { "Invalid profile probe index" }
+        return "profile-probe-$index"
+    }
+
     fun hev(socksPort: Int): ByteArray = """
         tunnel:
           mtu: 1500
@@ -108,7 +132,7 @@ internal object NativeConfig {
         return "{ \"type\": \"field\", \"$field\": [$values], \"outboundTag\": \"$outboundTag\" }"
     }
 
-    private fun standardOutbound(profile: StandardProfile): String {
+    private fun standardOutbound(profile: StandardProfile, tag: String = "proxy"): String {
         val settings = when (profile.protocol) {
             StandardProfile.Protocol.VLESS -> """
                 "vnext": [{
@@ -137,7 +161,7 @@ internal object NativeConfig {
         }
         return """{
           "protocol": "$protocol",
-          "tag": "proxy",
+          "tag": "$tag",
           "settings": { $settings }$streamSettings
         }""".trimIndent()
     }
@@ -203,6 +227,7 @@ internal object NativeConfig {
     private const val DNS_OUT_TAG = "dns-out"
     private const val PRIVATE_DNS_PORT = 853
     private const val LATENCY_TEST_TAG = "latency-test"
+    private const val MAX_PARALLEL_PROBES = 4
     const val VPN_DNS_ADDRESS = "10.0.0.1"
     private val LAN_RANGES = listOf(
         "10.0.0.0/8",

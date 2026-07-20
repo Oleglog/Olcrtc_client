@@ -541,8 +541,8 @@ class MainActivity : AppCompatActivity() {
         private val EXTERNAL_PROFILE_SCHEMES = setOf("olcrtc", "vless", "vmess", "trojan", "ss")
         private val MAIN_DESTINATIONS = intArrayOf(
             R.id.connectionFragment,
-            R.id.profilesFragment,
             R.id.statisticsFragment,
+            R.id.profilesFragment,
             R.id.settingsFragment,
         )
     }
@@ -557,8 +557,8 @@ class MainActivity : AppCompatActivity() {
 
         override fun createFragment(position: Int): Fragment = when (position) {
             0 -> ConnectionFragment()
-            1 -> ProfilesFragment()
-            2 -> StatisticsFragment()
+            1 -> StatisticsFragment()
+            2 -> ProfilesFragment()
             else -> SettingsFragment()
         }
     }
