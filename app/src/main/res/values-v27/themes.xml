@@ -1,0 +1,5 @@
+<resources>
+    <style name="ThemeOverlay.OlcrtcClient.Black" parent="ThemeOverlay.OlcrtcClient.Black.Base">
+        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+</resources>

@@ -51,7 +51,7 @@
         <item name="android:navigationBarColor">@color/olcrtc_bronze_surface</item>
     </style>
 
-    <style name="ThemeOverlay.OlcrtcClient.Black" parent="">
+    <style name="ThemeOverlay.OlcrtcClient.Black.Base" parent="">
         <item name="colorPrimary">@color/olcrtc_black_primary</item>
         <item name="colorOnPrimary">@color/olcrtc_black_on_primary</item>
         <item name="colorPrimaryContainer">@color/olcrtc_black_primary_container</item>
@@ -69,7 +69,9 @@
         <item name="android:statusBarColor">@color/olcrtc_black_surface</item>
         <item name="android:navigationBarColor">@color/olcrtc_black_surface</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowLightNavigationBar">false</item>
+    </style>
+
+    <style name="ThemeOverlay.OlcrtcClient.Black" parent="ThemeOverlay.OlcrtcClient.Black.Base">
     </style>
 
     <style name="ThemeOverlay.OlcrtcClient.Mono" parent="">
