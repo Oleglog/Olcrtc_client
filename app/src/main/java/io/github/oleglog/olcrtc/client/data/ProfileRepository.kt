@@ -632,6 +632,7 @@ internal class ProfileRepository(
                 .put("xhttpHost", xhttpHost)
                 .put("xhttpPath", xhttpPath)
                 .put("xhttpExtraJson", xhttpExtraJson)
+                .put("dnsServer", dnsServer)
                 .toString(),
         ),
     )

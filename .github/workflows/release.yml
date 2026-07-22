@@ -12,6 +12,7 @@ on:
       - "v*"
 
 permissions:
+  actions: read
   contents: write
 
 jobs:
@@ -21,6 +22,15 @@ jobs:
       ANDROID_SIGNING_CERT_SHA256: ${{ secrets.ANDROID_SIGNING_CERT_SHA256 }}
     steps:
       - uses: actions/checkout@v4
+
+      - name: Verify successful CI for release commit
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          successful_runs="$(gh run list --workflow ci.yml --commit "$GITHUB_SHA" --status success --limit 1 --json databaseId --jq 'length')"
+          test "$successful_runs" -eq 1 || { echo "A successful CI run for $GITHUB_SHA is required" >&2; exit 1; }
 
       - name: Cache mobilecore AAR
         id: mobilecore-cache
@@ -95,9 +105,6 @@ jobs:
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
           HEV_APP_ABI: armeabi-v7a arm64-v8a
-
-      - name: Run unit tests
-        run: ./gradlew --no-daemon --build-cache :app:testDebugUnitTest
 
       - name: Assemble signed release APK
         run: ./gradlew --no-daemon --build-cache :app:assembleRelease

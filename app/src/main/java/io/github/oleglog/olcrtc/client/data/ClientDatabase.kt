@@ -405,8 +405,17 @@ internal abstract class SubscriptionDao {
         val existing = getProfiles(subscription.groupId)
         val existingByIdentity = existing.associateBy(SubscriptionProfileEntity::identityHash)
         val incomingIdentities = profiles.mapTo(mutableSetOf(), SubscriptionProfileEntity::identityHash)
+        val matchedIds = mutableSetOf<String>()
         val updates = profiles.map { incoming ->
             val current = existingByIdentity[incoming.identityHash]
+                ?.takeUnless { it.id in matchedIds }
+                ?: existing.firstOrNull { candidate ->
+                    candidate.id !in matchedIds &&
+                        candidate.isLocallyModified &&
+                        candidate.type == incoming.type &&
+                        candidate.sortOrder == incoming.sortOrder
+                }
+            if (current != null) matchedIds += current.id
             if (current == null) {
                 incoming.copy(groupId = subscription.groupId)
             } else {

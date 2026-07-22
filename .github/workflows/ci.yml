@@ -69,12 +69,28 @@ jobs:
             native/mobilecore/module-graph.txt
           if-no-files-found: warn
 
+      - name: Cache mobilecore AAR for release
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/go/bin/gomobile
+            app/libs/mobilecore.aar
+          key: mobilecore-${{ runner.os }}-android-all-${{ hashFiles('scripts/build_mobilecore.sh', 'native/mobilecore/go.mod', 'native/mobilecore/go.sum', 'native/mobilecore/**/*.go') }}
+
       - name: Build HEV tunnel
         run: scripts/build_hev.sh
         env:
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
           FORCE_NATIVE_REBUILD: "1"
           HEV_APP_ABI: armeabi-v7a arm64-v8a x86_64
+
+      - name: Cache HEV native libraries for release
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            app/src/main/jniLibs
+            native/hev-socks5-tunnel/upstream
+          key: hev-${{ runner.os }}-ndk-28.2.13676358-${{ hashFiles('scripts/build_hev.sh', 'app/src/main/jni/**') }}
 
       - name: Run Android unit tests, lint and assemble test APKs
         run: >
@@ -83,6 +99,12 @@ jobs:
           :app:lintDebug
           :app:assembleDebug
           :app:assembleDebugAndroidTest
+
+      - name: Enable KVM acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
 
       - name: Run Android instrumentation tests
         uses: reactivecircus/android-emulator-runner@v2

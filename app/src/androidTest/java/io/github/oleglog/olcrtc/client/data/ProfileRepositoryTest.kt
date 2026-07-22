@@ -443,8 +443,8 @@ class ProfileRepositoryTest {
         assertEquals(listOf(ImportedProfile.Standard(renamed)), repository.getSubscriptionProfiles(subscriptionId))
         assertEquals(1, database.subscriptions().countProfiles())
         val subscription = database.subscriptions().getSubscription(subscriptionId)!!
-        assertEquals(2, subscription.lastSuccessAt)
-        assertEquals(2, subscription.lastAttemptAt)
+        assertEquals(2L, subscription.lastSuccessAt)
+        assertEquals(2L, subscription.lastAttemptAt)
         assertEquals("1.9.46", subscription.serverVersion)
         assertEquals("etag", subscription.etag)
         assertEquals("last-modified", subscription.lastModified)
