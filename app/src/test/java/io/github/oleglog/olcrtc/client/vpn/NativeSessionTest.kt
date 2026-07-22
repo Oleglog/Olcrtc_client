@@ -126,6 +126,7 @@ class NativeSessionTest {
         val config = NativeOlcrtcConfig(
             provider = "wbstream",
             transport = "vp8channel",
+            compatibilityMode = "legacy",
             roomId = "room",
             clientId = "client",
             keyHex = "a".repeat(64),
@@ -407,6 +408,7 @@ class NativeSessionTest {
     private fun olcrtcConfig() = NativeOlcrtcConfig(
         provider = "wbstream",
         transport = "vp8channel",
+        compatibilityMode = "current",
         roomId = "room",
         clientId = "client",
         keyHex = "a".repeat(64),

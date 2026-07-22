@@ -24,6 +24,7 @@ class OlcrtcUriTest {
         assertEquals(64, profile.vp8BatchSize)
         assertEquals(OlcrtcProfile.Provider.WBSTREAM, profile.provider)
         assertEquals(OlcrtcProfile.Transport.VP8CHANNEL, profile.transport)
+        assertEquals(OlcrtcProfile.CompatibilityMode.CURRENT, profile.compatibilityMode)
     }
 
     @Test
@@ -58,6 +59,17 @@ class OlcrtcUriTest {
         assertEquals(60, profile.vp8Fps)
         assertEquals(8, profile.vp8BatchSize)
         assertEquals(15, profile.keepaliveIntervalSeconds)
+        assertEquals(OlcrtcProfile.CompatibilityMode.CURRENT, profile.compatibilityMode)
+    }
+
+    @Test
+    fun parsesAndSerializesLegacyCompatibilityMode() {
+        val profile = OlcrtcUri.parse(
+            "olcrtc://wbstream@r/room?k=$key&t=vp8channel&core=legacy&c=client",
+        )
+
+        assertEquals(OlcrtcProfile.CompatibilityMode.LEGACY, profile.compatibilityMode)
+        assertTrue(OlcrtcUri.serialize(profile).contains("core=legacy"))
     }
 
     @Test
@@ -69,6 +81,7 @@ class OlcrtcUriTest {
         assertEquals(120, profile.vp8Fps)
         assertEquals(64, profile.vp8BatchSize)
         assertEquals(null, profile.dnsServer)
+        assertEquals(OlcrtcProfile.CompatibilityMode.CURRENT, profile.compatibilityMode)
     }
 
     @Test

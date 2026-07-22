@@ -17,3 +17,8 @@ keystore.properties
 __pycache__/
 *.pyc
 /docs/
+.gitnexus/
+
+## local
+olcrtc-client-core-upgrade.md
+temp-files/

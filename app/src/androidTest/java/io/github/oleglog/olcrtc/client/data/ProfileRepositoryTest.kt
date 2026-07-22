@@ -64,6 +64,7 @@ class ProfileRepositoryTest {
         assertFalse(stored.roomPassword!!.contentEquals("password".encodeToByteArray()))
         assertFalse(stored.keyHex.contentEquals(profile.keyHex.encodeToByteArray()))
         assertFalse(stored.authToken!!.contentEquals("token".encodeToByteArray()))
+        assertEquals("current", stored.compatibilityMode)
         assertEquals(profile, repository.getOlcrtc(id))
     }
 
@@ -276,6 +277,42 @@ class ProfileRepositoryTest {
 
         assertEquals("OLCRTC", database.subscriptions().getSubscription(subscriptionId)?.kind)
         assertEquals(listOf(profile), repository.getSubscriptionProfiles(subscriptionId))
+    }
+
+    @Test
+    fun preservesPerProfileCompatibilityModeAcrossSubscriptionRefreshAndReset() {
+        val upstream = ImportedProfile.Olcrtc(OlcrtcProfile(
+            name = "olcRTC",
+            provider = OlcrtcProfile.Provider.WBSTREAM,
+            transport = OlcrtcProfile.Transport.VP8CHANNEL,
+            compatibilityMode = OlcrtcProfile.CompatibilityMode.CURRENT,
+            roomId = "room",
+            clientId = "client",
+            keyHex = "a".repeat(64),
+        ))
+        val subscriptionId = repository.insertSubscription(subscriptionBundle(listOf(upstream)), now = 1)
+        val dao = database.subscriptions()
+        val groupId = dao.getSubscriptionGroup(subscriptionId)!!.groupId
+        val profileId = dao.getProfiles(groupId).single().id
+        val legacy = ImportedProfile.Olcrtc(
+            upstream.value.copy(compatibilityMode = OlcrtcProfile.CompatibilityMode.LEGACY),
+        )
+
+        repository.updateSubscriptionProfile(profileId, legacy, now = 2)
+        repository.replaceSubscriptionProfiles(subscriptionId, listOf(upstream), now = 3)
+
+        assertEquals(
+            OlcrtcProfile.CompatibilityMode.LEGACY,
+            (repository.getSubscriptionProfile(profileId) as ProfileConfig.Olcrtc).value.compatibilityMode,
+        )
+        assertEquals("legacy", dao.getProfile(profileId)!!.compatibilityMode)
+
+        repository.resetSubscriptionProfile(profileId, now = 4)
+
+        assertEquals(
+            OlcrtcProfile.CompatibilityMode.LEGACY,
+            (repository.getSubscriptionProfile(profileId) as ProfileConfig.Olcrtc).value.compatibilityMode,
+        )
     }
 
     @Test
@@ -622,6 +659,7 @@ class ProfileRepositoryTest {
             groupId = 0,
             type = "OLCRTC",
             name = "Profile",
+            compatibilityMode = "legacy",
             encryptedConfigJson = byteArrayOf(1),
             encryptedUpstreamConfigJson = byteArrayOf(2),
             identityHash = "same",

@@ -9,6 +9,14 @@
 - Added GitHub release parsing and ABI-specific update asset selection primitives.
 - Fixed Android CI issues around URI parsing, minSdk-compatible URL decoding, foreground service type, optional camera feature and package visibility lint.
 
+## 1.3.6 — 2026-07-22
+
+- Updated the bundled official olcRTC core to commit `42ae4e0c6a1a` and removed the client fork replacements.
+- Added a per-profile `current` / `legacy` compatibility selector for the 36-byte and 32-byte VP8 wire formats.
+- Migrated existing local and subscription profiles to `legacy` while new profiles default to `current`.
+- Added the compatibility mode to exported olcRTC URIs, subscription persistence and diagnostics.
+- Added GitHub Actions validation for the native core, dependency graph, Android unit tests, lint, APK assembly and instrumentation tests.
+
 ## 1.3.5 — 2026-07-20
 
 - Refined the full client UI with edge-to-edge layouts, a calmer wordmark, consistent cards and a centered four-item bottom navigation.

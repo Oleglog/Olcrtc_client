@@ -15,6 +15,7 @@ internal object GomobileCore : NativeCore {
         Mobilecore.startOlcrtc(
             config.provider,
             config.transport,
+            config.compatibilityMode,
             config.roomId,
             config.clientId,
             config.keyHex,
@@ -56,6 +57,7 @@ internal object GomobileCore : NativeCore {
         Mobilecore.startProfileProbeOlcrtc(
             config.provider,
             config.transport,
+            config.compatibilityMode,
             config.roomId,
             config.clientId,
             config.keyHex,

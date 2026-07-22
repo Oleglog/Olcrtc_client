@@ -392,6 +392,7 @@ internal class ProfileRepository(
         subscriptions.updateProfile(
             current.copy(
                 name = updated.name,
+                compatibilityMode = updated.compatibilityMode,
                 encryptedConfigJson = secrets.encrypt(updated.configJson),
                 isLocallyModified = true,
                 updatedAt = now,
@@ -453,6 +454,7 @@ internal class ProfileRepository(
                 groupId = 0,
                 type = profile.type,
                 name = profile.name,
+                compatibilityMode = profile.compatibilityMode,
                 encryptedConfigJson = secrets.encrypt(profile.configJson),
                 encryptedUpstreamConfigJson = secrets.encrypt(profile.configJson),
                 identityHash = profile.identityHash,
@@ -470,12 +472,14 @@ internal class ProfileRepository(
         is ImportedProfile.Olcrtc -> PreparedSubscriptionProfile(
             type = "OLCRTC",
             name = profile.value.name,
+            compatibilityMode = profile.value.compatibilityMode.value,
             identityHash = ProfileIdentity.hash(profile.value),
             configJson = profile.value.toJson(),
         )
         is ImportedProfile.Standard -> PreparedSubscriptionProfile(
             type = profile.value.protocol.name,
             name = profile.value.name,
+            compatibilityMode = OlcrtcProfile.CompatibilityMode.CURRENT.value,
             identityHash = ProfileIdentity.hash(profile.value),
             configJson = profile.value.toJson(),
         )
@@ -492,6 +496,7 @@ internal class ProfileRepository(
                     name = profileName,
                     provider = OlcrtcProfile.Provider.parse(value.getString("provider")),
                     transport = OlcrtcProfile.Transport.parse(value.getString("transport")),
+                    compatibilityMode = OlcrtcProfile.CompatibilityMode.parse(compatibilityMode),
                     roomId = value.getString("roomId"),
                     roomPassword = value.stringOrNull("roomPassword"),
                     clientId = value.getString("clientId"),
@@ -514,6 +519,7 @@ internal class ProfileRepository(
         .put("name", name)
         .put("provider", provider.value)
         .put("transport", transport.value)
+        .put("compatibilityMode", compatibilityMode.value)
         .put("roomId", roomId)
         .put("roomPassword", roomPassword)
         .put("clientId", clientId)
@@ -557,6 +563,7 @@ internal class ProfileRepository(
     private data class PreparedSubscriptionProfile(
         val type: String,
         val name: String,
+        val compatibilityMode: String,
         val identityHash: String,
         val configJson: String,
     )
@@ -567,6 +574,7 @@ internal class ProfileRepository(
         name = name,
         provider = provider.value,
         transport = transport.value,
+        compatibilityMode = compatibilityMode.value,
         roomId = roomId,
         roomPassword = roomPassword?.let(secrets::encrypt),
         clientId = clientId,
@@ -582,6 +590,7 @@ internal class ProfileRepository(
         name = name,
         provider = OlcrtcProfile.Provider.parse(provider),
         transport = OlcrtcProfile.Transport.parse(transport),
+        compatibilityMode = OlcrtcProfile.CompatibilityMode.parse(compatibilityMode),
         roomId = roomId,
         roomPassword = roomPassword?.let(secrets::decrypt),
         clientId = clientId,

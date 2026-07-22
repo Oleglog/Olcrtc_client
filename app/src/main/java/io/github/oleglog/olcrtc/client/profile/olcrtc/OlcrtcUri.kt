@@ -9,6 +9,7 @@ object OlcrtcUri {
     private val allowedParameters = setOf(
         "key", "k",
         "transport", "t",
+        "core",
         "vp8_fps", "f",
         "vp8_batch", "b",
         "client_id", "c",
@@ -36,6 +37,9 @@ object OlcrtcUri {
         val transport = parameter(params, "transport", "t")
             ?.let(OlcrtcProfile.Transport::parse)
             ?: OlcrtcProfile.Transport.DATACHANNEL
+        val compatibilityMode = parameter(params, "core")
+            ?.let(OlcrtcProfile.CompatibilityMode::parse)
+            ?: OlcrtcProfile.CompatibilityMode.CURRENT
         // QR payloads use the host; legacy links keep the room in the path.
         val roomId = uri.rawPath
             ?.takeIf { it.isNotBlank() && it != "/" }
@@ -49,6 +53,7 @@ object OlcrtcUri {
             name = uri.rawFragment?.let(::decode).orEmpty(),
             provider = provider,
             transport = transport,
+            compatibilityMode = compatibilityMode,
             roomId = roomId,
             roomPassword = parameter(params, "room_password", "rp"),
             clientId = clientId,
@@ -70,6 +75,7 @@ object OlcrtcUri {
         val query = buildList {
             add("k=${encode(profile.keyHex)}")
             add("t=${encode(profile.transport.value)}")
+            add("core=${encode(profile.compatibilityMode.value)}")
             if (profile.transport == OlcrtcProfile.Transport.VP8CHANNEL) {
                 add("f=${profile.vp8Fps}")
                 add("b=${profile.vp8BatchSize}")

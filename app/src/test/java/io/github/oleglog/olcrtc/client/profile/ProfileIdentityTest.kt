@@ -35,6 +35,17 @@ class ProfileIdentityTest {
     }
 
     @Test
+    fun ignoresLocalCompatibilityMode() {
+        val current = olcrtc(name = "Current", authToken = null)
+        val legacy = current.copy(
+            name = "Legacy",
+            compatibilityMode = OlcrtcProfile.CompatibilityMode.LEGACY,
+        )
+
+        assertEquals(ProfileIdentity.hash(current), ProfileIdentity.hash(legacy))
+    }
+
+    @Test
     fun ignoresInsignificantXhttpJsonWhitespace() {
         val first = xhttp("""{"noSSEHeader":true,"xmux":{"maxConcurrency":"2-4"}}""")
         val second = xhttp(""" { "noSSEHeader" : true, "xmux" : { "maxConcurrency" : "2-4" } } """)

@@ -857,6 +857,13 @@ class OlcrtcVpnService : VpnService() {
         when (profile) {
             is ProfileConfig.Olcrtc -> {
                 olcrtcConfig = NativeOlcrtcConfig.from(profile.value, freeLoopbackPort(), checkNotNull(dns.carrier))
+                diagnostics.append(
+                    "info",
+                    "olcRTC runtime provider=${profile.value.provider.value} " +
+                        "transport=${profile.value.transport.value} " +
+                        "compatibility=${profile.value.compatibilityMode.value} " +
+                        "core=${GomobileCore.coreVersions().olcrtc} routing=${routingPolicy.preset}",
+                )
                 xraySocksPort = freeLoopbackPort(olcrtcConfig.socksPort)
                 xrayConfig = NativeConfig.xray(
                     socksPort = xraySocksPort,

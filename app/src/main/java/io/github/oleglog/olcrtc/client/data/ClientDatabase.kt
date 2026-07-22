@@ -29,6 +29,7 @@ internal data class OlcrtcProfileEntity(
     val name: String,
     val provider: String,
     val transport: String,
+    @ColumnInfo(defaultValue = "'legacy'") val compatibilityMode: String,
     val roomId: String,
     val roomPassword: ByteArray?,
     val clientId: String,
@@ -157,6 +158,7 @@ internal data class SubscriptionProfileEntity(
     val groupId: Long,
     val type: String,
     val name: String,
+    @ColumnInfo(defaultValue = "'legacy'") val compatibilityMode: String,
     val encryptedConfigJson: ByteArray,
     val encryptedUpstreamConfigJson: ByteArray?,
     val identityHash: String,
@@ -417,6 +419,7 @@ internal abstract class SubscriptionDao {
                     } else {
                         incoming.encryptedConfigJson
                     },
+                    compatibilityMode = current.compatibilityMode,
                     isLocallyModified = current.isLocallyModified,
                     isDeleted = false,
                     favorite = current.favorite,
@@ -560,7 +563,7 @@ internal class RoutingRuleRepository(
         AppRoutingEntryEntity::class,
         RoutingRuleEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 internal abstract class ClientDatabase : RoomDatabase() {
@@ -647,6 +650,17 @@ internal abstract class ClientDatabase : RoomDatabase() {
             }
         }
 
+        internal val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE `olcrtc_profiles` ADD COLUMN `compatibilityMode` TEXT NOT NULL DEFAULT 'legacy'",
+                )
+                database.execSQL(
+                    "ALTER TABLE `subscription_profiles` ADD COLUMN `compatibilityMode` TEXT NOT NULL DEFAULT 'legacy'",
+                )
+            }
+        }
+
         fun open(context: Context): ClientDatabase = Room.databaseBuilder(
             context.applicationContext,
             ClientDatabase::class.java,
@@ -659,6 +673,7 @@ internal abstract class ClientDatabase : RoomDatabase() {
             MIGRATION_5_6,
             MIGRATION_6_7,
             MIGRATION_7_8,
+            MIGRATION_8_9,
         )
             .addCallback(localGroupCallback)
             .enableMultiInstanceInvalidation()

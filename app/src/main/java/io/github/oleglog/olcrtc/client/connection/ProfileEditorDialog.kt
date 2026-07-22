@@ -119,6 +119,28 @@ internal object ProfileEditorDialog {
         val name = field(fragment, form, R.string.profile_field_name, profile.name)
         val provider = choice(fragment, form, R.string.profile_field_provider, OlcrtcProfile.Provider.entries, profile.provider)
         val transport = choice(fragment, form, R.string.profile_field_transport, OlcrtcProfile.Transport.entries, profile.transport)
+        val compatibilityMode = choice(
+            fragment,
+            form,
+            R.string.profile_field_compatibility_mode,
+            OlcrtcProfile.CompatibilityMode.entries,
+            profile.compatibilityMode,
+        )
+        val compatibilityDescription = TextView(fragment.requireContext()).apply {
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+            setPadding(4.dp(fragment), 0, 4.dp(fragment), 8.dp(fragment))
+        }.also(form::addView)
+        fun updateCompatibilityDescription() {
+            compatibilityDescription.setText(
+                if (compatibilityMode.selected == OlcrtcProfile.CompatibilityMode.CURRENT) {
+                    R.string.profile_compatibility_current_description
+                } else {
+                    R.string.profile_compatibility_legacy_description
+                },
+            )
+        }
+        compatibilityMode.onSelectionChanged(::updateCompatibilityDescription)
+        updateCompatibilityDescription()
         val roomId = field(fragment, form, R.string.profile_field_room_id, profile.roomId)
         val roomPassword = field(fragment, form, R.string.profile_field_room_password, profile.roomPassword.orEmpty(), secret = true)
         val clientId = field(fragment, form, R.string.profile_field_client_id, profile.clientId)
@@ -143,6 +165,7 @@ internal object ProfileEditorDialog {
                     name = name.requiredValue(fragment.getString(R.string.profile_value_required)),
                     provider = provider.selected,
                     transport = transport.selected,
+                    compatibilityMode = compatibilityMode.selected,
                     roomId = roomId.requiredValue(fragment.getString(R.string.profile_value_required)),
                     roomPassword = roomPassword.optionalValue(),
                     clientId = clientId.requiredValue(fragment.getString(R.string.profile_value_required)),

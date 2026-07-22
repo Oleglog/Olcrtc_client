@@ -20,6 +20,9 @@
     <string name="profile_field_name">Name</string>
     <string name="profile_field_provider">Provider</string>
     <string name="profile_field_transport">Transport</string>
+    <string name="profile_field_compatibility_mode">Core compatibility</string>
+    <string name="profile_compatibility_current_description">current — official olcRTC protocol (36-byte VP8 header)</string>
+    <string name="profile_compatibility_legacy_description">legacy — Olcrtc_manager v1.9.64-compatible protocol (32-byte VP8 header)</string>
     <string name="profile_field_room_id">Room ID</string>
     <string name="profile_field_room_password">Room password</string>
     <string name="profile_field_client_id">Client ID</string>

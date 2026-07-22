@@ -30,9 +30,16 @@
     },
     {
       "name": "olcRTC mobile/core",
+      "source": "https://github.com/openlibrecommunity/olcrtc",
+      "ref": "v0.0.0-20260713124136-42ae4e0c6a1a",
+      "commit": "42ae4e0c6a1af3e01c52cf0149502cc13c326a3f",
+      "license": "WTFPL"
+    },
+    {
+      "name": "Olcrtc_manager legacy VP8 transport",
       "source": "https://github.com/Oleglog/Olcrtc_manager",
-      "ref": "server-v1.9.45",
-      "commit": "10917350c92ca25d47e53d7996f06de6f91c0ecb",
+      "ref": "server-v1.9.64",
+      "commit": "ec536083969fbb0398172192dfb780eb3f031890",
       "license": "WTFPL"
     },
     {

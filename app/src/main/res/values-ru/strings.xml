@@ -21,6 +21,9 @@
     <string name="profile_field_name">Название</string>
     <string name="profile_field_provider">Провайдер</string>
     <string name="profile_field_transport">Транспорт</string>
+    <string name="profile_field_compatibility_mode">Совместимость ядра</string>
+    <string name="profile_compatibility_current_description">current — официальный протокол olcRTC (36-байтовый заголовок VP8)</string>
+    <string name="profile_compatibility_legacy_description">legacy — протокол для Olcrtc_manager v1.9.64 (32-байтовый заголовок VP8)</string>
     <string name="profile_field_room_id">ID комнаты</string>
     <string name="profile_field_room_password">Пароль комнаты</string>
     <string name="profile_field_client_id">ID клиента</string>

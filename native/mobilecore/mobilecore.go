@@ -15,7 +15,10 @@ import (
 	"syscall"
 	"time"
 
+	transportregistry "github.com/openlibrecommunity/olcrtc/internal/transport"
+	currentvp8channel "github.com/openlibrecommunity/olcrtc/internal/transport/vp8channel"
 	olcrtc "github.com/openlibrecommunity/olcrtc/mobile"
+	"github.com/openlibrecommunity/olcrtc/mobilecore/legacyvp8channel"
 	xraynet "github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/session"
 	"github.com/xtls/xray-core/core"
@@ -32,6 +35,7 @@ var (
 	profileProbe       *core.Instance
 	profileProbeOlcrtc bool
 	profileProbeMu     sync.Mutex
+	olcrtcStartMu      sync.Mutex
 )
 
 type SocketProtector interface {
@@ -204,6 +208,7 @@ func validateURLTest(link string, timeoutMillis int) error {
 func StartProfileProbeOlcrtc(
 	provider string,
 	transport string,
+	compatibilityMode string,
 	roomID string,
 	clientID string,
 	keyHex string,
@@ -219,6 +224,7 @@ func StartProfileProbeOlcrtc(
 	if err := StartOlcrtc(
 		provider,
 		transport,
+		compatibilityMode,
 		roomID,
 		clientID,
 		keyHex,
@@ -324,6 +330,7 @@ func runURLTestWithInboundTag(link string, timeoutMillis int, inboundTag string,
 func StartOlcrtc(
 	provider string,
 	transport string,
+	compatibilityMode string,
 	roomID string,
 	clientID string,
 	keyHex string,
@@ -334,11 +341,17 @@ func StartOlcrtc(
 	keepaliveSeconds int,
 	socksPort int,
 ) error {
+	olcrtcStartMu.Lock()
+	defer olcrtcStartMu.Unlock()
+
 	if olcrtc.IsRunning() {
 		return errAlreadyRunning
 	}
 
 	olcrtc.SetProviders()
+	if err := registerVP8Transport(compatibilityMode); err != nil {
+		return err
+	}
 	olcrtc.SetDNS(dnsServer)
 	olcrtc.SetWBToken(authToken)
 	olcrtc.SetVP8Options(vp8FPS, vp8BatchSize)
@@ -354,6 +367,18 @@ func StartOlcrtc(
 		"",
 	); err != nil {
 		return fmt.Errorf("start olcRTC: %w", err)
+	}
+	return nil
+}
+
+func registerVP8Transport(compatibilityMode string) error {
+	switch strings.ToLower(strings.TrimSpace(compatibilityMode)) {
+	case "", "current":
+		transportregistry.Register("vp8channel", currentvp8channel.New)
+	case "legacy":
+		transportregistry.Register("vp8channel", legacyvp8channel.New)
+	default:
+		return fmt.Errorf("unsupported olcRTC compatibility mode: %q", compatibilityMode)
 	}
 	return nil
 }
@@ -389,10 +414,7 @@ func XrayVersion() string {
 }
 
 func OlcrtcVersion() string {
-	if value := dependencyVersion("github.com/openlibrecommunity/olcrtc"); value != "unknown" {
-		return value
-	}
-	return dependencyVersion("github.com/Oleglog/Olcrtc_manager")
+	return dependencyVersion("github.com/openlibrecommunity/olcrtc")
 }
 
 func dependencyVersion(path string) string {

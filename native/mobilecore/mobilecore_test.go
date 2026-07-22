@@ -166,3 +166,14 @@ func TestFatalErrors(t *testing.T) {
 		}
 	}
 }
+
+func TestVP8CompatibilityModes(t *testing.T) {
+	for _, mode := range []string{"", "current", "CURRENT", "legacy", " LEGACY "} {
+		if err := registerVP8Transport(mode); err != nil {
+			t.Fatalf("registerVP8Transport(%q) returned an error: %v", mode, err)
+		}
+	}
+	if err := registerVP8Transport("future"); err == nil {
+		t.Fatal("registerVP8Transport accepted an unsupported mode")
+	}
+}

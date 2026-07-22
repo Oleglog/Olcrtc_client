@@ -6,6 +6,7 @@ data class OlcrtcProfile(
     val name: String,
     val provider: Provider,
     val transport: Transport,
+    val compatibilityMode: CompatibilityMode = CompatibilityMode.CURRENT,
     val roomId: String,
     val roomPassword: String? = null,
     val clientId: String,
@@ -50,6 +51,19 @@ data class OlcrtcProfile(
         companion object {
             fun parse(value: String): Transport = entries.firstOrNull { it.value == value.lowercase() }
                 ?: throw IllegalArgumentException("Unsupported olcRTC transport: $value")
+        }
+    }
+
+    enum class CompatibilityMode(val value: String) {
+        CURRENT("current"),
+        LEGACY("legacy");
+
+        override fun toString(): String = value
+
+        companion object {
+            fun parse(value: String): CompatibilityMode =
+                entries.firstOrNull { it.value == value.trim().lowercase() }
+                    ?: throw IllegalArgumentException("Unsupported olcRTC compatibility mode: $value")
         }
     }
 

@@ -22,6 +22,7 @@ internal fun sessionDns(profile: ProfileConfig, globalDns: String?): SessionDns 
 internal data class NativeOlcrtcConfig(
     val provider: String,
     val transport: String,
+    val compatibilityMode: String,
     val roomId: String,
     val clientId: String,
     val keyHex: String,
@@ -37,6 +38,7 @@ internal data class NativeOlcrtcConfig(
         fun from(profile: OlcrtcProfile, socksPort: Int, dns: DnsEndpoint) = NativeOlcrtcConfig(
             provider = profile.provider.value,
             transport = profile.transport.value,
+            compatibilityMode = profile.compatibilityMode.value,
             roomId = profile.roomId,
             clientId = profile.clientId,
             keyHex = profile.keyHex,
