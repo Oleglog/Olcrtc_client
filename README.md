@@ -71,7 +71,7 @@ Required toolchain:
 - JDK 17.
 - Android SDK 36.
 - Android NDK 28.2.13676358.
-- Go 1.25.x for mobilecore.
+- The Go version declared in `native/mobilecore/go.mod`.
 
 ## Troubleshooting
 

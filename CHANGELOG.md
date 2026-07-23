@@ -9,6 +9,12 @@
 - Added GitHub release parsing and ABI-specific update asset selection primitives.
 - Fixed Android CI issues around URI parsing, minSdk-compatible URL decoding, foreground service type, optional camera feature and package visibility lint.
 
+## 1.3.7 — 2026-07-23
+
+- Rebuilt the bundled mobilecore AAR from official olcRTC commit `42ae4e0c6a1a`, including its isolated control-plane KCP session for current VP8 connections.
+- Forced release builds to compile mobilecore from the pinned source even when a cached AAR exists.
+- Added CI and release checks that verify every bundled `libgojni.so` uses the pinned official core and contains no legacy fork dependencies.
+
 ## 1.3.6 — 2026-07-22
 
 - Updated the bundled official olcRTC core to commit `42ae4e0c6a1a` and removed the client fork replacements.

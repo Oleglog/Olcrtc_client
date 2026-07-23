@@ -32,7 +32,7 @@ jobs:
           successful_runs="$(gh run list --workflow ci.yml --commit "$GITHUB_SHA" --status success --limit 1 --json databaseId --jq 'length')"
           test "$successful_runs" -eq 1 || { echo "A successful CI run for $GITHUB_SHA is required" >&2; exit 1; }
 
-      - name: Cache mobilecore AAR
+      - name: Restore mobilecore build cache
         id: mobilecore-cache
         uses: actions/cache/restore@v4
         with:
@@ -48,7 +48,6 @@ jobs:
           cache: gradle
 
       - uses: actions/setup-go@v5
-        if: steps.mobilecore-cache.outputs.cache-hit != 'true'
         with:
           go-version-file: native/mobilecore/go.mod
           cache: true
@@ -89,7 +88,11 @@ jobs:
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
+          FORCE_NATIVE_REBUILD: "1"
           MOBILECORE_TARGET: android
+
+      - name: Verify mobilecore AAR dependency metadata
+        run: scripts/verify_mobilecore_artifact.sh
 
       - name: Save mobilecore AAR cache
         if: steps.mobilecore-cache.outputs.cache-hit != 'true'

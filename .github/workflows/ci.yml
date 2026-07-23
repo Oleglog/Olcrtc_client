@@ -46,6 +46,9 @@ jobs:
           FORCE_NATIVE_REBUILD: "1"
           MOBILECORE_TARGET: android
 
+      - name: Verify mobilecore AAR dependency metadata
+        run: scripts/verify_mobilecore_artifact.sh
+
       - name: Verify official olcRTC dependency graph
         working-directory: native/mobilecore
         shell: bash
