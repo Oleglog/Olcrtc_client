@@ -9,6 +9,10 @@
 - Added GitHub release parsing and ABI-specific update asset selection primitives.
 - Fixed Android CI issues around URI parsing, minSdk-compatible URL decoding, foreground service type, optional camera feature and package visibility lint.
 
+## 1.3.8 — 2026-07-23
+
+- Preserved fast WBStream carrier authentication failures during native readiness checks so fatal errors stop automatic reconnect loops instead of being replaced with `mobilecore is not running`.
+
 ## 1.3.7 — 2026-07-23
 
 - Rebuilt the bundled mobilecore AAR from official olcRTC commit `42ae4e0c6a1a`, including its isolated control-plane KCP session for current VP8 connections.

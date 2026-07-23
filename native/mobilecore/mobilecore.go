@@ -384,9 +384,8 @@ func registerVP8Transport(compatibilityMode string) error {
 }
 
 func WaitOlcrtcReady(timeoutMillis int) error {
-	if !olcrtc.IsRunning() {
-		return errNotRunning
-	}
+	// WaitReady preserves errors from runs that finish before this call;
+	// an IsRunning precheck would discard those errors.
 	if err := olcrtc.WaitReady(timeoutMillis); err != nil {
 		return fmt.Errorf("wait for olcRTC: %w", err)
 	}
