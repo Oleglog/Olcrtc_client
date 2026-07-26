@@ -9,6 +9,11 @@
 - Added GitHub release parsing and ABI-specific update asset selection primitives.
 - Fixed Android CI issues around URI parsing, minSdk-compatible URL decoding, foreground service type, optional camera feature and package visibility lint.
 
+## 1.3.9 — 2026-07-26
+
+- Reduced tunnel health probe interval from 60 s to 180 s to lower idle background traffic through the VPN tunnel.
+- Refreshed the VPN connections list immediately on tab resume so newly added subscriptions and QR connections appear without restarting the app.
+
 ## 1.3.8 — 2026-07-23
 
 - Preserved fast WBStream carrier authentication failures during native readiness checks so fatal errors stop automatic reconnect loops instead of being replaced with `mobilecore is not running`.
