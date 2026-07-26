@@ -174,6 +174,7 @@ class ConnectionFragment : Fragment() {
         super.onResume()
         activityHost.setVpnStateListener(::showVpnState)
         activityHost.setImportListener(R.id.connectionFragment) { validatePreview(it, R.string.source_deep_link) }
+        loadProfiles()
         ticker.removeCallbacks(dashboardTicker)
         ticker.post(dashboardTicker)
     }

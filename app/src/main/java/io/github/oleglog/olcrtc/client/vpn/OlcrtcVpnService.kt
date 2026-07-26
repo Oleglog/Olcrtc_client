@@ -1398,7 +1398,7 @@ class OlcrtcVpnService : VpnService() {
         private const val CONNECTION_TEST_URL = "https://www.google.com/generate_204"
         private const val CONNECTION_TEST_TIMEOUT_MILLIS = 5_000
         private const val NOTIFICATION_SAMPLE_INTERVAL_SECONDS = 5L
-        private const val TUNNEL_HEALTH_INTERVAL_MILLIS = 60_000L
+        private const val TUNNEL_HEALTH_INTERVAL_MILLIS = 180_000L
         private const val TUNNEL_HEALTH_TIMEOUT_MILLIS = 30_000
         private val RECONNECTABLE_STATES = setOf(
             VpnState.PREPARING,
