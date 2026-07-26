@@ -9,6 +9,11 @@
 - Added GitHub release parsing and ABI-specific update asset selection primitives.
 - Fixed Android CI issues around URI parsing, minSdk-compatible URL decoding, foreground service type, optional camera feature and package visibility lint.
 
+## 1.4.0 — 2026-07-26
+
+- Added a download progress bar to the in-app APK update dialog, showing percent and MB transferred.
+- All Standard (VLESS/VMess/Trojan/SS) profiles are now pinged simultaneously instead of in sequential batches of four; olcRTC profiles remain sequential.
+
 ## 1.3.9 — 2026-07-26
 
 - Reduced tunnel health probe interval from 60 s to 180 s to lower idle background traffic through the VPN tunnel.
