@@ -111,11 +111,35 @@ internal class ApkUpdateInstaller(
         val archive = context.packageManager.getPackageArchiveInfo(apkFile.absolutePath, flags)
             ?: throw IllegalArgumentException("APK package metadata is unreadable")
         require(archive.packageName == expectedPackageName) { "APK package name mismatch" }
-        val expectedDigest = expectedSigningCertSha256.takeIf(String::isNotBlank) ?: return
         val actualDigests = archive.signingCertificateDigests()
-        require(actualDigests.any { it.equals(expectedDigest, ignoreCase = true) }) {
-            "APK signing certificate mismatch"
+        // Normalize the expected digest: strip colons/spaces and lowercase so that both
+        // plain hex ("ab12cd34") and keytool colon format ("AB:12:CD:34") are accepted.
+        val normalizedExpected = expectedSigningCertSha256
+            .replace(":", "").replace(" ", "").lowercase(java.util.Locale.ROOT)
+        val trustedDigests: List<String> = when {
+            normalizedExpected.isNotBlank() -> listOf(normalizedExpected)
+            // No configured cert SHA256: fall back to the cert of the installed app itself,
+            // ensuring the downloaded APK is signed with the same key.
+            else -> installedSigningCertDigests()
         }
+        if (trustedDigests.isNotEmpty()) {
+            require(actualDigests.any { actual -> trustedDigests.any { actual.equals(it, ignoreCase = true) } }) {
+                "APK signing certificate mismatch"
+            }
+        }
+    }
+
+    private fun installedSigningCertDigests(): List<String> {
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            PackageManager.GET_SIGNING_CERTIFICATES
+        } else {
+            @Suppress("DEPRECATION")
+            PackageManager.GET_SIGNATURES
+        }
+        val packageInfo = runCatching {
+            context.packageManager.getPackageInfo(context.packageName, flags)
+        }.getOrNull() ?: return emptyList()
+        return packageInfo.signingCertificateDigests()
     }
 
     private fun PackageInfo.signingCertificateDigests(): List<String> = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {

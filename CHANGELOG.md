@@ -9,6 +9,10 @@
 - Added GitHub release parsing and ABI-specific update asset selection primitives.
 - Fixed Android CI issues around URI parsing, minSdk-compatible URL decoding, foreground service type, optional camera feature and package visibility lint.
 
+## 1.4.1 — 2026-07-26
+
+- Fixed "APK signing certificate mismatch" when updating in-app: the expected certificate digest is now normalized (colons and spaces stripped, lowercased) so both plain hex and keytool colon-separated formats are accepted. When no certificate SHA-256 is configured, the check falls back to comparing against the currently installed app's own signing certificate instead of skipping the check entirely.
+
 ## 1.4.0 — 2026-07-26
 
 - Added a download progress bar to the in-app APK update dialog, showing percent and MB transferred.
