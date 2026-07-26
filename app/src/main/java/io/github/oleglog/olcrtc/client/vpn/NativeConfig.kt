@@ -35,7 +35,6 @@ internal object NativeConfig {
 
     fun profileProbe(profiles: List<StandardProfile>): String {
         require(profiles.isNotEmpty()) { "At least one profile is required" }
-        require(profiles.size <= MAX_PARALLEL_PROBES) { "At most $MAX_PARALLEL_PROBES profiles can be tested at once" }
         val outbounds = profiles.mapIndexed { index, profile ->
             standardOutbound(profile, profileProbeTag(index))
         }
@@ -53,7 +52,7 @@ internal object NativeConfig {
     }
 
     fun profileProbeTag(index: Int): String {
-        require(index in 0 until MAX_PARALLEL_PROBES) { "Invalid profile probe index" }
+        require(index >= 0) { "Invalid profile probe index" }
         return "profile-probe-$index"
     }
 
@@ -227,7 +226,7 @@ internal object NativeConfig {
     private const val DNS_OUT_TAG = "dns-out"
     private const val PRIVATE_DNS_PORT = 853
     private const val LATENCY_TEST_TAG = "latency-test"
-    private const val MAX_PARALLEL_PROBES = 4
+    private const val MAX_PARALLEL_PROBES = 64
     const val VPN_DNS_ADDRESS = "10.0.0.1"
     private val LAN_RANGES = listOf(
         "10.0.0.0/8",

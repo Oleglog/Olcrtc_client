@@ -228,6 +228,7 @@
     <string name="settings_update_incompatible_message">%1$s не соответствует списку ABI устройства. Системный установщик Android может отклонить этот файл.</string>
     <string name="settings_update_install_permission">Разрешите приложению установку APK. Установка продолжится автоматически.</string>
     <string name="settings_update_downloading">Загрузка и проверка APK…</string>
+    <string name="settings_update_download_progress">%1$d%% — %2$s / %3$s</string>
     <string name="settings_update_install_failed">Не удалось открыть системный установщик Android</string>
     <string name="settings_update_current">Установлена последняя известная версия: %1$s</string>
     <string name="settings_update_no_asset">Релиз найден, но совместимого APK-файла нет</string>

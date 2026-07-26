@@ -25,9 +25,10 @@ internal class ProfileLatencyProbe(
     ) {
         GomobileCore.stopProfileProbe()
         try {
-            targets.filter { it.config is ProfileConfig.Standard }
-                .chunked(MAX_PARALLEL_PROBES)
-                .forEach { testStandardGroup(it, onStarted, onResult) }
+            val standardTargets = targets.filter { it.config is ProfileConfig.Standard }
+            if (standardTargets.isNotEmpty()) {
+                testStandardGroup(standardTargets, onStarted, onResult)
+            }
             targets.filter { it.config is ProfileConfig.Olcrtc }
                 .forEach { testOlcrtc(it, onStarted, onResult) }
         } finally {
@@ -98,7 +99,6 @@ internal class ProfileLatencyProbe(
     }
 
     private companion object {
-        const val MAX_PARALLEL_PROBES = 4
         const val TEST_URL = "https://www.google.com/generate_204"
         const val TEST_TIMEOUT_MILLIS = 5_000
         const val LATENCY_TEST_TAG = "latency-test"

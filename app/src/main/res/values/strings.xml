@@ -227,6 +227,7 @@
     <string name="settings_update_incompatible_message">%1$s does not match the device ABI list. The Android installer may reject it.</string>
     <string name="settings_update_install_permission">Allow APK installs for this app. Installation will continue automatically.</string>
     <string name="settings_update_downloading">Downloading and verifying the APK…</string>
+    <string name="settings_update_download_progress">%1$d%% — %2$s / %3$s</string>
     <string name="settings_update_install_failed">Could not open the Android package installer</string>
     <string name="settings_update_current">You are using the latest known version: %1$s</string>
     <string name="settings_update_no_asset">Release found, but no compatible APK asset is available</string>

@@ -31,14 +31,18 @@ internal class ApkUpdateInstaller(
     private val expectedPackageName: String = context.packageName,
     private val expectedSigningCertSha256: String = io.github.oleglog.olcrtc.client.BuildConfig.EXPECTED_SIGNING_CERT_SHA256,
 ) {
-    fun downloadAndVerify(release: GitHubRelease, asset: GitHubRelease.ReleaseAsset): VerifiedApkUpdate {
+    fun downloadAndVerify(
+        release: GitHubRelease,
+        asset: GitHubRelease.ReleaseAsset,
+        onProgress: ((downloaded: Long, total: Long) -> Unit)? = null,
+    ): VerifiedApkUpdate {
         require(asset.downloadUrl.startsWith("https://", ignoreCase = true)) { "APK download must use HTTPS" }
         val checksumAsset = release.assets.firstOrNull { it.name.equals("SHA256SUMS.txt", ignoreCase = true) }
             ?: throw IllegalArgumentException("SHA256SUMS.txt is missing")
         val checksums = UpdateAssetSelector.parseSha256Sums(fetchText(checksumAsset.downloadUrl))
         val expectedSha256 = checksums[asset.name]
             ?: throw IllegalArgumentException("SHA-256 checksum for ${asset.name} is missing")
-        val apkFile = downloadApk(asset)
+        val apkFile = downloadApk(asset, onProgress)
         val actualSha256 = sha256(apkFile)
         require(actualSha256.equals(expectedSha256, ignoreCase = true)) { "APK checksum mismatch" }
         verifyPackage(apkFile)
@@ -55,7 +59,10 @@ internal class ApkUpdateInstaller(
     fun canRequestPackageInstalls(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.O || context.packageManager.canRequestPackageInstalls()
 
-    private fun downloadApk(asset: GitHubRelease.ReleaseAsset): File {
+    private fun downloadApk(
+        asset: GitHubRelease.ReleaseAsset,
+        onProgress: ((downloaded: Long, total: Long) -> Unit)?,
+    ): File {
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
         val file = File(dir, asset.name)
         val connection = URL(asset.downloadUrl).openConnection() as HttpsURLConnection
@@ -64,7 +71,20 @@ internal class ApkUpdateInstaller(
         connection.requestMethod = "GET"
         connection.use {
             require(responseCode in 200..299) { "APK download failed: HTTP $responseCode" }
-            inputStream.use { input -> file.outputStream().use(input::copyTo) }
+            val total = asset.size.takeIf { it > 0 } ?: contentLengthLong.takeIf { it > 0 } ?: 0L
+            var downloaded = 0L
+            inputStream.use { input ->
+                file.outputStream().use { output ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    while (true) {
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        output.write(buffer, 0, read)
+                        downloaded += read
+                        onProgress?.invoke(downloaded, total)
+                    }
+                }
+            }
         }
         return file
     }

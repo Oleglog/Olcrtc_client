@@ -72,7 +72,7 @@ class ConnectionFragment : Fragment() {
     private val connectivity by lazy { requireContext().getSystemService(ConnectivityManager::class.java) }
     private val storage = Executors.newSingleThreadExecutor()
     private val latency = Executors.newSingleThreadExecutor()
-    private val profileProbeWorkers = Executors.newFixedThreadPool(4)
+    private val profileProbeWorkers = Executors.newFixedThreadPool(12)
     private val ticker = Handler(Looper.getMainLooper())
     private val bundleImports = BundleImportDispatcher()
     private var currentState = VpnState.NO_PROFILE

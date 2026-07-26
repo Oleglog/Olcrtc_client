@@ -405,15 +405,55 @@ class MainActivity : AppCompatActivity() {
         }
 
         updateInstallInProgress = true
-        val progress = MaterialAlertDialogBuilder(this)
+        val density = resources.displayMetrics.density
+        val progressIndicator = com.google.android.material.progressindicator.LinearProgressIndicator(this).apply {
+            isIndeterminate = true
+            max = 100
+            trackCornerRadius = (4 * density).toInt()
+        }
+        val progressText = android.widget.TextView(this).apply {
+            setText(R.string.settings_update_downloading)
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
+        }
+        val progressContent = android.widget.LinearLayout(this).apply {
+            orientation = android.widget.LinearLayout.VERTICAL
+            val h = (24 * density).toInt()
+            val v = (16 * density).toInt()
+            setPadding(h, v, h, v)
+            addView(progressText, android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+            ))
+            addView(progressIndicator, android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = (12 * density).toInt() })
+        }
+        val progressDialog = MaterialAlertDialogBuilder(this)
             .setTitle(R.string.settings_check_update)
-            .setMessage(R.string.settings_update_downloading)
+            .setView(progressContent)
             .setCancelable(false)
             .create()
             .also { it.show() }
         lifecycleScope.launch {
             val update = try {
-                withContext(Dispatchers.IO) { installer.downloadAndVerify(release, asset) }
+                withContext(Dispatchers.IO) {
+                    installer.downloadAndVerify(release, asset) { downloaded, total ->
+                        runOnUiThread {
+                            if (total > 0) {
+                                progressIndicator.isIndeterminate = false
+                                val percent = (downloaded * 100 / total).toInt().coerceIn(0, 100)
+                                progressIndicator.setProgressCompat(percent, true)
+                                progressText.text = getString(
+                                    R.string.settings_update_download_progress,
+                                    percent,
+                                    android.text.format.Formatter.formatShortFileSize(this@MainActivity, downloaded),
+                                    android.text.format.Formatter.formatShortFileSize(this@MainActivity, total),
+                                )
+                            }
+                        }
+                    }
+                }
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Throwable) {
@@ -421,7 +461,7 @@ class MainActivity : AppCompatActivity() {
                 return@launch
             } finally {
                 updateInstallInProgress = false
-                runCatching { progress.dismiss() }
+                runCatching { progressDialog.dismiss() }
             }
             stopVpn()
             runCatching { startActivity(installer.installIntent(update)) }
