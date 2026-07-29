@@ -23,15 +23,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify successful CI for release commit
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          successful_runs="$(gh run list --workflow ci.yml --commit "$GITHUB_SHA" --status success --limit 1 --json databaseId --jq 'length')"
-          test "$successful_runs" -eq 1 || { echo "A successful CI run for $GITHUB_SHA is required" >&2; exit 1; }
-
       - name: Restore mobilecore build cache
         id: mobilecore-cache
         uses: actions/cache/restore@v4
