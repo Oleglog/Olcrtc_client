@@ -14,7 +14,6 @@ internal object ProfileIdentity {
         profile.roomPassword,
         profile.clientId,
         profile.keyHex.lowercase(),
-        profile.authToken,
         profile.dnsServer?.let { DnsEndpoint.parse(it).toString() },
         profile.vp8Fps.toString(),
         profile.vp8BatchSize.toString(),

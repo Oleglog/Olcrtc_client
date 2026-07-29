@@ -13,7 +13,6 @@ object OlcrtcUri {
         "vp8_fps", "f",
         "vp8_batch", "b",
         "client_id", "c",
-        "auth_token", "auth.token", "a",
         "dns", "d",
         "room_password", "rp",
         "keepalive", "ka",
@@ -58,7 +57,6 @@ object OlcrtcUri {
             roomPassword = parameter(params, "room_password", "rp"),
             clientId = clientId,
             keyHex = keyHex,
-            authToken = parameter(params, "auth_token", "auth.token", "a"),
             dnsServer = parameter(params, "dns", "d")?.takeIf(String::isNotBlank),
             vp8Fps = integer(params, OlcrtcProfile.LEGACY_VP8_FPS, "vp8_fps", "f"),
             vp8BatchSize = integer(params, OlcrtcProfile.LEGACY_VP8_BATCH, "vp8_batch", "b"),
@@ -71,7 +69,7 @@ object OlcrtcUri {
         )
     }
 
-    fun serialize(profile: OlcrtcProfile, includeAuthToken: Boolean = false): String {
+    fun serialize(profile: OlcrtcProfile): String {
         val query = buildList {
             add("k=${encode(profile.keyHex)}")
             add("t=${encode(profile.transport.value)}")
@@ -82,9 +80,6 @@ object OlcrtcUri {
             }
             add("c=${encode(profile.clientId)}")
             profile.roomPassword?.takeIf(String::isNotEmpty)?.let { add("rp=${encode(it)}") }
-            if (includeAuthToken) {
-                profile.authToken?.takeIf(String::isNotEmpty)?.let { add("a=${encode(it)}") }
-            }
             profile.dnsServer?.let { add("d=${encode(it)}") }
             add("ka=${profile.keepaliveIntervalSeconds}")
         }.joinToString("&")

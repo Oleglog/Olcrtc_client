@@ -145,9 +145,6 @@ internal object ProfileEditorDialog {
         val roomPassword = field(fragment, form, R.string.profile_field_room_password, profile.roomPassword.orEmpty(), secret = true)
         val clientId = field(fragment, form, R.string.profile_field_client_id, profile.clientId)
         val key = field(fragment, form, R.string.profile_field_key, profile.keyHex, secret = true)
-        // Never put the stored credential into the editable view.  A blank value means
-        // "keep the existing token"; typing a value is the explicit replacement.
-        val auth = field(fragment, form, R.string.profile_field_auth_token, "", secret = true)
         val dns = field(fragment, form, R.string.profile_field_dns, profile.dnsServer.orEmpty())
         val advanced = advancedSection(fragment, form)
         val fps = field(fragment, advanced, R.string.profile_field_vp8_fps, profile.vp8Fps.toString(), numeric = true)
@@ -172,7 +169,6 @@ internal object ProfileEditorDialog {
                     keyHex = key.validatedValue(fragment.getString(R.string.profile_key_invalid)) {
                         it.length == 64 && it.all(Char::isHexDigit)
                     },
-                    authToken = preserveSecretValue(auth.optionalValue(), profile.authToken),
                     dnsServer = dns.optionalValue(),
                     vp8Fps = fps.intValue(1..120, fragment.getString(R.string.profile_value_invalid)),
                     vp8BatchSize = batch.intValue(1..64, fragment.getString(R.string.profile_value_invalid)),

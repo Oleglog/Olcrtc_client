@@ -11,7 +11,6 @@ data class OlcrtcProfile(
     val roomPassword: String? = null,
     val clientId: String,
     val keyHex: String,
-    val authToken: String? = null,
     val dnsServer: String? = null,
     val vp8Fps: Int = DEFAULT_VP8_FPS,
     val vp8BatchSize: Int = DEFAULT_VP8_BATCH,

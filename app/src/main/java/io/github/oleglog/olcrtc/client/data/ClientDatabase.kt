@@ -34,7 +34,6 @@ internal data class OlcrtcProfileEntity(
     val roomPassword: ByteArray?,
     val clientId: String,
     val keyHex: ByteArray,
-    val authToken: ByteArray?,
     val dnsServer: String,
     val vp8Fps: Int,
     val vp8BatchSize: Int,

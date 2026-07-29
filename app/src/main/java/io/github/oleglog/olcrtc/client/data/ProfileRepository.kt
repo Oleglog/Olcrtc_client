@@ -132,14 +132,14 @@ internal class ProfileRepository(
     fun getOlcrtc(id: Long): OlcrtcProfile? =
         if (id in 1 until STANDARD_ID_OFFSET) olcrtcProfiles.get(id)?.toProfile() else null
 
-    fun exportProfileUri(id: Long, includeAuthToken: Boolean = false): String {
+    fun exportProfileUri(id: Long): String {
         val profile = get(id) ?: throw IllegalArgumentException("Profile not found")
-        return profile.exportUri(includeAuthToken)
+        return profile.exportUri()
     }
 
-    fun exportSubscriptionProfileUri(profileId: String, includeAuthToken: Boolean = false): String {
+    fun exportSubscriptionProfileUri(profileId: String): String {
         val profile = getSubscriptionProfile(profileId) ?: throw IllegalArgumentException("Subscription profile not found")
-        return profile.exportUri(includeAuthToken)
+        return profile.exportUri()
     }
 
     fun testLocalProfileLatency(id: Long): Long = measureLatency(get(id) ?: throw IllegalArgumentException("Profile not found"))
@@ -501,7 +501,6 @@ internal class ProfileRepository(
                     roomPassword = value.stringOrNull("roomPassword"),
                     clientId = value.getString("clientId"),
                     keyHex = value.getString("keyHex"),
-                    authToken = value.stringOrNull("authToken"),
                     dnsServer = value.stringOrNull("dnsServer"),
                     vp8Fps = value.getInt("vp8Fps"),
                     vp8BatchSize = value.getInt("vp8BatchSize"),
@@ -524,7 +523,6 @@ internal class ProfileRepository(
         .put("roomPassword", roomPassword)
         .put("clientId", clientId)
         .put("keyHex", keyHex)
-        .put("authToken", authToken)
         .put("dnsServer", dnsServer)
         .put("vp8Fps", vp8Fps)
         .put("vp8BatchSize", vp8BatchSize)
@@ -579,7 +577,6 @@ internal class ProfileRepository(
         roomPassword = roomPassword?.let(secrets::encrypt),
         clientId = clientId,
         keyHex = secrets.encrypt(keyHex),
-        authToken = authToken?.let(secrets::encrypt),
         dnsServer = dnsServer.orEmpty(),
         vp8Fps = vp8Fps,
         vp8BatchSize = vp8BatchSize,
@@ -595,7 +592,6 @@ internal class ProfileRepository(
         roomPassword = roomPassword?.let(secrets::decrypt),
         clientId = clientId,
         keyHex = secrets.decrypt(keyHex),
-        authToken = authToken?.let(secrets::decrypt),
         dnsServer = dnsServer.takeIf(String::isNotBlank),
         vp8Fps = vp8Fps,
         vp8BatchSize = vp8BatchSize,
@@ -676,8 +672,8 @@ internal class ProfileRepository(
         dnsServer = stringOrNull("dnsServer"),
     )
 
-    private fun ProfileConfig.exportUri(includeAuthToken: Boolean): String = when (this) {
-        is ProfileConfig.Olcrtc -> OlcrtcUri.serialize(value, includeAuthToken)
+    private fun ProfileConfig.exportUri(): String = when (this) {
+        is ProfileConfig.Olcrtc -> OlcrtcUri.serialize(value)
         is ProfileConfig.Standard -> StandardUri.serialize(value)
     }
 
