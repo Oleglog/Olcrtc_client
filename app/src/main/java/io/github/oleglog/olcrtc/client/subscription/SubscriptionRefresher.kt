@@ -93,7 +93,7 @@ internal class SubscriptionRefresher(
             throw e
         } catch (e: java.util.concurrent.ExecutionException) {
             throw e.cause ?: e
-        } catch (e: java.util.concurrent.InterruptedException) {
+        } catch (e: InterruptedException) {
             task.cancel(true)
             Thread.currentThread().interrupt()
             throw e

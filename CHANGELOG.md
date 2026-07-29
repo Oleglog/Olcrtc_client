@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.4.2 — 2026-07-29
+
+- Subscription refresh now races the primary host under a hard 2s deadline and fails over to the Yandex mirror within ~2s instead of waiting out the full HTTP timeouts when the primary is unreachable. Mitigated the long "stuck on primary" delay when the city-list subscription host is down.
+- Lowered subscription HTTP connect/read timeouts from 15s to 5s; the primary payload is a small plain-text file.
+- Bumped GitHub release retention from 5 to 15 published releases for rollback/regression access.
+
 ## Unreleased
 
 - Added profile import, subscription parsing, multipart QR, GZIP bundle and mirror primitives.
