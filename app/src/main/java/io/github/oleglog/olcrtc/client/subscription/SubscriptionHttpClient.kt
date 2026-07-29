@@ -126,7 +126,7 @@ internal class SubscriptionHttpClient(
     companion object {
         private const val MAX_REDIRECTS = 5
         private const val MAX_RESPONSE_BYTES = 2 * 1024 * 1024
-        private const val TIMEOUT_MS = 15_000
+        private const val TIMEOUT_MS = 5_000
         private val REDIRECT_CODES = setOf(301, 302, 303, 307, 308)
         private val untrustedContext by lazy {
             val trustManager = object : X509TrustManager {

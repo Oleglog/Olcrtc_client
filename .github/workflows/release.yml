@@ -138,13 +138,13 @@ jobs:
           files: release-artifacts/*
           generate_release_notes: true
 
-      - name: Keep latest five GitHub Releases
+      - name: Keep latest fifteen GitHub Releases
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" \
-            --jq 'map(select(.draft == false)) | sort_by(.published_at) | reverse | .[5:][]?.id' |
+            --jq 'map(select(.draft == false)) | sort_by(.published_at) | reverse | .[15:][]?.id' |
           while read -r release_id; do
             gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/${release_id}"
           done

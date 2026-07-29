@@ -9,6 +9,7 @@ import io.github.oleglog.olcrtc.client.profile.ProfileIdentity
 import java.net.URI
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+import java.util.concurrent.Executors
 
 internal class SubscriptionRefresher(
     private val repository: ProfileRepository,
@@ -49,7 +50,7 @@ internal class SubscriptionRefresher(
     ): Source? {
         val source = requireNotNull(repository.getSubscriptionSource(subscriptionId)) { "Subscription not found" }
         return runCatching {
-            refreshPrimary(subscriptionId, source, now, force)
+            runPrimaryWithDeadline(subscriptionId, source, now, force)
             Source.PRIMARY
         }
             .recoverCatching { primaryError ->
@@ -66,6 +67,37 @@ internal class SubscriptionRefresher(
                     null
                 },
             )
+    }
+
+    // ponytail: primary runs on a background thread under a hard deadline so a
+    // hanging primary server fails over to the Yandex mirror in ~PRIMARY_DEADLINE_MS
+    // instead of waiting out the full HTTP timeouts. The abandoned task is
+    // cancelled; its HTTP socket tears down on the next connect/read tick
+    // (<= HTTP TIMEOUT_MS). A short-lived single-thread executor is fine: refresh
+    // runs on the already-serialized subscriptionRefresh/single-thread executor,
+    // so at most one refresh races a primary at a time.
+    private fun runPrimaryWithDeadline(
+        subscriptionId: Long,
+        source: SubscriptionSource,
+        now: Long,
+        force: Boolean,
+    ) {
+        val task = java.util.concurrent.FutureTask {
+            refreshPrimary(subscriptionId, source, now, force)
+        }
+        primaryRaceExecutor.execute(task)
+        try {
+            task.get(PRIMARY_DEADLINE_MS, java.util.concurrent.TimeUnit.MILLISECONDS)
+        } catch (e: java.util.concurrent.TimeoutException) {
+            task.cancel(true)
+            throw e
+        } catch (e: java.util.concurrent.ExecutionException) {
+            throw e.cause ?: e
+        } catch (e: java.util.concurrent.InterruptedException) {
+            task.cancel(true)
+            Thread.currentThread().interrupt()
+            throw e
+        }
     }
 
     fun refreshWithChanges(subscriptionId: Long, now: Long = System.currentTimeMillis()): Result {
@@ -152,5 +184,20 @@ internal class SubscriptionRefresher(
     private companion object {
         const val YANDEX_DOWNLOAD_ENDPOINT =
             "https://cloud-api.yandex.net/v1/disk/public/resources/download?public_key="
+
+        // ponytail: hard deadline for the primary fetch. If the subscription host is
+        // unreachable, fail over to the Yandex mirror within this many milliseconds
+        // instead of waiting out HTTP connect/read timeouts. Bump up if the primary
+        // file genuinely streams slower than this on flaky links.
+        const val PRIMARY_DEADLINE_MS = 2_000L
+
+        // Reused across fresheners so a hung primary thread is abandoned (cancel(true))
+        // and the same worker serves the next race. Single thread: refresh already
+        // serializes upstream on subscriptionRefresh; no two primaries race here.
+        val primaryRaceExecutor by lazy {
+            Executors.newSingleThreadExecutor { r ->
+                Thread(r, "olcrtc-sub-primary").apply { isDaemon = true }
+            }
+        }
     }
 }
