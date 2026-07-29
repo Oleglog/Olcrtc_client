@@ -212,7 +212,6 @@ func StartProfileProbeOlcrtc(
 	roomID string,
 	clientID string,
 	keyHex string,
-	authToken string,
 	dnsServer string,
 	vp8FPS int,
 	vp8BatchSize int,
@@ -228,7 +227,6 @@ func StartProfileProbeOlcrtc(
 		roomID,
 		clientID,
 		keyHex,
-		authToken,
 		dnsServer,
 		vp8FPS,
 		vp8BatchSize,
@@ -334,7 +332,6 @@ func StartOlcrtc(
 	roomID string,
 	clientID string,
 	keyHex string,
-	authToken string,
 	dnsServer string,
 	vp8FPS int,
 	vp8BatchSize int,
@@ -353,7 +350,6 @@ func StartOlcrtc(
 		return err
 	}
 	olcrtc.SetDNS(dnsServer)
-	olcrtc.SetWBToken(authToken)
 	olcrtc.SetVP8Options(vp8FPS, vp8BatchSize)
 	olcrtc.SetLivenessOptions(keepaliveSeconds*1000, 0, 0)
 	if err := olcrtc.StartWithTransport(

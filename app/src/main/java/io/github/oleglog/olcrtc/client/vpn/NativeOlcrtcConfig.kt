@@ -41,7 +41,6 @@ internal data class NativeOlcrtcConfig(
             roomId = profile.roomId,
             clientId = profile.clientId,
             keyHex = profile.keyHex,
-            authToken = "",
             dnsServer = dns.toString(),
             vp8Fps = profile.vp8Fps,
             vp8BatchSize = profile.vp8BatchSize,
