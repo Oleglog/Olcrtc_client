@@ -261,6 +261,38 @@ class ProfileRepositoryTest {
     }
 
     @Test
+    fun preservesStoredMirrorWhenReimportedWithoutMirror() {
+        val subscriptionId = repository.insertSubscription(
+            subscriptionBundle(listOf(ImportedProfile.Standard(profile))),
+            now = 1,
+        )
+        assertEquals("https://example.com/mirror", repository.getSubscriptionSource(subscriptionId)?.mirrorUrl)
+
+        // Re-import the same subscription via a bare /open deep link — no mirror
+        // fields. The stored Yandex fallback must survive; otherwise an "open in
+        // app" re-import silently drops the only path that works when the server
+        // is down or blocked.
+        val bareDeepLinkBundle = SubscriptionBundle(
+            name = "Test subscription",
+            slug = "test",
+            url = "https://example.com/subscription",
+            serverVersion = null,
+            mirrors = emptyList(),
+            mirrorKey = null,
+            deduplication = true,
+            updateWhenConnectedOnly = false,
+            profiles = emptyList(),
+            rejectedProfiles = emptyList(),
+        )
+        val reimportId = repository.insertSubscription(bareDeepLinkBundle, now = 2)
+
+        assertEquals(subscriptionId, reimportId)
+        val source = repository.getSubscriptionSource(reimportId)
+        assertEquals("https://example.com/subscription", source?.url)
+        assertEquals("https://example.com/mirror", source?.mirrorUrl)
+    }
+
+    @Test
     fun restoresOlcrtcSubscriptionProfileAndKind() {
         val profile = ImportedProfile.Olcrtc(OlcrtcProfile(
             name = "olcRTC",

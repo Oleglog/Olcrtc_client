@@ -307,14 +307,22 @@ internal class ProfileRepository(
         val existing = findSubscription(bundle.url)
         val kind = if (bundle.profiles.any { it is ImportedProfile.Olcrtc }) "OLCRTC" else existing?.kind ?: "GENERIC"
         if (existing != null) {
+            // A bare /open deep link (re-import via the web "open in app" page)
+            // carries no mirror fields. Overwriting the stored mirror with null
+            // would drop the Yandex fallback — the only path when the server is
+            // down or blocked. Preserve the existing mirror when the bundle omits
+            // it, and only replace it when a fresh QR/bootstrap bundle supplies one.
+            val mirrorType = mirror?.type?.let(secrets::encrypt) ?: existing.encryptedMirrorType
+            val mirrorUrl = mirror?.url?.let(secrets::encrypt) ?: existing.encryptedMirrorUrl
+            val mirrorKey = bundle.mirrorKey?.let(secrets::encrypt) ?: existing.encryptedMirrorKey
             subscriptions.updateSubscriptionMetadata(
                 existing.copy(
                     kind = kind,
                     encryptedUrl = secrets.encrypt(bundle.url.trim()),
-                    serverVersion = bundle.serverVersion,
-                    encryptedMirrorType = mirror?.type?.let(secrets::encrypt),
-                    encryptedMirrorUrl = mirror?.url?.let(secrets::encrypt),
-                    encryptedMirrorKey = bundle.mirrorKey?.let(secrets::encrypt),
+                    serverVersion = bundle.serverVersion ?: existing.serverVersion,
+                    encryptedMirrorType = mirrorType,
+                    encryptedMirrorUrl = mirrorUrl,
+                    encryptedMirrorKey = mirrorKey,
                     enabled = true,
                 ),
             )

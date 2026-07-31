@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.5 — 2026-07-31
+
+- Re-importing a subscription via a bare `/open` deep link (the web "open in app" page, no mirror fields) no longer wipes the stored Yandex mirror. A repeated open used to overwrite `mirrorType/Url/Key` with null, dropping the only fallback that works when the primary server is down or blocked by allow-lists — now the stored mirror is preserved unless a fresh QR/bootstrap bundle supplies a new one.
+
 ## 1.4.2 — 2026-07-29
 
 - Subscription refresh now races the primary host under a hard 2s deadline and fails over to the Yandex mirror within ~2s instead of waiting out the full HTTP timeouts when the primary is unreachable. Mitigated the long "stuck on primary" delay when the city-list subscription host is down.
