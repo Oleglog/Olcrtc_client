@@ -46,14 +46,19 @@ internal data class NativeOlcrtcConfig(
             vp8BatchSize = profile.vp8BatchSize,
             keepaliveSeconds = profile.keepaliveIntervalSeconds,
             socksPort = socksPort,
-            readyTimeoutMillis = if (profile.provider == OlcrtcProfile.Provider.WBSTREAM) {
-                WBSTREAM_READY_TIMEOUT_MILLIS
-            } else {
-                DEFAULT_READY_TIMEOUT_MILLIS
+            readyTimeoutMillis = when (profile.provider) {
+                OlcrtcProfile.Provider.WBSTREAM -> WBSTREAM_READY_TIMEOUT_MILLIS
+                // Jitsi handshake is multi-stage (MUC join -> Jingle session-initiate
+                // -> bridge negotiation) and far slower to reach ready than a
+                // signaling-only carrier; allow it the same budget as wbstream
+                // instead of the 15s default which fires false-ready timeouts.
+                OlcrtcProfile.Provider.JITSI -> JITSI_READY_TIMEOUT_MILLIS
+                OlcrtcProfile.Provider.TELEMOST -> DEFAULT_READY_TIMEOUT_MILLIS
             },
         )
 
         const val DEFAULT_READY_TIMEOUT_MILLIS = 15_000
         const val WBSTREAM_READY_TIMEOUT_MILLIS = 45_000
+        const val JITSI_READY_TIMEOUT_MILLIS = 45_000
     }
 }

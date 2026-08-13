@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.4.6 — 2026-08-13
+
+- Jitsi ready timeout raised to 45 s (the same budget as WBStream) instead of the 15 s default. The Jitsi handshake is multi-stage (MUC join → Jingle session-initiate → bridge negotiation) and previously tripped false "start timed out" failures on slow rooms before the carrier reached ready.
+- Rebuilt the bundled mobilecore against the Oleglog/j fork carrying two upstream ICE-disco fixes cherry-picked over the existing anonymousdomain handling: `a5b03af` normalizes ICE service URLs advertised over XEP-0215 disco, `9ac7664` rejects malformed colon ICE hosts. Wired through a `replace github.com/zarazaex69/j => github.com/Oleglog/j` in mobilecore's `go.mod` so CI `go mod tidy` resolves the fork; the anonymousdomain path for guest vhosts (e.g. `guest.meet.jit.si`) is preserved.
+
 ## 1.4.5 — 2026-07-31
 
 - Re-importing a subscription via a bare `/open` deep link (the web "open in app" page, no mirror fields) no longer wipes the stored Yandex mirror. A repeated open used to overwrite `mirrorType/Url/Key` with null, dropping the only fallback that works when the primary server is down or blocked by allow-lists — now the stored mirror is preserved unless a fresh QR/bootstrap bundle supplies a new one.
