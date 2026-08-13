@@ -121,4 +121,4 @@ require (
 // Route the transitive zarazaex69/j onto our Oleglog/j fork with the upstream
 // ICE-disco fixes (a5b03af, 9ac7664) cherry-picked over anonymousdomain handling.
 // CI's `go mod tidy` regenerates go.sum; bump the pseudo-version on re-cherry-pick.
-replace github.com/zarazaex69/j => github.com/Oleglog/j v0.0.0-20260813184654-7d2ba0653412
+replace github.com/zarazaex69/j => github.com/Oleglog/j v0.0.0-20260813144654-7d2ba0653412
