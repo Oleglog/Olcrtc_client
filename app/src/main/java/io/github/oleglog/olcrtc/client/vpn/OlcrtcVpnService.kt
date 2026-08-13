@@ -15,6 +15,7 @@ import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.VpnService
 import android.os.Build
+import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
@@ -37,6 +38,8 @@ import io.github.oleglog.olcrtc.client.routing.RoutingSettings
 import io.github.oleglog.olcrtc.client.statistics.ConnectionSessionRepository
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionHttpClient
 import io.github.oleglog.olcrtc.client.subscription.SubscriptionRefresher
+import io.github.oleglog.olcrtc.client.updater.GitHubUpdateClient
+import io.github.oleglog.olcrtc.client.updater.UpdateCheckWire
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.net.InetSocketAddress
@@ -168,6 +171,9 @@ class OlcrtcVpnService : VpnService() {
                 result.source?.wireCode ?: 0,
             )
         }
+
+        override fun checkForUpdate(currentVersion: String): Bundle =
+            checkForUpdateThroughProxy(currentVersion)
 
         override fun testConnectionLatency(): Long = measureConnectionLatency()
 
@@ -557,6 +563,22 @@ class OlcrtcVpnService : VpnService() {
             userHttp = SubscriptionHttpClient(proxy = proxy),
             strictHttp = SubscriptionHttpClient(),
         )
+    }
+
+    // ponytail: route the update check through the same SOCKS-loopback proxy as subscription
+    // refresh so api.github.com rides the tunnel instead of the system routing table (which
+    // sends github direct under RUSSIA_DIRECT and then times out). Failure here returns a
+    // success=false Bundle so MainActivity falls back to a direct request, matching the
+    // no-tunnel case.
+    private fun checkForUpdateThroughProxy(currentVersion: String): Bundle {
+        val socksPort = activeSocksPort ?: return UpdateCheckWire.failure()
+        val proxy = Proxy(
+            Proxy.Type.SOCKS,
+            InetSocketAddress.createUnresolved("127.0.0.1", socksPort),
+        )
+        return runCatching {
+            UpdateCheckWire.pack(GitHubUpdateClient(proxy = proxy, currentVersion = currentVersion).check())
+        }.getOrElse { UpdateCheckWire.failure() }
     }
 
     private fun measureConnectionLatency(): Long {

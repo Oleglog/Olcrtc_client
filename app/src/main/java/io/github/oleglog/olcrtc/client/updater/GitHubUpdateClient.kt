@@ -1,6 +1,7 @@
 package io.github.oleglog.olcrtc.client.updater
 
 import android.os.Build
+import java.net.Proxy
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 
@@ -14,6 +15,10 @@ internal class GitHubUpdateClient(
     private val releaseEndpoint: String = LATEST_RELEASE_URL,
     private val currentVersion: String,
     private val supportedAbis: List<String> = Build.SUPPORTED_ABIS.toList(),
+    // ponytail: optional SOCKS proxy + injectable openConnection mirror SubscriptionHttpClient,
+    // so check-update can ride the VPN-protected loopback proxy when the tunnel is up.
+    private val proxy: Proxy? = null,
+    private val openConnection: (URL, Proxy?) -> HttpsURLConnection = ::defaultOpenConnection,
 ) {
     fun check(): UpdateCheckResult {
         val release = GitHubReleaseParser.parse(fetchText(releaseEndpoint))
@@ -25,7 +30,7 @@ internal class GitHubUpdateClient(
     }
 
     private fun fetchText(url: String): String {
-        val connection = URL(url).openConnection() as HttpsURLConnection
+        val connection = openConnection(URL(url), proxy)
         connection.connectTimeout = TIMEOUT_MILLIS
         connection.readTimeout = TIMEOUT_MILLIS
         connection.requestMethod = "GET"
@@ -46,6 +51,9 @@ internal class GitHubUpdateClient(
     companion object {
         private const val TIMEOUT_MILLIS = 15_000
         private const val LATEST_RELEASE_URL = "https://api.github.com/repos/Oleglog/Olcrtc_client/releases/latest"
+
+        private fun defaultOpenConnection(url: URL, proxy: Proxy?): HttpsURLConnection =
+            (if (proxy == null) url.openConnection() else url.openConnection(proxy)) as HttpsURLConnection
     }
 }
 

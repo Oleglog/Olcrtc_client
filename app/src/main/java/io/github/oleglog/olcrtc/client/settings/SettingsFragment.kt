@@ -46,7 +46,6 @@ import io.github.oleglog.olcrtc.client.routing.RoutingRule
 import io.github.oleglog.olcrtc.client.routing.RoutingSettings
 import io.github.oleglog.olcrtc.client.support.IssueReportBuilder
 import io.github.oleglog.olcrtc.client.support.IssueReportInfo
-import io.github.oleglog.olcrtc.client.updater.GitHubUpdateClient
 import io.github.oleglog.olcrtc.client.updater.GitHubRelease
 import io.github.oleglog.olcrtc.client.updater.UpdateAssetSelector
 import io.github.oleglog.olcrtc.client.updater.VersionComparator
@@ -635,7 +634,7 @@ class SettingsFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             val result = runCatching {
                 withContext(Dispatchers.IO) {
-                    GitHubUpdateClient(currentVersion = BuildConfig.VERSION_NAME).check()
+                    (requireActivity() as MainActivity).checkForUpdateThroughTunnelOrDirect()
                 }
             }
             val binding = _binding ?: return@launch
@@ -668,7 +667,7 @@ class SettingsFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             val release = try {
                 withContext(Dispatchers.IO) {
-                    GitHubUpdateClient(currentVersion = BuildConfig.VERSION_NAME).check().release
+                    (requireActivity() as MainActivity).checkForUpdateThroughTunnelOrDirect().release
                 }
             } catch (error: CancellationException) {
                 throw error

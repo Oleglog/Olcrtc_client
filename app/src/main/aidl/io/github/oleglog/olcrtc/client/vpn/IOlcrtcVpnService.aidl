@@ -1,6 +1,7 @@
 package io.github.oleglog.olcrtc.client.vpn;
 
 import io.github.oleglog.olcrtc.client.vpn.IVpnStateCallback;
+import android.os.Bundle;
 
 interface IOlcrtcVpnService {
     void start(long profileId);
@@ -14,4 +15,5 @@ interface IOlcrtcVpnService {
     int getState();
     void registerCallback(IVpnStateCallback callback);
     void unregisterCallback(IVpnStateCallback callback);
+    Bundle checkForUpdate(String currentVersion);
 }

@@ -45,6 +45,7 @@ import io.github.oleglog.olcrtc.client.updater.ApkUpdateInstaller
 import io.github.oleglog.olcrtc.client.updater.GitHubRelease
 import io.github.oleglog.olcrtc.client.updater.GitHubUpdateClient
 import io.github.oleglog.olcrtc.client.updater.UpdateCheckResult
+import io.github.oleglog.olcrtc.client.updater.UpdateCheckWire
 import io.github.oleglog.olcrtc.client.updater.UpdateInstallAction
 import io.github.oleglog.olcrtc.client.updater.shouldRunAutomaticUpdateCheck
 import io.github.oleglog.olcrtc.client.updater.shouldShowUpdatePrompt
@@ -339,7 +340,7 @@ class MainActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val update = try {
                 withContext(Dispatchers.IO) {
-                    GitHubUpdateClient(currentVersion = BuildConfig.VERSION_NAME).check()
+                    checkForUpdateThroughTunnelOrDirect()
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -507,6 +508,20 @@ class MainActivity : AppCompatActivity() {
             source = values.getOrNull(4)?.let { SubscriptionRefresher.Source.fromWireCode(it) },
         )
     }
+
+    // Returns the last-release check fetched through the VPN SOCKS-loopback proxy, or null when
+    // the tunnel is down or the proxied request failed — callers then fall back to a direct
+    // GitHubUpdateClient.check(), matching the pre-fix behaviour.
+    internal fun checkForUpdate(): UpdateCheckResult? {
+        val bundle = vpn?.checkForUpdate(BuildConfig.VERSION_NAME) ?: return null
+        return UpdateCheckWire.unpack(bundle)
+    }
+
+    // ponytail: prefer the tunnel-routed check (works under RUSSIA_DIRECT where github goes
+    // direct and times out); fall back to a direct request when there is no tunnel or the
+    // proxied fetch failed. Both run on Dispatchers.IO from callers.
+    internal fun checkForUpdateThroughTunnelOrDirect(): UpdateCheckResult =
+        checkForUpdate() ?: GitHubUpdateClient(currentVersion = BuildConfig.VERSION_NAME).check()
 
     fun requestVpnPermission(profileId: Long) {
         pendingProfileId = profileId
