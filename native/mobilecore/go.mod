@@ -3,9 +3,9 @@ module github.com/openlibrecommunity/olcrtc/mobilecore
 go 1.26.3
 
 require (
-	github.com/openlibrecommunity/olcrtc v0.0.0-20260713124136-42ae4e0c6a1a
+	github.com/openlibrecommunity/olcrtc v0.0.0-20260811121518-3339cd367168
 	github.com/pion/rtp v1.10.2
-	github.com/pion/webrtc/v4 v4.2.13
+	github.com/pion/webrtc/v4 v4.2.15
 	github.com/xtaci/kcp-go/v5 v5.6.72
 	github.com/xtls/xray-core v1.260206.0
 )
@@ -56,7 +56,7 @@ require (
 	github.com/pelletier/go-toml v1.9.5 // indirect
 	github.com/pion/datachannel v1.6.0 // indirect
 	github.com/pion/dtls/v3 v3.1.2 // indirect
-	github.com/pion/ice/v4 v4.2.5 // indirect
+	github.com/pion/ice/v4 v4.2.7 // indirect
 	github.com/pion/interceptor v0.1.45 // indirect
 	github.com/pion/logging v0.2.4 // indirect
 	github.com/pion/mdns/v2 v2.1.0 // indirect
@@ -118,7 +118,7 @@ require (
 	rsc.io/qr v0.2.0 // indirect
 )
 
-// Route the transitive zarazaex69/j onto our Oleglog/j fork with the upstream
-// ICE-disco fixes (a5b03af, 9ac7664) cherry-picked over anonymousdomain handling.
+// Route the transitive zarazaex69/j onto our Oleglog/j fork with protected
+// per-session Jitsi HTTP signaling, anonymousdomain, and ICE-disco fixes.
 // CI's `go mod tidy` regenerates go.sum; bump the pseudo-version on re-cherry-pick.
-replace github.com/zarazaex69/j => github.com/Oleglog/j v0.0.0-20260813144654-7d2ba0653412
+replace github.com/zarazaex69/j => github.com/Oleglog/j v0.0.0-20260813164759-98b35e399132

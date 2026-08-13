@@ -3,8 +3,8 @@ set -euo pipefail
 
 readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly AAR="${1:-$ROOT/app/libs/mobilecore.aar}"
-readonly EXPECTED_OLCRTC_VERSION="v0.0.0-20260713124136-42ae4e0c6a1a"
-readonly EXPECTED_J_VERSION="v0.0.0-20260813144654-7d2ba0653412"
+readonly EXPECTED_OLCRTC_VERSION="v0.0.0-20260811121518-3339cd367168"
+readonly EXPECTED_J_VERSION="v0.0.0-20260813164759-98b35e399132"
 readonly -a REQUIRED_LIBRARIES=(
   "jni/arm64-v8a/libgojni.so"
   "jni/armeabi-v7a/libgojni.so"

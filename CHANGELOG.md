@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.7 — 2026-08-13
+
+- Fixed Android Jitsi reconnect loops before MUC join by upgrading the official core and routing config discovery, XMPP WebSocket/BOSH, and Colibri WebSocket through the session's VPN-protected HTTP client. The Oleglog/j fork retains guest `anonymousdomain` handling and the earlier ICE-discovery URL fixes.
+
 ## 1.4.6 — 2026-08-13
 
 - Jitsi ready timeout raised to 45 s (the same budget as WBStream) instead of the 15 s default. The Jitsi handshake is multi-stage (MUC join → Jingle session-initiate → bridge negotiation) and previously tripped false "start timed out" failures on slow rooms before the carrier reached ready.
