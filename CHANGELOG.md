@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.9 — 2026-08-14
+
+- Core wire-format compatibility (legacy 32-byte vs current 36-byte VP8) is now auto-detected from the `core=` parameter the manager pins into each subscription URI, instead of a manual toggle in the profile editor. Pulling a QR from `Olcrtc_manager` sets `core=legacy` and heals to it on the next subscription refresh; `olcrtc-panel-lite` and bare URIs default to `current`. Removed the per-profile compatibility selector from the editor; existing stored values imported from the URI are preserved unchanged.
+
 ## 1.4.8 — 2026-08-13
 
 - Fixed Android Jitsi staying stuck before MUC join on devices where `VpnService.protect(fd)` alone does not pick the working physical network after the TUN is up. The socket protector now also binds each carrier/Xray socket to the current underlying `Network` via `Network.bindSocket` on a duplicated fd (the original fd stays owned by Go), so config discovery, XMPP WebSocket and Colibri traffic follow the chosen physical route instead of the empty TUN route. The path is fail-closed: a failed protect, missing network or failed bind surfaces immediately as a `socket route bind failed` warning instead of the previous uninformative 30 s `config.js` timeout, and a one-shot `socket route protect+bind active` line confirms the route on the next device log.
