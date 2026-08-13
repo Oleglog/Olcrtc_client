@@ -4,6 +4,7 @@ set -euo pipefail
 readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly AAR="${1:-$ROOT/app/libs/mobilecore.aar}"
 readonly EXPECTED_OLCRTC_VERSION="v0.0.0-20260713124136-42ae4e0c6a1a"
+readonly EXPECTED_J_VERSION="v0.0.0-20260813144654-7d2ba0653412"
 readonly -a REQUIRED_LIBRARIES=(
   "jni/arm64-v8a/libgojni.so"
   "jni/armeabi-v7a/libgojni.so"
@@ -46,8 +47,15 @@ for library in "${libraries[@]}"; do
       "$abi" "$EXPECTED_OLCRTC_VERSION" >&2
     exit 1
   fi
-  if grep -E 'github\.com/Oleglog/(Olcrtc_manager|j)([[:space:]]|$)' "$metadata"; then
+  if grep -E 'github\.com/Oleglog/Olcrtc_manager([[:space:]]|$)' "$metadata"; then
     printf 'mobilecore %s contains a forbidden legacy dependency\n' "$abi" >&2
+    exit 1
+  fi
+  if ! awk -v expected="$EXPECTED_J_VERSION" \
+    '$1 == "=>" && $2 == "github.com/Oleglog/j" && $3 == expected { found = 1 } END { exit !found }' \
+    "$metadata"; then
+    printf 'mobilecore %s does not contain the required Oleglog/j version %s\n' \
+      "$abi" "$EXPECTED_J_VERSION" >&2
     exit 1
   fi
 done
