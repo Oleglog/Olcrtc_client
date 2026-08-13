@@ -17,6 +17,7 @@ import android.net.VpnService
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
+import android.os.ParcelFileDescriptor
 import android.os.PowerManager
 import android.os.RemoteCallbackList
 import android.os.RemoteException
@@ -96,6 +97,7 @@ class OlcrtcVpnService : VpnService() {
     private var healthProbeToken = 0L
     private var lastHealthProbeAt = 0L
     @Volatile private var activeNetwork: Network? = null
+    private val socketRouteLogged = AtomicBoolean(false)
 
     private val userUnlockedReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -208,7 +210,7 @@ class OlcrtcVpnService : VpnService() {
         geoAssets = GeoAssetManager(this)
         diagnostics.prune()
         connectivity = getSystemService(ConnectivityManager::class.java)
-        GomobileCore.setProtector(::protect)
+        GomobileCore.setProtector(::protectAndBindSocket)
         GomobileCore.setLogWriter { diagnostics.append("info", "olcRTC core: $it") }
         createNotificationChannel()
         activeNetwork = connectivity.activeNetwork?.takeIf(::isUnderlyingNetwork)
@@ -469,6 +471,7 @@ class OlcrtcVpnService : VpnService() {
             startedAt = SystemClock.elapsedRealtime(),
         )
         connectionAttempt = attempt
+        socketRouteLogged.set(false)
         if (!reconnecting) transition(VpnState.CONNECTING)
         connectionFuture = connectionStartup.submit {
             val result = runCatching {
@@ -596,6 +599,7 @@ class OlcrtcVpnService : VpnService() {
             UnderlyingNetworkChange.REPLACE -> {
                 val previous = activeNetwork
                 activeNetwork = network
+                socketRouteLogged.set(false)
                 reconnectBackoff.reset()
                 reconnectAttemptCount = 0
                 diagnostics.append("info", "Underlying network changed")
@@ -622,6 +626,27 @@ class OlcrtcVpnService : VpnService() {
         val capabilities = connectivity.getNetworkCapabilities(network) ?: return false
         return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
             capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
+    }
+
+    private fun protectAndBindSocket(fd: Int): Boolean {
+        if (!protect(fd)) return false
+        val network = activeNetwork ?: return false
+        val duplicate = runCatching { ParcelFileDescriptor.fromFd(fd) }.getOrElse {
+            diagnostics.append("warning", "socket route bind failed")
+            return false
+        }
+        return runCatching {
+            network.bindSocket(duplicate.fileDescriptor)
+            duplicate.close()
+            if (socketRouteLogged.compareAndSet(false, true)) {
+                diagnostics.append("info", "socket route protect+bind active")
+            }
+            true
+        }.getOrElse {
+            runCatching { duplicate.close() }
+            diagnostics.append("warning", "socket route bind failed")
+            false
+        }
     }
 
     private fun requestNetworkReconnect(delayMillis: Long?) {
@@ -1453,3 +1478,22 @@ internal fun <T> underlyingNetworkChange(
         UnderlyingNetworkChange.LOST
     else -> UnderlyingNetworkChange.KEEP
 }
+
+// ponytail: pure orchestration extracted for unit testing without Android mocking.
+// Orders protect -> resolve network -> bind, and is fail-closed: a failed protect
+// skips bind, a missing network skips bind, a failed bind surfaces as false. The
+// fd duplication (ParcelFileDescriptor.fromFd) and its cleanup stay in the service.
+internal fun tryProtectAndBind(
+    fd: Int,
+    protect: (Int) -> Boolean,
+    activeNetwork: () -> Any?,
+    bind: (network: Any?) -> Unit,
+): Boolean =
+    when {
+        !protect(fd) -> false
+        else -> {
+            val network = activeNetwork()
+            if (network == null) false
+            else runCatching { bind(network); true }.getOrElse { false }
+        }
+    }

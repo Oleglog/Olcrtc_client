@@ -531,4 +531,54 @@ class NativeSessionTest {
             events += "tunnel:close"
         }
     }
+
+    @Test
+    fun protectAndBindBindsAfterProtect() {
+        val calls = mutableListOf<String>()
+        val result = tryProtectAndBind(
+            fd = 7,
+            protect = { calls += "protect($it)"; true },
+            activeNetwork = { calls += "network()"; "wifi" },
+            bind = { calls += "bind($it)"; },
+        )
+        assertTrue(result)
+        assertEquals(listOf("protect(7)", "network()", "bind(wifi)"), calls)
+    }
+
+    @Test
+    fun protectAndBindSkipsBindWhenProtectFails() {
+        val calls = mutableListOf<String>()
+        val result = tryProtectAndBind(
+            fd = 7,
+            protect = { false },
+            activeNetwork = { error("network must not be read") },
+            bind = { error("bind must not run") },
+        )
+        assertFalse(result)
+        assertTrue(calls.isEmpty())
+    }
+
+    @Test
+    fun protectAndBindSkipsBindWhenNetworkMissing() {
+        var bound = false
+        val result = tryProtectAndBind(
+            fd = 7,
+            protect = { true },
+            activeNetwork = { null },
+            bind = { bound = true },
+        )
+        assertFalse(result)
+        assertFalse(bound)
+    }
+
+    @Test
+    fun protectAndBindFailsClosedWhenBindThrows() {
+        val result = tryProtectAndBind(
+            fd = 7,
+            protect = { true },
+            activeNetwork = { "wifi" },
+            bind = { error("bind") },
+        )
+        assertFalse(result)
+    }
 }

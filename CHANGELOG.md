@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.4.8 — 2026-08-13
+
+- Fixed Android Jitsi staying stuck before MUC join on devices where `VpnService.protect(fd)` alone does not pick the working physical network after the TUN is up. The socket protector now also binds each carrier/Xray socket to the current underlying `Network` via `Network.bindSocket` on a duplicated fd (the original fd stays owned by Go), so config discovery, XMPP WebSocket and Colibri traffic follow the chosen physical route instead of the empty TUN route. The path is fail-closed: a failed protect, missing network or failed bind surfaces immediately as a `socket route bind failed` warning instead of the previous uninformative 30 s `config.js` timeout, and a one-shot `socket route protect+bind active` line confirms the route on the next device log.
+
 ## 1.4.7 — 2026-08-13
 
 - Fixed Android Jitsi reconnect loops before MUC join by upgrading the official core and routing config discovery, XMPP WebSocket/BOSH, and Colibri WebSocket through the session's VPN-protected HTTP client. The Oleglog/j fork retains guest `anonymousdomain` handling and the earlier ICE-discovery URL fixes.
