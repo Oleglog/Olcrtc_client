@@ -110,12 +110,21 @@ jobs:
           mkdir -p release-artifacts
           # Extract the signing certificate from the universal APK
           APK_PATH="app/build/outputs/apk/release/app-universal-release.apk"
-          # Find the .RSA file name (usually CERT.RSA or similar)
-          RSA_FILE=$(unzip -l "$APK_PATH" | grep 'META-INF/.*\.RSA' | awk '{print $4}' | head -1)
+
+          # Debug: list META-INF contents
+          echo "=== META-INF contents ==="
+          unzip -l "$APK_PATH" | grep META-INF || true
+          echo "========================"
+
+          # Find certificate file (.RSA or .EC for ECDSA)
+          RSA_FILE=$(unzip -l "$APK_PATH" | grep -E 'META-INF/.*\.(RSA|EC)' | awk '{print $4}' | head -1 || true)
+
           if [ -z "$RSA_FILE" ]; then
-            echo "Error: No .RSA file found in APK" >&2
+            echo "Error: No certificate file (.RSA or .EC) found in APK" >&2
+            echo "This APK may use APK Signature Scheme v2/v3 only (no JAR signature)" >&2
             exit 1
           fi
+
           echo "Found certificate file: $RSA_FILE"
           CERT_SHA256=$(unzip -p "$APK_PATH" "$RSA_FILE" | \
             keytool -printcert -v | \
