@@ -403,8 +403,6 @@
     <string name="vpn_tile_label">olcRTC VPN</string>
     <string name="vpn_tile_connecting">Connecting</string>
     <string name="vpn_native_unavailable">Native VPN components are not installed</string>
-    <string name="statistics_intro">A quiet record of the current connection and recent activity.</string>
-    <string name="statistics_sessions_label">Sessions</string>
     <string name="statistics_duration_label">Duration</string>
     <string name="statistics_total_label">Total</string>
     <string name="statistics_speed_label">Speed</string>

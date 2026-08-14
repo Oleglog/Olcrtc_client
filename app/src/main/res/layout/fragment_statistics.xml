@@ -23,14 +23,6 @@
             android:text="@string/navigation_statistics"
             android:textAppearance="?attr/textAppearanceHeadlineSmall" />
 
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/space_1"
-            android:text="@string/statistics_intro"
-            android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:textColor="?attr/colorOnSurfaceVariant" />
-
         <com.google.android.material.card.MaterialCardView
             android:id="@+id/active_card"
             android:layout_width="match_parent"
@@ -148,7 +140,7 @@
         </com.google.android.material.card.MaterialCardView>
 
         <com.google.android.material.card.MaterialCardView
-            android:id="@+id/today_card"
+            android:id="@+id/range_card"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/space_4"
@@ -164,11 +156,33 @@
                 android:orientation="vertical"
                 android:padding="@dimen/space_4">
 
-                <TextView
-                    android:layout_width="match_parent"
+                <com.google.android.material.button.MaterialButtonToggleGroup
+                    android:id="@+id/range_toggle"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="@string/statistics_today"
-                    android:textAppearance="?attr/textAppearanceTitleMedium" />
+                    app:selectionRequired="true"
+                    app:singleSelection="true">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/range_today"
+                        style="?attr/materialButtonOutlinedStyle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minHeight="0dp"
+                        android:paddingTop="@dimen/space_1"
+                        android:paddingBottom="@dimen/space_1"
+                        android:text="@string/statistics_today" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/range_month"
+                        style="?attr/materialButtonOutlinedStyle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minHeight="0dp"
+                        android:paddingTop="@dimen/space_1"
+                        android:paddingBottom="@dimen/space_1"
+                        android:text="@string/statistics_month" />
+                </com.google.android.material.button.MaterialButtonToggleGroup>
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -182,8 +196,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:orientation="vertical">
-                        <TextView android:id="@+id/today_sessions" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="@style/TextAppearance.Olcrtc.Data" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_1" android:text="@string/statistics_sessions_label" android:textAppearance="?attr/textAppearanceLabelSmall" android:textColor="?attr/colorOnSurfaceVariant" />
+                        <TextView android:id="@+id/range_sessions" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="@style/TextAppearance.Olcrtc.Data" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -191,8 +204,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:orientation="vertical">
-                        <TextView android:id="@+id/today_duration" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="@style/TextAppearance.Olcrtc.Data" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_1" android:text="@string/statistics_duration_label" android:textAppearance="?attr/textAppearanceLabelSmall" android:textColor="?attr/colorOnSurfaceVariant" />
+                        <TextView android:id="@+id/range_duration" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="@style/TextAppearance.Olcrtc.Data" android:typeface="monospace" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -200,8 +212,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:orientation="vertical">
-                        <TextView android:id="@+id/today_download" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="@style/TextAppearance.Olcrtc.Data" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_1" android:text="@string/connection_download" android:textAppearance="?attr/textAppearanceLabelSmall" android:textColor="?attr/colorOnSurfaceVariant" />
+                        <TextView android:id="@+id/range_down" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="@style/TextAppearance.Olcrtc.Data" />
                     </LinearLayout>
 
                     <LinearLayout
@@ -209,50 +220,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:orientation="vertical">
-                        <TextView android:id="@+id/today_upload" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="@style/TextAppearance.Olcrtc.Data" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_1" android:text="@string/connection_upload" android:textAppearance="?attr/textAppearanceLabelSmall" android:textColor="?attr/colorOnSurfaceVariant" />
-                    </LinearLayout>
-                </LinearLayout>
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginTop="@dimen/space_4"
-                    android:layout_marginBottom="@dimen/space_4"
-                    android:alpha="0.35"
-                    android:background="?attr/colorOutline" />
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/statistics_month"
-                    android:textAppearance="?attr/textAppearanceTitleMedium" />
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="@dimen/space_3"
-                    android:baselineAligned="false"
-                    android:orientation="horizontal">
-
-                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-                        <TextView android:id="@+id/month_sessions" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="@style/TextAppearance.Olcrtc.Data" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_1" android:text="@string/statistics_sessions_label" android:textAppearance="?attr/textAppearanceLabelSmall" android:textColor="?attr/colorOnSurfaceVariant" />
-                    </LinearLayout>
-
-                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-                        <TextView android:id="@+id/month_duration" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="@style/TextAppearance.Olcrtc.Data" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_1" android:text="@string/statistics_duration_label" android:textAppearance="?attr/textAppearanceLabelSmall" android:textColor="?attr/colorOnSurfaceVariant" />
-                    </LinearLayout>
-
-                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-                        <TextView android:id="@+id/month_download" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="@style/TextAppearance.Olcrtc.Data" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_1" android:text="@string/connection_download" android:textAppearance="?attr/textAppearanceLabelSmall" android:textColor="?attr/colorOnSurfaceVariant" />
-                    </LinearLayout>
-
-                    <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1" android:orientation="vertical">
-                        <TextView android:id="@+id/month_upload" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="@style/TextAppearance.Olcrtc.Data" />
-                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginTop="@dimen/space_1" android:text="@string/connection_upload" android:textAppearance="?attr/textAppearanceLabelSmall" android:textColor="?attr/colorOnSurfaceVariant" />
+                        <TextView android:id="@+id/range_up" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textAppearance="@style/TextAppearance.Olcrtc.Data" />
                     </LinearLayout>
                 </LinearLayout>
             </LinearLayout>

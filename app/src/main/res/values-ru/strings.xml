@@ -399,8 +399,6 @@
     <string name="vpn_tile_label">olcRTC VPN</string>
     <string name="vpn_tile_connecting">Подключение</string>
     <string name="vpn_native_unavailable">Нативные компоненты VPN не установлены</string>
-    <string name="statistics_intro">Спокойная сводка текущего подключения и недавней активности.</string>
-    <string name="statistics_sessions_label">Сеансы</string>
     <string name="statistics_duration_label">Время</string>
     <string name="statistics_total_label">Всего</string>
     <string name="statistics_speed_label">Скорость</string>

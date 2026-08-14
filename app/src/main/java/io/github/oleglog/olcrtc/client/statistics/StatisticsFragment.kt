@@ -29,7 +29,9 @@ class StatisticsFragment : Fragment() {
     private val storage = Executors.newSingleThreadExecutor()
     private val ticker = Handler(Looper.getMainLooper())
     private var currentSession: ConnectionSessionEntity? = null
+    private var summarySnapshot: StatisticsSummary? = null
     @Volatile private var loadInFlight = false
+    @Volatile private var trafficRangeIsToday = true
     private val refreshCurrent = object : Runnable {
         override fun run() {
             val b = _binding ?: return
@@ -50,6 +52,12 @@ class StatisticsFragment : Fragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View {
         _binding = FragmentStatisticsBinding.inflate(inflater, container, false)
         binding.clearHistory.setOnClickListener { confirmClearHistory() }
+        binding.rangeToggle.check(binding.rangeToday.id)
+        binding.rangeToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            trafficRangeIsToday = checkedId == binding.rangeToday.id
+            summarySnapshot?.let { renderTotals(selected(it)) }
+        }
         return binding.root
     }
 
@@ -104,10 +112,10 @@ class StatisticsFragment : Fragment() {
 
     private fun showSummary(summary: StatisticsSummary) {
         val b = binding
+        summarySnapshot = summary
         currentSession = summary.current
         renderCurrentSession(summary.current)
-        renderTotals(summary.today, b.todaySessions, b.todayDuration, b.todayDownload, b.todayUpload)
-        renderTotals(summary.month, b.monthSessions, b.monthDuration, b.monthDownload, b.monthUpload)
+        renderTotals(selected(summary))
         b.historyList.removeAllViews()
         b.clearHistory.visibility = if (summary.recent.isEmpty()) View.GONE else View.VISIBLE
         if (summary.recent.isEmpty()) {
@@ -117,6 +125,9 @@ class StatisticsFragment : Fragment() {
             summary.recent.take(5).forEach { b.historyList.addView(recentSessionRow(it)) }
         }
     }
+
+    private fun selected(summary: StatisticsSummary): StatisticsTotals =
+        if (trafficRangeIsToday) summary.today else summary.month
 
     private fun recentSessionRow(session: ConnectionSessionEntity): View {
         val started = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(session.startedAt))
@@ -236,29 +247,20 @@ class StatisticsFragment : Fragment() {
         b.activeMetrics.isVisible = true
     }
 
-    private fun renderTotals(
-        totals: StatisticsTotals,
-        sessions: TextView,
-        duration: TextView,
-        download: TextView,
-        upload: TextView,
-    ) {
-        sessions.text = totals.sessions.toString()
-        duration.text = formatDuration(totals.durationMillis)
-        download.text = formatBytes(totals.bytesDown)
-        upload.text = formatBytes(totals.bytesUp)
+    private fun renderTotals(totals: StatisticsTotals) {
+        val b = binding
+        b.rangeSessions.text = totals.sessions.toString()
+        b.rangeDuration.text = formatDuration(totals.durationMillis)
+        b.rangeDown.text = "↓ ${formatBytes(totals.bytesDown)}"
+        b.rangeUp.text = "↑ ${formatBytes(totals.bytesUp)}"
     }
 
     private fun clearTotals() {
         listOf(
-            binding.todaySessions,
-            binding.todayDuration,
-            binding.todayDownload,
-            binding.todayUpload,
-            binding.monthSessions,
-            binding.monthDuration,
-            binding.monthDownload,
-            binding.monthUpload,
+            binding.rangeSessions,
+            binding.rangeDuration,
+            binding.rangeDown,
+            binding.rangeUp,
         ).forEach { it.setText(R.string.statistics_not_available) }
     }
 
