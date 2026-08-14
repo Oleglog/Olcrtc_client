@@ -93,17 +93,7 @@ class SettingsFragment : Fragment() {
                 getString(R.string.settings_system_description),
             )
         }
-        binding.settingsUpdatesRow.setOnClickListener {
-            showActions(
-                R.string.settings_updates_title,
-                intArrayOf(
-                    R.string.settings_check_update,
-                    R.string.settings_choose_release_apk,
-                ),
-                arrayOf(::checkUpdate, ::chooseReleaseAndApk),
-                getString(R.string.settings_updates_description),
-            )
-        }
+        binding.settingsUpdatesRow.setOnClickListener { showUpdatesSettings() }
         binding.settingsDiagnosticsRow.setOnClickListener { showDiagnosticsMenu() }
         binding.settingsAboutRow.setOnClickListener { showAbout() }
         binding.settingsAppearanceSummary.setText(R.string.settings_appearance_summary)
@@ -438,17 +428,51 @@ class SettingsFragment : Fragment() {
             .show()
     }
 
+    private fun showUpdatesSettings() {
+        val content = LinearLayout(requireContext()).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(24.dp, 8.dp, 24.dp, 0)
+            addView(TextView(requireContext()).apply {
+                setText(R.string.settings_updates_description)
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
+                setPadding(0, 0, 0, 12.dp)
+            })
+            addView(MaterialSwitch(requireContext()).apply {
+                setText(R.string.settings_auto_subscription_refresh)
+                isChecked = settings.getAutoSubscriptionRefresh()
+                setOnCheckedChangeListener { _, checked ->
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        withContext(Dispatchers.IO) { settings.setAutoSubscriptionRefresh(checked) }
+                    }
+                }
+            })
+            addView(TextView(requireContext()).apply {
+                setText(R.string.settings_auto_subscription_refresh_description)
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+            })
+        }
+        showActions(
+            R.string.settings_updates_title,
+            intArrayOf(R.string.settings_check_update, R.string.settings_choose_release_apk),
+            arrayOf(::checkUpdate, ::chooseReleaseAndApk),
+            message = null,
+            header = content,
+        )
+    }
+
     private fun showActions(
         title: Int,
         labels: IntArray,
         actions: Array<() -> Unit>,
         message: CharSequence? = null,
+        header: View? = null,
     ) {
         require(labels.size == actions.size)
         var dialog: AlertDialog? = null
         val content = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(24.dp, 8.dp, 24.dp, 0)
+            header?.let { addView(it) }
             message?.let {
                 addView(TextView(requireContext()).apply {
                     text = it

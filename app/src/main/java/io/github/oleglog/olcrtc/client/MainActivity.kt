@@ -33,6 +33,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import io.github.oleglog.olcrtc.client.connection.ConnectionFragment
+import io.github.oleglog.olcrtc.client.data.ProfileRepository
 import io.github.oleglog.olcrtc.client.databinding.ActivityMainBinding
 import io.github.oleglog.olcrtc.client.importer.SubscriptionDeepLinkParser
 import io.github.oleglog.olcrtc.client.profiles.ProfilesFragment
@@ -87,6 +88,8 @@ class MainActivity : AppCompatActivity() {
     private var lastAutomaticUpdateCheckElapsed = 0L
     private val updatePreferences by lazy { getSharedPreferences(UPDATE_PREFERENCES, Context.MODE_PRIVATE) }
     private val systemPreferences by lazy { getSharedPreferences(SYSTEM_PREFERENCES, Context.MODE_PRIVATE) }
+    private val profiles by lazy { ProfileRepository.open(applicationContext) }
+    @Volatile private var subscriptionRefreshedThisSession = false
 
     private val callback = object : IVpnStateCallback.Stub() {
         override fun onStateChanged(state: Int, error: String?, stage: Int, reconnectAttempt: Int) {
@@ -169,6 +172,7 @@ class MainActivity : AppCompatActivity() {
         }
         refreshBackgroundEffects()
         acceptExternalIntent(intent)
+        refreshStaleSubscriptionsOnEntry()
     }
 
     private fun setupMainPager() {
@@ -323,6 +327,26 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageUri))
         }.onFailure {
             Toast.makeText(this, R.string.settings_system_screen_unavailable, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    // ponytail: one refreshStale() per process. onCreate fires only for a true cold
+    // start (new process), never on background return (onStart does that), so a plain
+    // @Volatile flag without persistence is enough to keep it to once per session.
+    // Runs over direct HTTP — the subscription host is reachable without a tunnel,
+    // unlike github (see checkForUpdateThroughTunnelOrDirect).
+    private fun refreshStaleSubscriptionsOnEntry() {
+        val enabled = RoutingSettings.open(applicationContext).getAutoSubscriptionRefresh()
+        if (!shouldRefreshOnColdStart(
+                alreadyRefreshedThisSession = subscriptionRefreshedThisSession,
+                autoRefreshEnabled = enabled,
+            )
+        ) return
+        subscriptionRefreshedThisSession = true
+        lifecycleScope.launch {
+            withContext(Dispatchers.IO) {
+                runCatching { SubscriptionRefresher(profiles).refreshStale() }
+            }
         }
     }
 
@@ -657,6 +681,11 @@ internal fun shouldShowBatteryOptimizationPrompt(
     ignoringOptimizations: Boolean,
     promptHandled: Boolean,
 ): Boolean = !ignoringOptimizations && !promptHandled
+
+internal fun shouldRefreshOnColdStart(
+    alreadyRefreshedThisSession: Boolean,
+    autoRefreshEnabled: Boolean,
+): Boolean = !alreadyRefreshedThisSession && autoRefreshEnabled
 
 internal fun shouldDeliverExternalImportImmediately(
     destinationId: Int,

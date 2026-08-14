@@ -84,6 +84,14 @@ internal class RoutingSettings private constructor(
         store.data.first()[LAST_SUCCESSFUL_PROFILE]?.takeIf(String::isNotBlank)
     }
 
+    fun getAutoSubscriptionRefresh(): Boolean = runBlocking {
+        store.data.first()[AUTO_SUBSCRIPTION_REFRESH] ?: true
+    }
+
+    suspend fun setAutoSubscriptionRefresh(value: Boolean) {
+        store.edit { preferences -> preferences[AUTO_SUBSCRIPTION_REFRESH] = value }
+    }
+
     suspend fun setDnsServer(value: String?) {
         val normalized = value?.let { DnsEndpoint.parse(it).toString() }
         store.edit { preferences ->
@@ -216,6 +224,7 @@ internal class RoutingSettings private constructor(
         private val VPN_SUBSCRIPTION_PROFILE_ID = stringPreferencesKey("vpn_subscription_profile_id")
         private val FAVORITE_LOCAL_PROFILES = stringSetPreferencesKey("favorite_local_profiles")
         private val LAST_SUCCESSFUL_PROFILE = stringPreferencesKey("last_successful_profile")
+        private val AUTO_SUBSCRIPTION_REFRESH = booleanPreferencesKey("auto_subscription_refresh")
 
         @Volatile
         private var instance: RoutingSettings? = null

@@ -207,6 +207,8 @@
     <string name="settings_battery_optimization">Disable battery optimization for this app</string>
     <string name="settings_updates_title">Updates</string>
     <string name="settings_updates_description">Check the latest release or choose the APK variant for this device.</string>
+    <string name="settings_auto_subscription_refresh">Refresh subscriptions on app start</string>
+    <string name="settings_auto_subscription_refresh_description">Automatically update subscriptions once when the app is opened, without a connected tunnel.</string>
     <string name="settings_check_update">Check application update</string>
     <string name="settings_choose_release_apk">Choose APK for latest release</string>
     <string name="settings_choose_apk">APK for %1$s</string>

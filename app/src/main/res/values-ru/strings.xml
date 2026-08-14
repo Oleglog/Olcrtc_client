@@ -208,6 +208,8 @@
     <string name="settings_battery_optimization">Отключить экономию заряда для приложения</string>
     <string name="settings_updates_title">Обновления</string>
     <string name="settings_updates_description">Проверьте последнюю версию или выберите вариант APK для этого устройства.</string>
+    <string name="settings_auto_subscription_refresh">Обновлять подписки при запуске</string>
+    <string name="settings_auto_subscription_refresh_description">Автоматически обновлять подписки один раз при открытии приложения, без подключённого туннеля.</string>
     <string name="settings_check_update">Проверить обновление приложения</string>
     <string name="settings_choose_release_apk">Выбрать APK последнего релиза</string>
     <string name="settings_choose_apk">APK для %1$s</string>
