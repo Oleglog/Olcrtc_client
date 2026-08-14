@@ -1,7 +1,9 @@
 package io.github.oleglog.olcrtc.client.ui
 
+import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.color.DynamicColors
+import com.google.android.material.color.DynamicColorsOptions
 import io.github.oleglog.olcrtc.client.R
 import io.github.oleglog.olcrtc.client.routing.RoutingSettings
 
@@ -22,6 +24,20 @@ internal object AppearanceTheme {
                 activity.theme.applyStyle(R.style.ThemeOverlay_OlcrtcClient_Mono, true)
         }
         if (normalized.palette != RoutingSettings.Appearance.Palette.MONO) {
+            val custom = normalized.accent == RoutingSettings.Appearance.Accent.CUSTOM
+                && normalized.customAccentColor != null
+            if (custom && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                // Derive a full tonal palette from the user's chosen color. On
+                // API < 31 DynamicColors content-based seeding is unavailable,
+                // so we fall back to the neutral base already applied above.
+                DynamicColors.applyToActivityIfAvailable(
+                    activity,
+                    DynamicColorsOptions.Builder()
+                        .setContentBasedSource(normalized.customAccentColor)
+                        .build(),
+                )
+                return
+            }
             val accentOverlay = when (normalized.accent) {
                 RoutingSettings.Appearance.Accent.AUTO -> 0
                 RoutingSettings.Appearance.Accent.TEAL -> R.style.ThemeOverlay_OlcrtcClient_Accent_Teal
@@ -29,6 +45,7 @@ internal object AppearanceTheme {
                 RoutingSettings.Appearance.Accent.VIOLET -> R.style.ThemeOverlay_OlcrtcClient_Accent_Violet
                 RoutingSettings.Appearance.Accent.ROSE -> R.style.ThemeOverlay_OlcrtcClient_Accent_Rose
                 RoutingSettings.Appearance.Accent.AMBER -> R.style.ThemeOverlay_OlcrtcClient_Accent_Amber
+                RoutingSettings.Appearance.Accent.CUSTOM -> 0
             }
             if (accentOverlay != 0) activity.theme.applyStyle(accentOverlay, true)
         }

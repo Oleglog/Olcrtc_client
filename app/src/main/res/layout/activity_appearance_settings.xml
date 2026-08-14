@@ -455,6 +455,7 @@
                                 style="?attr/materialButtonOutlinedStyle"
                                 android:layout_width="48dp"
                                 android:layout_height="48dp"
+                                android:layout_marginEnd="@dimen/space_2"
                                 android:checkable="true"
                                 android:contentDescription="@string/appearance_accent_amber"
                                 android:insetTop="0dp"
@@ -462,6 +463,20 @@
                                 android:minWidth="0dp"
                                 android:text=""
                                 app:backgroundTint="@color/appearance_accent_amber"
+                                app:cornerRadius="16dp" />
+
+                            <com.google.android.material.button.MaterialButton
+                                android:id="@+id/accent_custom"
+                                style="?attr/materialButtonOutlinedStyle"
+                                android:layout_width="96dp"
+                                android:layout_height="48dp"
+                                android:checkable="true"
+                                android:insetTop="0dp"
+                                android:insetBottom="0dp"
+                                android:minWidth="0dp"
+                                android:text="@string/appearance_accent_custom"
+                                android:textSize="11sp"
+                                app:backgroundTint="?attr/colorSurfaceContainerHigh"
                                 app:cornerRadius="16dp" />
                         </LinearLayout>
                     </HorizontalScrollView>

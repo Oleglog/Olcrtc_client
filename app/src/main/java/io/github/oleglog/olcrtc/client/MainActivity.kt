@@ -179,9 +179,11 @@ class MainActivity : AppCompatActivity() {
         binding.mainPager.adapter = MainPagerAdapter(this)
         binding.mainPager.offscreenPageLimit = 1
         binding.mainPager.setPageTransformer { page, position ->
-            val distance = if (appearance.motionEnabled) abs(position).coerceIn(0f, 1f) else 0f
-            page.alpha = 1f - distance * 0.12f
-            page.scaleY = 1f - distance * 0.015f
+            if (!appearance.motionEnabled) return@setPageTransformer
+            val distance = abs(position).coerceIn(0f, 1f)
+            page.alpha = 1f - distance * 0.18f
+            page.translationX = -position * 0.12f * page.width
+            page.scaleY = 1f - distance * 0.02f
         }
         val navigationItems = listOf(
             binding.navigationConnection,

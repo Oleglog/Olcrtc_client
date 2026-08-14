@@ -272,6 +272,11 @@
     <string name="appearance_accent_violet">Violet</string>
     <string name="appearance_accent_rose">Rose</string>
     <string name="appearance_accent_amber">Amber</string>
+    <string name="appearance_accent_custom">Custom</string>
+    <string name="appearance_custom_color_title">Pick an accent color</string>
+    <string name="appearance_custom_color_hue">Hue</string>
+    <string name="appearance_custom_color_saturation">Saturation</string>
+    <string name="appearance_custom_color_value">Brightness</string>
     <string name="appearance_atmosphere_title">Atmosphere</string>
     <string name="appearance_atmosphere_summary">Choose a clean screen, connection glow or slow ambient drift.</string>
     <string name="appearance_glow_intensity">Connection glow</string>
