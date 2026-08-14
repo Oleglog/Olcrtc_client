@@ -3,7 +3,7 @@ module github.com/openlibrecommunity/olcrtc/mobilecore
 go 1.26.3
 
 require (
-	github.com/openlibrecommunity/olcrtc v0.0.0-20260811234728-91dd30d5765f
+	github.com/openlibrecommunity/olcrtc v0.0.0-20260811121518-3339cd367168
 	github.com/pion/rtp v1.10.2
 	github.com/pion/webrtc/v4 v4.2.15
 	github.com/xtaci/kcp-go/v5 v5.6.72
