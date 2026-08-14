@@ -3,9 +3,6 @@ package io.github.oleglog.olcrtc.client.settings
 import android.app.Activity
 import android.content.res.ColorStateList
 import android.os.Bundle
-import android.view.View
-import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.graphics.ColorUtils
@@ -95,7 +92,6 @@ class AppearanceSettingsActivity : AppCompatActivity() {
                 updatePreview()
             }
         }
-        binding.accentCustom.setOnClickListener { openCustomColorPicker() }
         binding.effectGroup.addOnButtonCheckedListener { _, checkedId, checked ->
             if (checked) {
                 applyAtmosphere(checkedId)
@@ -121,13 +117,7 @@ class AppearanceSettingsActivity : AppCompatActivity() {
     }
 
     private fun updatePreview() {
-        val custom = appearance.accent == RoutingSettings.Appearance.Accent.CUSTOM
-            && appearance.palette != RoutingSettings.Appearance.Palette.MONO
-        val color = if (custom) {
-            appearance.customAccentColor ?: ContextCompat.getColor(this, R.color.appearance_accent_teal)
-        } else {
-            ContextCompat.getColor(this, previewColor())
-        }
+        val color = ContextCompat.getColor(this, previewColor())
         val surface = previewSurfaceColor()
         binding.previewCard.setCardBackgroundColor(surface)
         binding.previewCard.strokeColor = color
@@ -180,7 +170,6 @@ class AppearanceSettingsActivity : AppCompatActivity() {
         RoutingSettings.Appearance.Accent.VIOLET -> R.id.accent_violet
         RoutingSettings.Appearance.Accent.ROSE -> R.id.accent_rose
         RoutingSettings.Appearance.Accent.AMBER -> R.id.accent_amber
-        RoutingSettings.Appearance.Accent.CUSTOM -> R.id.accent_custom
     }
 
     private fun accentButtons(): List<MaterialButton> = listOf(
@@ -190,7 +179,6 @@ class AppearanceSettingsActivity : AppCompatActivity() {
         binding.accentViolet,
         binding.accentRose,
         binding.accentAmber,
-        binding.accentCustom,
     )
 
     private fun setAccentSelection(value: RoutingSettings.Appearance.Accent) {
@@ -204,78 +192,6 @@ class AppearanceSettingsActivity : AppCompatActivity() {
                 if (button.isChecked) R.dimen.card_border_active else R.dimen.card_border,
             )
         }
-    }
-
-    private fun openCustomColorPicker() {
-        val initial = appearance.customAccentColor
-            ?: ContextCompat.getColor(this, R.color.appearance_accent_teal)
-        val hsv = FloatArray(3)
-        android.graphics.Color.colorToHSV(initial, hsv)
-        var hue = hsv[0]
-        var sat = hsv[1] * 100f
-        var value = hsv[2] * 100f
-
-        fun currentColor(): Int = android.graphics.Color.HSVToColor(floatArrayOf(hue, sat / 100f, value / 100f))
-
-        val form = LinearLayout(requireContext()).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(24.dp, 8.dp, 24.dp, 0)
-        }
-        val preview = View(requireContext()).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 64.dp)
-            background = android.graphics.drawable.GradientDrawable().apply {
-                shape = android.graphics.drawable.GradientDrawable.RECTANGLE
-                cornerRadius = 14.dp.toFloat()
-                setColor(initial)
-            }
-        }
-        fun syncPreview() {
-            (preview.background as android.graphics.drawable.GradientDrawable).setColor(currentColor())
-        }
-        fun label(textRes: Int): TextView = TextView(requireContext()).apply {
-            text = getString(textRes)
-            setPadding(0, 12.dp, 0, 2.dp)
-            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelLarge)
-            setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
-        }
-        fun makeSlider(
-            initialValue: Float,
-            textRes: Int,
-            onChanged: (Float) -> Unit,
-        ): com.google.android.material.slider.Slider {
-            form.addView(label(textRes))
-            return com.google.android.material.slider.Slider(requireContext()).apply {
-                valueFrom = 0f
-                valueTo = 100f
-                value = initialValue
-                addOnChangeListener { _, value, fromUser ->
-                    if (fromUser) {
-                        onChanged(value)
-                        syncPreview()
-                    }
-                }
-                form.addView(this)
-            }
-        }
-        makeSlider(hue / 3.6f, R.string.appearance_custom_color_hue) { hue = it * 3.6f }
-        makeSlider(sat, R.string.appearance_custom_color_saturation) { sat = it }
-        makeSlider(value, R.string.appearance_custom_color_value) { value = it }
-
-        form.addView(preview, 0)
-
-        androidx.appcompat.app.AlertDialog.Builder(this)
-            .setTitle(R.string.appearance_custom_color_title)
-            .setView(form)
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(android.R.string.ok) { _, _ ->
-                appearance = appearance.copy(
-                    accent = RoutingSettings.Appearance.Accent.CUSTOM,
-                    customAccentColor = currentColor(),
-                ).normalized()
-                setAccentSelection(appearance.accent)
-                updatePreview()
-            }
-            .show()
     }
 
     private fun previewColor(): Int = when {
@@ -380,11 +296,4 @@ class AppearanceSettingsActivity : AppCompatActivity() {
         R.id.intensity_high -> RoutingSettings.BackgroundEffects.Intensity.HIGH
         else -> RoutingSettings.BackgroundEffects.Intensity.MEDIUM
     }
-
-    private fun resolveColor(attribute: Int): Int {
-        val values = requireContext().obtainStyledAttributes(intArrayOf(attribute))
-        return values.getColor(0, 0).also { values.recycle() }
-    }
-
-    private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
 }

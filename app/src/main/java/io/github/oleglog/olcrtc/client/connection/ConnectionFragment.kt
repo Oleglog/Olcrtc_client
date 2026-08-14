@@ -424,7 +424,10 @@ class ConnectionFragment : Fragment() {
             profileProbeResults[item.reference] == null -> getString(R.string.profile_test_unavailable)
             else -> getString(R.string.connection_latency_value, profileProbeResults.getValue(item.reference))
         }
-        views.profileDetail.text = item.type
+        views.profileDetail.text = listOfNotNull(
+            item.type,
+            connectionStatus,
+        ).joinToString(" · ")
         views.profileLatency.text = probeStatus
         views.profileLatency.isVisible = probeStatus != null
         views.profileProgress.isVisible = checkingProfiles.contains(item.reference) ||

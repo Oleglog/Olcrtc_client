@@ -271,11 +271,6 @@
     <string name="appearance_accent_violet">Фиолетовый</string>
     <string name="appearance_accent_rose">Розовый</string>
     <string name="appearance_accent_amber">Янтарный</string>
-    <string name="appearance_accent_custom">Свой</string>
-    <string name="appearance_custom_color_title">Выберите акцентный цвет</string>
-    <string name="appearance_custom_color_hue">Тон</string>
-    <string name="appearance_custom_color_saturation">Насыщенность</string>
-    <string name="appearance_custom_color_value">Яркость</string>
     <string name="appearance_atmosphere_title">Атмосфера</string>
     <string name="appearance_atmosphere_summary">Выберите чистый экран, свечение подключения или медленный фоновый дрейф.</string>
     <string name="appearance_glow_intensity">Свечение подключения</string>

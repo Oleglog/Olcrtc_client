@@ -48,7 +48,6 @@ internal class RoutingSettings private constructor(
         Appearance(
             palette = parseAppearancePalette(preferences[APPEARANCE_PALETTE]),
             accent = parseAppearanceAccent(preferences[APPEARANCE_ACCENT]),
-            customAccentColor = preferences[APPEARANCE_CUSTOM_ACCENT],
             glowIntensity = (preferences[APPEARANCE_GLOW_INTENSITY] ?: 60).coerceIn(0, 100),
             motionEnabled = preferences[APPEARANCE_MOTION] ?: true,
         ).normalized()
@@ -113,9 +112,6 @@ internal class RoutingSettings private constructor(
         store.edit { preferences ->
             preferences[APPEARANCE_PALETTE] = normalized.palette.name
             preferences[APPEARANCE_ACCENT] = normalized.accent.name
-            normalized.customAccentColor?.let {
-                preferences[APPEARANCE_CUSTOM_ACCENT] = it
-            }
             preferences[APPEARANCE_GLOW_INTENSITY] = normalized.glowIntensity
             preferences[APPEARANCE_MOTION] = normalized.motionEnabled
         }
@@ -193,9 +189,8 @@ internal class RoutingSettings private constructor(
     }
 
     data class Appearance(
-        val palette: Palette = Palette.NEUTRAL,
+        val palette: Palette = Palette.SYSTEM,
         val accent: Accent = Accent.AUTO,
-        val customAccentColor: Int? = null,
         val glowIntensity: Int = 60,
         val motionEnabled: Boolean = true,
     ) {
@@ -207,7 +202,7 @@ internal class RoutingSettings private constructor(
             if (palette == Palette.MONO && accent != Accent.AUTO) copy(accent = Accent.AUTO) else this
 
         enum class Palette { SYSTEM, NEUTRAL, BRONZE, BLACK, MONO }
-        enum class Accent { AUTO, TEAL, BLUE, VIOLET, ROSE, AMBER, CUSTOM }
+        enum class Accent { AUTO, TEAL, BLUE, VIOLET, ROSE, AMBER }
     }
 
     companion object {
@@ -220,7 +215,6 @@ internal class RoutingSettings private constructor(
         private val BACKGROUND_EFFECT_INTENSITY = stringPreferencesKey("background_effect_intensity")
         private val APPEARANCE_PALETTE = stringPreferencesKey("appearance_palette")
         private val APPEARANCE_ACCENT = stringPreferencesKey("appearance_accent")
-        private val APPEARANCE_CUSTOM_ACCENT = intPreferencesKey("appearance_custom_accent")
         private val APPEARANCE_GLOW_INTENSITY = intPreferencesKey("appearance_glow_intensity")
         private val APPEARANCE_MOTION = booleanPreferencesKey("appearance_motion")
         private val PER_APP_MODE = stringPreferencesKey("per_app_mode")
@@ -255,10 +249,9 @@ internal fun parseBackgroundEffectStyle(value: String?): RoutingSettings.Backgro
 
 internal fun parseAppearancePalette(value: String?): RoutingSettings.Appearance.Palette = when (value) {
     "SAGE", "POLAR" -> RoutingSettings.Appearance.Palette.NEUTRAL
-    null -> RoutingSettings.Appearance.Palette.NEUTRAL
     else -> value
         ?.let { runCatching { RoutingSettings.Appearance.Palette.valueOf(it) }.getOrNull() }
-        ?: RoutingSettings.Appearance.Palette.NEUTRAL
+        ?: RoutingSettings.Appearance.Palette.SYSTEM
 }
 
 internal fun parseAppearanceAccent(value: String?): RoutingSettings.Appearance.Accent = value
