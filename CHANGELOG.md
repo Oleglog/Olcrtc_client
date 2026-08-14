@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Updated olcRTC core dependency to upstream commit `e6a160f` which includes handshake protocol v3 with client challenge binding (fixes "decrypt failed: bad record magic" on current servers). The native `mobilecore.aar` will be rebuilt in CI with the new handshake implementation.
+- Fixed "APK signing certificate mismatch" during in-app updates by auto-extracting the signing certificate SHA-256 from the built release APK and embedding it in release metadata. Updates no longer depend on a manually configured secret.
+
 ## 1.4.9 — 2026-08-14
 
 - Core wire-format compatibility (legacy 32-byte vs current 36-byte VP8) is now auto-detected from the `core=` parameter the manager pins into each subscription URI, instead of a manual toggle in the profile editor. Pulling a QR from `Olcrtc_manager` sets `core=legacy` and heals to it on the next subscription refresh; `olcrtc-panel-lite` and bare URIs default to `current`. Removed the per-profile compatibility selector from the editor; existing stored values imported from the URI are preserved unchanged.

@@ -103,6 +103,21 @@ jobs:
       - name: Assemble signed release APK
         run: ./gradlew --no-daemon --build-cache :app:assembleRelease
 
+      - name: Extract signing certificate SHA-256
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Extract the signing certificate from the universal APK
+          APK_PATH="app/build/outputs/apk/release/app-universal-release.apk"
+          CERT_SHA256=$(unzip -p "$APK_PATH" META-INF/*.RSA | \
+            keytool -printcert -v | \
+            grep -A1 "SHA256:" | \
+            tail -1 | \
+            tr -d '[:space:]:' | \
+            tr '[:upper:]' '[:lower:]')
+          echo "Extracted certificate SHA-256: $CERT_SHA256"
+          echo "$CERT_SHA256" > release-artifacts/SIGNING_CERT_SHA256.txt
+
       - name: Package release artifacts
         shell: bash
         run: |
@@ -113,6 +128,12 @@ jobs:
           cp app/build/outputs/apk/release/app-armeabi-v7a-release.apk "release-artifacts/olcRTC-Client-${TAG}-armeabi-v7a.apk"
           cp app/build/outputs/apk/release/app-universal-release.apk "release-artifacts/olcRTC-Client-${TAG}-universal.apk"
           (cd release-artifacts && sha256sum *.apk > SHA256SUMS.txt)
+          # Append signing certificate SHA-256 to checksums file
+          if [ -f release-artifacts/SIGNING_CERT_SHA256.txt ]; then
+            echo "" >> release-artifacts/SHA256SUMS.txt
+            echo "# APK Signing Certificate SHA-256:" >> release-artifacts/SHA256SUMS.txt
+            cat release-artifacts/SIGNING_CERT_SHA256.txt >> release-artifacts/SHA256SUMS.txt
+          fi
           cat release-artifacts/SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
