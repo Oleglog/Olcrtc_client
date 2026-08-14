@@ -108,30 +108,30 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-artifacts
-          # Extract the signing certificate from the universal APK
+          # Extract the signing certificate from the universal APK using apksigner
           APK_PATH="app/build/outputs/apk/release/app-universal-release.apk"
 
-          # Debug: list META-INF contents
-          echo "=== META-INF contents ==="
-          unzip -l "$APK_PATH" | grep META-INF || true
-          echo "========================"
+          # Use apksigner to extract certificate from APK Signature Scheme v2/v3
+          APKSIGNER="${ANDROID_HOME}/build-tools/$(ls ${ANDROID_HOME}/build-tools | sort -V | tail -1)/apksigner"
 
-          # Find certificate file (.RSA or .EC for ECDSA)
-          RSA_FILE=$(unzip -l "$APK_PATH" | grep -E 'META-INF/.*\.(RSA|EC)' | awk '{print $4}' | head -1 || true)
+          echo "Using apksigner: $APKSIGNER"
+          echo "=== APK Signature Info ==="
+          "$APKSIGNER" verify --print-certs "$APK_PATH"
+          echo "=========================="
 
-          if [ -z "$RSA_FILE" ]; then
-            echo "Error: No certificate file (.RSA or .EC) found in APK" >&2
-            echo "This APK may use APK Signature Scheme v2/v3 only (no JAR signature)" >&2
+          # Extract SHA-256 from first signer certificate
+          CERT_SHA256=$("$APKSIGNER" verify --print-certs "$APK_PATH" | \
+            grep -i "SHA-256 digest:" | \
+            head -1 | \
+            awk '{print $3}' | \
+            tr -d ':' | \
+            tr '[:upper:]' '[:lower:]')
+
+          if [ -z "$CERT_SHA256" ]; then
+            echo "Error: Could not extract certificate SHA-256 from APK" >&2
             exit 1
           fi
 
-          echo "Found certificate file: $RSA_FILE"
-          CERT_SHA256=$(unzip -p "$APK_PATH" "$RSA_FILE" | \
-            keytool -printcert -v | \
-            grep -A1 "SHA256:" | \
-            tail -1 | \
-            tr -d '[:space:]:' | \
-            tr '[:upper:]' '[:lower:]')
           echo "Extracted certificate SHA-256: $CERT_SHA256"
           echo "$CERT_SHA256" > release-artifacts/SIGNING_CERT_SHA256.txt
 
