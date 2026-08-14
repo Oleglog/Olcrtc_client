@@ -172,24 +172,24 @@ func New(ctx context.Context, cfg transport.Config) (transport.Transport, error)
 		return nil, err
 	}
 
-	session, err := enginebuiltin.Open(ctx, cfg.Carrier, enginebuiltin.Config{
-		RoomURL:   cfg.RoomURL,
-		Name:      cfg.Name,
-		OnData:    nil,
-		DNSServer: cfg.DNSServer,
-		ProxyAddr: cfg.ProxyAddr,
-		ProxyPort: cfg.ProxyPort,
-		Engine:    cfg.Engine,
-		URL:       cfg.URL,
-		Token:     cfg.Token,
-		AuthToken: cfg.AuthToken,
+	session, err := enginebuiltin.Open(ctx, cfg.Provider, enginebuiltin.Config{
+		RoomURL:       cfg.RoomURL,
+		Name:          cfg.Name,
+		OnData:        nil,
+		DNSServer:     cfg.DNSServer,
+		ProxyAddr:     cfg.ProxyAddr,
+		ProxyPort:     cfg.ProxyPort,
+		Engine:        cfg.Engine,
+		URL:           cfg.URL,
+		Token:         cfg.Token,
+		ProviderToken: cfg.ProviderToken,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("open engine session: %w", err)
 	}
 
 	vt, ok := session.(engine.VideoTrackCapable)
-	if !ok || !session.Capabilities().VideoTrack {
+	if !ok {
 		_ = session.Close()
 		return nil, ErrVideoTrackUnsupported
 	}
@@ -559,15 +559,11 @@ func (p *streamTransport) CanSend() bool {
 		len(p.outbound) < cap(p.outbound)*canSendHighWatermark/100
 }
 
-// Features advertises reliable+ordered semantics now that KCP guarantees
-// in-order delivery with retransmits. The upper layer (mux/curl tunnel)
-// can rely on these properties end-to-end.
+// Features advertises the maximum payload size. The transport provides
+// reliable, ordered, message-oriented semantics via KCP.
 func (p *streamTransport) Features() transport.Features {
 	return transport.Features{
-		Reliable:        true,
-		Ordered:         true,
-		MessageOriented: true,
-		MaxPayloadSize:  defaultMaxPayloadSize,
+		MaxPayloadSize: defaultMaxPayloadSize,
 	}
 }
 

@@ -30,11 +30,7 @@ func (v *engineVideoSession) Close() error {
 }
 
 func (v *engineVideoSession) SetReconnectCallback(cb func()) {
-	v.session.SetReconnectCallback(func(*webrtc.DataChannel) {
-		if cb != nil {
-			cb()
-		}
-	})
+	v.session.SetReconnectCallback(cb)
 }
 
 func (v *engineVideoSession) SetShouldReconnect(fn func() bool) { v.session.SetShouldReconnect(fn) }
