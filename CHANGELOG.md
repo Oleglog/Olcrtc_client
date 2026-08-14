@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Updated olcRTC core dependency to upstream commit `e6a160f` which includes handshake protocol v3 with client challenge binding (fixes "decrypt failed: bad record magic" on current servers). The native `mobilecore.aar` will be rebuilt in CI with the new handshake implementation.
+- Updated olcRTC core dependency to upstream commit `91dd30d` (2026-08-11) which includes handshake protocol v3 with client challenge binding (fixes "decrypt failed: bad record magic" on current servers). The native `mobilecore.aar` will be rebuilt in CI with the new handshake implementation.
 - Fixed "APK signing certificate mismatch" during in-app updates by auto-extracting the signing certificate SHA-256 from the built release APK and embedding it in release metadata. Updates no longer depend on a manually configured secret.
 
 ## 1.4.9 — 2026-08-14
