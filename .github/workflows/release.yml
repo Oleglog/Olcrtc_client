@@ -107,9 +107,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p release-artifacts
           # Extract the signing certificate from the universal APK
           APK_PATH="app/build/outputs/apk/release/app-universal-release.apk"
-          CERT_SHA256=$(unzip -p "$APK_PATH" META-INF/*.RSA | \
+          # Find the .RSA file name (usually CERT.RSA or similar)
+          RSA_FILE=$(unzip -l "$APK_PATH" | grep 'META-INF/.*\.RSA' | awk '{print $4}' | head -1)
+          if [ -z "$RSA_FILE" ]; then
+            echo "Error: No .RSA file found in APK" >&2
+            exit 1
+          fi
+          echo "Found certificate file: $RSA_FILE"
+          CERT_SHA256=$(unzip -p "$APK_PATH" "$RSA_FILE" | \
             keytool -printcert -v | \
             grep -A1 "SHA256:" | \
             tail -1 | \
