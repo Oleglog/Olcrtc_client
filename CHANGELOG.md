@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## 1.4.12 — 2026-09-06
+
+- Fixed in-app update failing with "SHA256SUMS.txt is missing" when the update check ran while the VPN was up: UpdateCheckWire packed only the selected APK across the AIDL boundary and dropped the rest of the release assets, so the installer could not find the checksum file. The full asset list now survives the VPN-proxy path.
+
 ## 1.4.11 — 2026-09-06
 
 - Security (issues #49, #50, #51): hardware-backed keystore (StrongBox preferred, TEE fallback), clipboard handling warns about secrets, wipes only its own content after 60s and marks it sensitive on Android 13+; diagnostics redactor covers camelCase JSON/query keys and Go core `name=value` fields without touching plain prose.
