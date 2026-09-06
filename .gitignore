@@ -22,3 +22,4 @@ __pycache__/
 ## local
 olcrtc-client-core-upgrade.md
 temp-files/
+.claude/
