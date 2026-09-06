@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.4.11 — 2026-09-06
+
+- Security (issues #49, #50, #51): hardware-backed keystore (StrongBox preferred, TEE fallback), clipboard handling warns about secrets, wipes only its own content after 60s and marks it sensitive on Android 13+; diagnostics redactor covers camelCase JSON/query keys and Go core `name=value` fields without touching plain prose.
+- Compatibility (issue #52): profile editor filters transports by provider (telemost/wbstream → vp8channel, jitsi → datachannel), matching the server-side matrix.
+- Reliability (issues #47, #48, #53): multi-host tunnel health probes (DNS+HTTPS, single TunnelHealthPolicy), front-door network check in Settings diagnostics, opt-in auto failover across profiles (2 attempts per profile, 1 cycle, favorites → last successful → rest).
+- Removed stale authToken references from tests left by the earlier token cleanup.
+
 ## 1.4.10 — 2026-08-14
 
 - Fixed "APK signing certificate mismatch" during in-app updates by auto-extracting the signing certificate SHA-256 from the built release APK and embedding it in release metadata. Updates no longer depend on a manually configured secret.
