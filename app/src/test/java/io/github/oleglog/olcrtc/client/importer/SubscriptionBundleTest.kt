@@ -16,7 +16,7 @@ class SubscriptionBundleTest {
 
     @Test
     fun parsesCurrentManagerSubscriptionBundle() {
-        val wbstream = "olcrtc://wbstream@r/room?k=${"b".repeat(64)}&t=vp8channel&f=120&b=64&c=client&a=token#WB"
+        val wbstream = "olcrtc://wbstream@r/room?k=${"b".repeat(64)}&t=vp8channel&f=120&b=64&c=client#WB"
         val bundle = SubscriptionBundleParser.parse(
             """{"type":"olcrtc-sub","v":2,"n":"Manager","s":"manager","u":"https://example.com/sub/manager","m":[{"t":"yandex_disk","u":"https://example.com/mirror","e":true,"a":"AES-256-GCM"}],"mk":"AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8","uc":true,"d":true,"p":["$profile","$wbstream"]}""",
         )
@@ -44,7 +44,7 @@ class SubscriptionBundleTest {
 
     @Test
     fun unwrapsManagerInstanceQrResponse() {
-        val uri = "olcrtc://wbstream@r/room?k=${"b".repeat(64)}&t=vp8channel&c=client&a=token"
+        val uri = "olcrtc://wbstream@r/room?k=${"b".repeat(64)}&t=vp8channel&c=client"
 
         assertEquals(uri, ImportPayload.managerProfileUriOrNull("""{"uri":"$uri"}"""))
         assertNull(ImportPayload.managerProfileUriOrNull("""{"type":"olcrtc-sub","v":2}"""))
@@ -100,7 +100,7 @@ class SubscriptionBundleTest {
 
     @Test
     fun dispatchesCompressedWbstreamQrAsProfile() {
-        val raw = "olcrtc://wbstream@r/room?k=${"b".repeat(64)}&t=vp8channel&c=client&a=${"token".repeat(200)}"
+        val raw = "olcrtc://wbstream@r/room?k=${"b".repeat(64)}&t=vp8channel&c=client&rp=${"secret".repeat(200)}"
         val payload = ImportPayload.decode("olcrtc+gz:${encodeGzip(raw)}") as DecodedImportPayload.Profile
 
         assertEquals(raw, payload.uri)

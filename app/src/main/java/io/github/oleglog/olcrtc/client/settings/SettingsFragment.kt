@@ -39,6 +39,7 @@ import io.github.oleglog.olcrtc.client.data.ProfileRepository
 import io.github.oleglog.olcrtc.client.databinding.FragmentSettingsBinding
 import io.github.oleglog.olcrtc.client.diagnostics.DiagnosticsLogStore
 import io.github.oleglog.olcrtc.client.diagnostics.DiagnosticsRedactor
+import io.github.oleglog.olcrtc.client.diagnostics.NetworkDiagnostics
 import io.github.oleglog.olcrtc.client.routing.GeoAssetManager
 import io.github.oleglog.olcrtc.client.routing.PerAppPolicy
 import io.github.oleglog.olcrtc.client.routing.RoutingPolicy
@@ -862,6 +863,7 @@ class SettingsFragment : Fragment() {
                 setTextIsSelectable(true)
             })
             listOf(
+                R.string.settings_run_network_check to ::runNetworkCheck,
                 R.string.settings_view_diagnostics to ::showDiagnosticsLog,
                 R.string.settings_copy_diagnostics to ::copyDiagnostics,
                 R.string.settings_export_diagnostics to ::exportDiagnostics,
@@ -878,6 +880,51 @@ class SettingsFragment : Fragment() {
             .setView(content)
             .setNegativeButton(R.string.cancel, null)
             .show()
+    }
+
+    /**
+     * Issue #53, block 1: direct front-door check answering "what does this
+     * operator let through". Runs off the UI thread; blocks 2-3 (profile
+     * probes through real tunnels) stay on the Connections tab where the
+     * existing per-card results already live.
+     */
+    private fun runNetworkCheck() {
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.settings_network_check_title)
+            .setMessage(getString(R.string.settings_network_check_running))
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+        viewLifecycleOwner.lifecycleScope.launch {
+            val results = withContext(Dispatchers.IO) { NetworkDiagnostics.checkFrontDoors() }
+            val recommendation = NetworkDiagnostics.formatRecommendation(results)
+            val text = buildString {
+                results.forEach { result ->
+                    append(result.label)
+                        .append(" = ")
+                        .append(
+                            if (result.reachable) {
+                                getString(
+                                    R.string.settings_network_check_reachable,
+                                    result.latencyMillis ?: 0,
+                                )
+                            } else {
+                                getString(
+                                    R.string.settings_network_check_blocked,
+                                    result.detail,
+                                )
+                            },
+                        )
+                        .append('\n')
+                }
+                append('\n')
+                append(getString(R.string.settings_network_check_recommendation, recommendation))
+                append('\n')
+                append(getString(R.string.settings_network_check_hint))
+            }
+            if (dialog.isShowing) {
+                dialog.setMessage(text)
+            }
+        }
     }
 
     private fun showDiagnosticsLog() {

@@ -154,6 +154,23 @@ class ConnectionFragment : Fragment() {
         binding.contentStateAction.setOnClickListener { showAddConnectionMenu() }
         binding.testSelected.setOnClickListener { testSelectedProfile() }
         binding.testAllProfiles.setOnClickListener { testAllProfiles() }
+        // Issue #47: Auto failover toggle. Persisted in RoutingSettings,
+        // default off; the service reads it on each failure.
+        binding.autoFailover.isChecked = settings.getAutoFailover()
+        binding.autoFailover.setOnCheckedChangeListener { _, checked ->
+            storage.execute {
+                val saved = runCatching { settings.setAutoFailoverBlocking(checked) }
+                activity?.runOnUiThread {
+                    if (_binding == null) return@runOnUiThread
+                    saved.onFailure { showStatus(it.message) }
+                    showStatus(
+                        getString(
+                            if (checked) R.string.failover_enabled else R.string.failover_disabled,
+                        ),
+                    )
+                }
+            }
+        }
         updateConnectPulse()
     }
 
@@ -334,6 +351,10 @@ class ConnectionFragment : Fragment() {
             menu.add(R.string.edit).setOnMenuItemClickListener {
                 item.localId?.let(::editLocalProfile)
                     ?: editSubscriptionProfile(requireNotNull(item.subscriptionProfileId))
+                true
+            }
+            menu.add(R.string.profile_copy_link).setOnMenuItemClickListener {
+                confirmCopyProfileLink(item)
                 true
             }
             menu.add(R.string.delete).setOnMenuItemClickListener {
@@ -874,12 +895,24 @@ class ConnectionFragment : Fragment() {
         VpnState.PREPARING, VpnState.CONNECTING -> connectionStageText(stage)
         VpnState.CONNECTED -> getString(R.string.vpn_notification_connected)
         VpnState.RECONNECTING -> if (reconnectAttempt > 0) {
-            getString(R.string.vpn_reconnecting_attempt, reconnectAttempt)
+            failoverAttemptName()?.let { name ->
+                getString(R.string.vpn_failover_attempt, name, reconnectAttempt)
+            } ?: getString(R.string.vpn_reconnecting_attempt, reconnectAttempt)
         } else {
             connectionStageText(stage)
         }
         VpnState.STOPPING -> getString(R.string.vpn_notification_stopping)
         VpnState.ERROR -> getString(R.string.vpn_notification_error)
+    }
+
+    /**
+     * Issue #47: during Auto failover the header names the profile currently
+     * being tried ("Trying Telemost…"), so the walk is visible. Returns null
+     * when the active profile is unknown (legacy same-profile retry text).
+     */
+    private fun failoverAttemptName(): String? {
+        val active = activityHost.activeProfileReference() ?: return null
+        return connectionItems.firstOrNull { it.reference == active }?.name
     }
 
     private fun connectionStageText(stage: ConnectionStage): String = getString(
@@ -1264,6 +1297,59 @@ class ConnectionFragment : Fragment() {
                 }.onFailure { showStatus(it.message ?: getString(R.string.invalid_profile)) }
             }
         }
+    }
+
+    private fun confirmCopyProfileLink(item: ConnectionListItem) {
+        if (storage.isShutdown) return
+        storage.execute {
+            val result = runCatching {
+                item.localId?.let(profiles::exportProfileUri)
+                    ?: profiles.exportSubscriptionProfileUri(requireNotNull(item.subscriptionProfileId))
+            }
+            activity?.runOnUiThread {
+                if (_binding == null) return@runOnUiThread
+                result.onSuccess { uri ->
+                    if (ProfileSharePolicy.containsSecrets(uri)) {
+                        MaterialAlertDialogBuilder(requireContext())
+                            .setTitle(R.string.profile_export_secret_warning_title)
+                            .setMessage(R.string.profile_export_secret_warning_message)
+                            .setNegativeButton(R.string.cancel, null)
+                            .setPositiveButton(R.string.copy) { _, _ -> copyProfileLink(uri) }
+                            .show()
+                    } else {
+                        copyProfileLink(uri)
+                    }
+                }.onFailure { showStatus(it.message ?: getString(R.string.invalid_profile)) }
+            }
+        }
+    }
+
+    private fun copyProfileLink(uri: String) {
+        val clipboard = requireContext().getSystemService(ClipboardManager::class.java)
+        clipboard.copySensitive(ProfileSharePolicy.CLIP_LABEL, uri)
+        showStatus(getString(R.string.profile_link_copied))
+        val copy = uri
+        ticker.removeCallbacks(clipboardWipe)
+        ticker.postDelayed(clipboardWipe, ProfileSharePolicy.CLEAR_DELAY_MILLIS)
+        lastCopiedProfileLink = copy
+    }
+
+    private var lastCopiedProfileLink: String? = null
+
+    private val clipboardWipe = Runnable {
+        val clipboard = requireContext().getSystemService(ClipboardManager::class.java)
+        val expected = lastCopiedProfileLink ?: return@Runnable
+        val clip = clipboard.primaryClip
+        if (clip == null || clip.itemCount == 0) {
+            lastCopiedProfileLink = null
+            return@Runnable
+        }
+        val label = clip.description.label
+        val text = clip.getItemAt(0)?.coerceToText(requireContext())
+        if (ProfileSharePolicy.shouldClearClipboard(ProfileSharePolicy.CLIP_LABEL, expected, label, text)) {
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("", ""))
+        }
+        lastCopiedProfileLink = null
     }
 
     private fun confirmDeleteSubscriptionProfile(profileId: String, name: String) {

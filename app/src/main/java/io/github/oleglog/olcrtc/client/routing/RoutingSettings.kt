@@ -92,6 +92,23 @@ internal class RoutingSettings private constructor(
         store.edit { preferences -> preferences[AUTO_SUBSCRIPTION_REFRESH] = value }
     }
 
+    /** Issue #47: "Auto" failover across profiles. Default off (opt-in). */
+    fun getAutoFailover(): Boolean = runBlocking {
+        store.data.first()[AUTO_FAILOVER] ?: false
+    }
+
+    suspend fun setAutoFailover(value: Boolean) {
+        store.edit { preferences -> preferences[AUTO_FAILOVER] = value }
+    }
+
+    /**
+     * Blocking variant for callers without a coroutine scope (plain
+     * background executors). Same write, wrapped in runBlocking.
+     */
+    fun setAutoFailoverBlocking(value: Boolean) = runBlocking {
+        store.edit { preferences -> preferences[AUTO_FAILOVER] = value }
+    }
+
     suspend fun setDnsServer(value: String?) {
         val normalized = value?.let { DnsEndpoint.parse(it).toString() }
         store.edit { preferences ->
@@ -225,6 +242,7 @@ internal class RoutingSettings private constructor(
         private val FAVORITE_LOCAL_PROFILES = stringSetPreferencesKey("favorite_local_profiles")
         private val LAST_SUCCESSFUL_PROFILE = stringPreferencesKey("last_successful_profile")
         private val AUTO_SUBSCRIPTION_REFRESH = booleanPreferencesKey("auto_subscription_refresh")
+        private val AUTO_FAILOVER = booleanPreferencesKey("auto_failover")
 
         @Volatile
         private var instance: RoutingSettings? = null

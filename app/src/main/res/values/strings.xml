@@ -112,6 +112,11 @@
     <string name="profile_key_invalid">The key must contain exactly 64 hexadecimal characters</string>
     <string name="profile_export_secret_warning_title">Copy profile link?</string>
     <string name="profile_export_secret_warning_message">Profile links contain connection secrets. Share them only with people you trust.</string>
+    <string name="profile_copy_link">Copy link</string>
+    <string name="profile_link_copied">Profile link copied. It will be cleared from the clipboard in a minute.</string>
+    <string name="failover_auto">Auto: try other connections on failure</string>
+    <string name="failover_enabled">Auto failover on: the app will try other connections after 2 failed attempts</string>
+    <string name="failover_disabled">Auto failover off: the app will keep retrying the same connection</string>
     <string name="profile_delete_title">Delete profile?</string>
     <string name="profile_delete_message">Delete %1$s?</string>
     <string name="delete">Delete</string>
@@ -312,6 +317,13 @@
     <string name="settings_diagnostics_network_unknown">Unavailable</string>
     <string name="settings_diagnostics_reconnecting">Restoring connection</string>
     <string name="settings_diagnostics_copied">Redacted diagnostics copied</string>
+    <string name="settings_run_network_check">Check carrier reachability</string>
+    <string name="settings_network_check_title">Network check</string>
+    <string name="settings_network_check_running">Probing Jitsi, Telemost and WBStream front doors…</string>
+    <string name="settings_network_check_reachable">reachable (%1$d ms)</string>
+    <string name="settings_network_check_blocked">blocked (%1$s)</string>
+    <string name="settings_network_check_recommendation">Recommended carrier: %1$s.</string>
+    <string name="settings_network_check_hint">Direct front-door check only. To test real tunnels, use “Check all connections” on the Connections tab.</string>
     <string name="routing_all_vpn">All traffic through VPN</string>
     <string name="routing_russia_direct">Russian resources directly</string>
     <string name="routing_mode_russia">For Russia</string>
@@ -379,6 +391,7 @@
     <string name="vpn_notification_stopping">Stopping</string>
     <string name="vpn_notification_error">Connection error</string>
     <string name="vpn_reconnecting_attempt">Restoring connection · attempt %1$d</string>
+    <string name="vpn_failover_attempt">Trying %1$s · attempt %2$d</string>
     <string name="vpn_stage_load_profile">Loading connection</string>
     <string name="vpn_stage_wait_network">Waiting for network</string>
     <string name="vpn_stage_prepare_assets">Preparing routing</string>

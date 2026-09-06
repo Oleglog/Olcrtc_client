@@ -17,8 +17,8 @@ class ProfileIdentityTest {
 
     @Test
     fun includesSecretsAndDistinguishesNullFromEmpty() {
-        val first = olcrtc(name = "First", authToken = "token")
-        val second = olcrtc(name = "Second", authToken = "other-token")
+        val first = olcrtc(name = "First", roomPassword = "one")
+        val second = olcrtc(name = "Second", roomPassword = "other")
         val withoutServerName = standard(serverName = null)
         val emptyServerName = standard(serverName = "")
 
@@ -28,15 +28,15 @@ class ProfileIdentityTest {
 
     @Test
     fun normalizesEquivalentDnsEndpoints() {
-        val first = olcrtc(name = "First", authToken = null, dnsServer = "[2001:db8::1]:53")
-        val second = olcrtc(name = "Second", authToken = null, dnsServer = "[2001:db8:0:0:0:0:0:1]:53")
+        val first = olcrtc(name = "First", dnsServer = "[2001:db8::1]:53")
+        val second = olcrtc(name = "Second", dnsServer = "[2001:db8:0:0:0:0:0:1]:53")
 
         assertEquals(ProfileIdentity.hash(first), ProfileIdentity.hash(second))
     }
 
     @Test
     fun ignoresLocalCompatibilityMode() {
-        val current = olcrtc(name = "Current", authToken = null)
+        val current = olcrtc(name = "Current")
         val legacy = current.copy(
             name = "Legacy",
             compatibilityMode = OlcrtcProfile.CompatibilityMode.LEGACY,
@@ -53,14 +53,14 @@ class ProfileIdentityTest {
         assertEquals(ProfileIdentity.hash(first), ProfileIdentity.hash(second))
     }
 
-    private fun olcrtc(name: String, authToken: String?, dnsServer: String? = null) = OlcrtcProfile(
+    private fun olcrtc(name: String, roomPassword: String? = null, dnsServer: String? = null) = OlcrtcProfile(
         name = name,
         provider = OlcrtcProfile.Provider.WBSTREAM,
         transport = OlcrtcProfile.Transport.VP8CHANNEL,
         roomId = "room",
+        roomPassword = roomPassword,
         clientId = "client",
         keyHex = "a".repeat(64),
-        authToken = authToken,
         dnsServer = dnsServer,
     )
 

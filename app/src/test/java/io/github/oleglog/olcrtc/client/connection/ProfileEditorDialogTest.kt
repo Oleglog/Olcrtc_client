@@ -2,8 +2,8 @@ package io.github.oleglog.olcrtc.client.connection
 
 import io.github.oleglog.olcrtc.client.data.ProfileConfig
 import io.github.oleglog.olcrtc.client.profile.olcrtc.OlcrtcProfile
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -32,5 +32,30 @@ class ProfileEditorDialogTest {
         assertEquals("stored", preserveSecretValue(null, "stored"))
         assertEquals("replacement", preserveSecretValue("replacement", "stored"))
         assertNull(preserveSecretValue(null, null))
+    }
+
+    @Test
+    fun compatibleTransportsMatchProviderSupport() {
+        assertEquals(
+            listOf(OlcrtcProfile.Transport.VP8CHANNEL),
+            compatibleTransports(OlcrtcProfile.Provider.WBSTREAM),
+        )
+        assertEquals(
+            listOf(OlcrtcProfile.Transport.VP8CHANNEL),
+            compatibleTransports(OlcrtcProfile.Provider.TELEMOST),
+        )
+        assertEquals(
+            listOf(OlcrtcProfile.Transport.DATACHANNEL),
+            compatibleTransports(OlcrtcProfile.Provider.JITSI),
+        )
+        OlcrtcProfile.Provider.entries.forEach { provider ->
+            OlcrtcProfile.Transport.entries.forEach { transport ->
+                assertEquals(
+                    "$provider+$transport",
+                    provider.supports(transport),
+                    transport in compatibleTransports(provider),
+                )
+            }
+        }
     }
 }

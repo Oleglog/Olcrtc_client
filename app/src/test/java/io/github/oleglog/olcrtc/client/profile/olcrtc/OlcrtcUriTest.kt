@@ -1,7 +1,6 @@
 package io.github.oleglog.olcrtc.client.profile.olcrtc
 
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -12,13 +11,12 @@ class OlcrtcUriTest {
     @Test
     fun parsesCurrentManagerQrUri() {
         val profile = OlcrtcUri.parse(
-            "olcrtc://wbstream@r/room%2Fone?k=$key&t=vp8channel&f=120&b=64&c=android%20client&a=token%2Bvalue&d=1.1.1.1%3A53#Main+instance",
+            "olcrtc://wbstream@r/room%2Fone?k=$key&t=vp8channel&f=120&b=64&c=android%20client&d=1.1.1.1%3A53#Main+instance",
         )
 
         assertEquals("Main instance", profile.name)
         assertEquals("room/one", profile.roomId)
         assertEquals("android client", profile.clientId)
-        assertEquals("token+value", profile.authToken)
         assertEquals("1.1.1.1:53", profile.dnsServer)
         assertEquals(120, profile.vp8Fps)
         assertEquals(64, profile.vp8BatchSize)
@@ -30,13 +28,12 @@ class OlcrtcUriTest {
     @Test
     fun parsesCompactUri() {
         val profile = OlcrtcUri.parse(
-            "olcrtc://wbstream@r/room%201?k=$key&t=vp8channel&f=120&b=64&c=client%201&a=token&d=77.88.8.8%3A53&ka=15#Main%20profile",
+            "olcrtc://wbstream@r/room%201?k=$key&t=vp8channel&f=120&b=64&c=client%201&d=77.88.8.8%3A53&ka=15#Main%20profile",
         )
 
         assertEquals("Main profile", profile.name)
         assertEquals("room 1", profile.roomId)
         assertEquals("client 1", profile.clientId)
-        assertEquals("token", profile.authToken)
         assertEquals(OlcrtcProfile.Provider.WBSTREAM, profile.provider)
     }
 
@@ -52,7 +49,7 @@ class OlcrtcUriTest {
     @Test
     fun parsesVerboseAliasesAndLegacyDefaults() {
         val profile = OlcrtcUri.parse(
-            "olcrtc://jitsi@room/test?key=$key&client_id=client&auth.token=token",
+            "olcrtc://jitsi@room/test?key=$key&client_id=client",
         )
 
         assertEquals(OlcrtcProfile.Transport.DATACHANNEL, profile.transport)
@@ -85,23 +82,12 @@ class OlcrtcUriTest {
     }
 
     @Test
-    fun serializerRequiresExplicitSecretExport() {
-        val profile = OlcrtcProfile(
-            name = "Main",
-            provider = OlcrtcProfile.Provider.WBSTREAM,
-            transport = OlcrtcProfile.Transport.VP8CHANNEL,
-            roomId = "room",
-            clientId = "client",
-            keyHex = key,
-            authToken = "secret",
-        )
-
-        val safe = OlcrtcUri.serialize(profile)
-        val withSecret = OlcrtcUri.serialize(profile, includeAuthToken = true)
-
-        assertFalse(safe.contains("a=secret"))
-        assertTrue(withSecret.contains("a=secret"))
-        assertEquals(profile, OlcrtcUri.parse(withSecret))
+    fun rejectsRemovedAuthTokenParameter() {
+        // The wbstream auth token was removed from the client (commit 25302ec):
+        // links carrying a=/auth_token/auth.token are rejected as unknown.
+        assertThrows(IllegalArgumentException::class.java) {
+            OlcrtcUri.parse("olcrtc://wbstream@r/room?k=$key&t=vp8channel&c=client&a=token")
+        }
     }
 
     @Test

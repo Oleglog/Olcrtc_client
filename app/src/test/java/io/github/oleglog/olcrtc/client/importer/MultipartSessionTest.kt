@@ -12,7 +12,7 @@ import java.util.zip.GZIPOutputStream
 class MultipartSessionTest {
     @Test
     fun dispatcherParsesManagerGzipBundleFromMultipartQr() {
-        val profile = "olcrtc://wbstream@r/room?k=${"a".repeat(64)}&t=vp8channel&f=120&b=64&c=client&a=token#WB"
+        val profile = "olcrtc://wbstream@r/room?k=${"a".repeat(64)}&t=vp8channel&f=120&b=64&c=client#WB"
         val raw = """{"type":"olcrtc-sub","v":2,"n":"Manager","s":"manager","u":"https://example.com/sub/manager","m":[],"mk":"","uc":true,"d":true,"p":["$profile"]}"""
         val payload = "olcrtc+gz:${gzipBase64Url(raw)}"
         val parts = parts(payload)

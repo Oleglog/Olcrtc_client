@@ -113,6 +113,11 @@
     <string name="profile_key_invalid">Ключ должен содержать ровно 64 шестнадцатеричных символа</string>
     <string name="profile_export_secret_warning_title">Копировать ссылку профиля?</string>
     <string name="profile_export_secret_warning_message">Ссылка профиля содержит данные для подключения. Передавайте её только тем, кому доверяете.</string>
+    <string name="profile_copy_link">Копировать ссылку</string>
+    <string name="profile_link_copied">Ссылка профиля скопирована. Через минуту она будет удалена из буфера обмена.</string>
+    <string name="failover_auto">Авто: пробовать другие подключения при сбое</string>
+    <string name="failover_enabled">Авто-переключение включено: после 2 неудачных попыток приложение попробует другие подключения</string>
+    <string name="failover_disabled">Авто-переключение выключено: приложение будет повторять то же подключение</string>
     <string name="profile_delete_title">Удалить профиль?</string>
     <string name="profile_delete_message">Удалить %1$s?</string>
     <string name="delete">Удалить</string>
@@ -308,6 +313,13 @@
     <string name="settings_diagnostics_reconnecting">Восстановление соединения</string>
     <string name="settings_no_diagnostics">Диагностических записей пока нет</string>
     <string name="settings_diagnostics_copied">Очищенный журнал скопирован</string>
+    <string name="settings_run_network_check">Проверить доступность провайдеров</string>
+    <string name="settings_network_check_title">Проверка сети</string>
+    <string name="settings_network_check_running">Проверяю Jitsi, Telemost и WBStream…</string>
+    <string name="settings_network_check_reachable">доступен (%1$d мс)</string>
+    <string name="settings_network_check_blocked">недоступен (%1$s)</string>
+    <string name="settings_network_check_recommendation">Рекомендуемый провайдер: %1$s.</string>
+    <string name="settings_network_check_hint">Это только прямая проверка. Реальные туннели проверяются кнопкой «Проверить все подключения» на вкладке подключений.</string>
     <string name="routing_all_vpn">Весь трафик через VPN</string>
     <string name="routing_russia_direct">Российские ресурсы напрямую</string>
     <string name="routing_mode_russia">Для России</string>
@@ -375,6 +387,7 @@
     <string name="vpn_notification_stopping">Отключение</string>
     <string name="vpn_notification_error">Ошибка подключения</string>
     <string name="vpn_reconnecting_attempt">Восстановление соединения · попытка %1$d</string>
+    <string name="vpn_failover_attempt">Пробую %1$s · попытка %2$d</string>
     <string name="vpn_stage_load_profile">Загрузка подключения</string>
     <string name="vpn_stage_wait_network">Ожидание сети</string>
     <string name="vpn_stage_prepare_assets">Подготовка маршрутизации</string>

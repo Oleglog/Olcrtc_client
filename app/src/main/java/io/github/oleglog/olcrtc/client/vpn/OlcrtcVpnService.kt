@@ -30,6 +30,7 @@ import io.github.oleglog.olcrtc.client.R
 import io.github.oleglog.olcrtc.client.data.ProfileConfig
 import io.github.oleglog.olcrtc.client.data.ProfileRepository
 import io.github.oleglog.olcrtc.client.diagnostics.DiagnosticsLogStore
+import io.github.oleglog.olcrtc.client.profile.orderProfiles
 import io.github.oleglog.olcrtc.client.routing.DnsEndpoint
 import io.github.oleglog.olcrtc.client.routing.GeoAssetManager
 import io.github.oleglog.olcrtc.client.routing.PerAppPolicy
@@ -76,6 +77,9 @@ class OlcrtcVpnService : VpnService() {
     private lateinit var geoAssets: GeoAssetManager
     @Volatile private var activeProfile: ProfileReference? = null
     private var activeProfileInfo: ProfileInfo? = null
+    // Issue #47: walk state for Auto failover across profiles. Reset on any
+    // manual start/stop/success; only handleConnectionFailure advances it.
+    private var failoverState = ProfileFailover.FailoverState()
     private var wakeLock: PowerManager.WakeLock? = null
     private var activeSessionId: Long? = null
     private var activeSessionBaseline = TrafficCounters()
@@ -377,6 +381,8 @@ class OlcrtcVpnService : VpnService() {
         cancelAutomaticReconnect()
         cancelConnectionAttempt("new profile requested")
         publishedError = null
+        // Any manual start re-anchors the failover walk (issue #47).
+        failoverState = ProfileFailover.FailoverState()
 
         publishStage(ConnectionStage.LOAD_PROFILE)
         val loadStartedAt = SystemClock.elapsedRealtime()
@@ -428,6 +434,8 @@ class OlcrtcVpnService : VpnService() {
 
     private fun reconnectVpn() {
         val reference = activeProfile ?: return
+        // Manual reconnect restarts from the current profile (issue #47).
+        cancelFailover()
         when (publishedState) {
             VpnState.CONNECTED -> {
                 cancelAutomaticReconnect()
@@ -507,7 +515,7 @@ class OlcrtcVpnService : VpnService() {
             networkReconnectRequested = true
             publishStage(ConnectionStage.WAIT_NETWORK)
             if (publishedState != VpnState.RECONNECTING) transition(VpnState.RECONNECTING)
-            if (activeNetwork != null) scheduleAutomaticReconnect(NETWORK_CHANGE_DEBOUNCE_MILLIS)
+            if (activeNetwork != null) scheduleAutomaticReconnect(TunnelHealthPolicy.NETWORK_CHANGE_DEBOUNCE_MILLIS)
             return
         }
         result.onSuccess { started ->
@@ -522,6 +530,7 @@ class OlcrtcVpnService : VpnService() {
                 "info",
                 "VPN connected attempt=${attempt.generation} total=${SystemClock.elapsedRealtime() - attempt.startedAt}ms",
             )
+            failoverState = ProfileFailover.onSuccess()
             startConnectionSession(attempt.reference)
             cancelAutomaticReconnect()
             refreshStaleSubscriptions()
@@ -585,10 +594,14 @@ class OlcrtcVpnService : VpnService() {
         check(publishedState == VpnState.CONNECTED) { "VPN is not connected" }
         val socksPort = checkNotNull(activeSocksPort) { "VPN SOCKS is not available" }
         val coreResult = runCatching {
-            GomobileCore.urlTest(CONNECTION_TEST_URL, CONNECTION_TEST_TIMEOUT_MILLIS).coerceAtLeast(1)
+            GomobileCore.urlTest(TunnelHealthPolicy.CONNECTION_TEST_URL, TunnelHealthPolicy.CONNECTION_TEST_TIMEOUT_MILLIS).coerceAtLeast(1)
         }
         val socksResult = runCatching {
-            measureSocksHttpLatency(socksPort, CONNECTION_TEST_URL, CONNECTION_TEST_TIMEOUT_MILLIS)
+            measureSocksHttpLatency(
+                socksPort,
+                TunnelHealthPolicy.CONNECTION_TEST_URL,
+                TunnelHealthPolicy.CONNECTION_TEST_TIMEOUT_MILLIS,
+            )
         }
         val counters = nativeSession?.trafficCounters() ?: TrafficCounters()
         diagnostics.append(
@@ -625,7 +638,7 @@ class OlcrtcVpnService : VpnService() {
                 reconnectBackoff.reset()
                 reconnectAttemptCount = 0
                 diagnostics.append("info", "Underlying network changed")
-                requestNetworkReconnect(networkReconnectDelay(previous != null))
+                requestNetworkReconnect(TunnelHealthPolicy.networkReconnectDelay(previous != null))
             }
         }
     }
@@ -710,12 +723,31 @@ class OlcrtcVpnService : VpnService() {
         if (error is CancellationException) return
         if (isFatalReconnectError(error)) {
             val userError = userConnectionError(error)
+            failoverState = ProfileFailover.onSuccess()
             cancelAutomaticReconnect()
             finishConnectionSession(error.message ?: error.javaClass.simpleName)
             persistVpnIntent(false, activeProfile ?: persistedProfileReference())
             transition(VpnState.ERROR, userError)
             releaseWakeLock()
             stopForeground(STOP_FOREGROUND_REMOVE)
+            return
+        }
+        // Issue #47: with Auto failover on, walk the ordered profile list
+        // instead of retrying the same blocked carrier forever.
+        val failoverTarget = nextFailoverTarget()
+        if (failoverTarget != null) {
+            networkReconnectRequested = true
+            reconnectAttemptCount++
+            if (publishedState != VpnState.RECONNECTING) transition(VpnState.RECONNECTING)
+            else notifyCallbacks()
+            diagnostics.append(
+                "info",
+                "VPN auto-failover ${activeProfile?.sessionId} -> ${failoverTarget.sessionId} " +
+                    "attempt=$reconnectAttemptCount",
+            )
+            activeProfile = failoverTarget
+            persistVpnIntent(true, failoverTarget)
+            scheduleAutomaticReconnect(0)
             return
         }
         networkReconnectRequested = true
@@ -725,12 +757,79 @@ class OlcrtcVpnService : VpnService() {
         scheduleAutomaticReconnect()
     }
 
+    /**
+     * Returns the next profile to try when Auto failover is enabled, or null
+     * to keep the legacy same-profile retry. Builds the candidate order
+     * from stored profiles (favorites → last successful → rest).
+     */
+    private fun nextFailoverTarget(): ProfileReference? {
+        if (!routingSettings.getAutoFailover()) {
+            failoverState = ProfileFailover.onSuccess()
+            return null
+        }
+        val failed = activeProfile ?: return null
+        val order = orderedFailoverReferences()
+        if (order.size < 2) return null
+        if (failoverState.order != order) {
+            failoverState = ProfileFailover.start(order, failed.sessionId)
+        }
+        val (updated, next) = ProfileFailover.onFailure(failoverState, failed.sessionId)
+        failoverState = updated
+        if (next == null || next == failed.sessionId) return null
+        return parseProfileReference(next) ?: return null
+    }
+
+    private fun orderedFailoverReferences(): List<String> {
+        val localFavorites = routingSettings.getFavoriteLocalProfileIds()
+        val local = profiles.listLocal().map { summary ->
+            FailoverCandidate(
+                reference = "local:${summary.id}",
+                name = summary.name,
+                favorite = summary.id in localFavorites,
+            )
+        }
+        val subscription = profiles.listSubscriptions().flatMap { source ->
+            profiles.listSubscriptionProfiles(source.id).map { summary ->
+                FailoverCandidate(
+                    reference = "subscription:${summary.id}",
+                    name = summary.name,
+                    favorite = summary.favorite,
+                )
+            }
+        }
+        val lastSuccessful = routingSettings.getLastSuccessfulProfileReference()
+        return orderProfiles(
+            local + subscription,
+            lastSuccessful,
+            FailoverCandidate::reference,
+            FailoverCandidate::favorite,
+        ).map(FailoverCandidate::reference)
+    }
+
+    private fun parseProfileReference(sessionId: String): ProfileReference? = when {
+        sessionId.startsWith("local:") ->
+            sessionId.removePrefix("local:").toLongOrNull()?.let(ProfileReference::Local)
+        sessionId.startsWith("subscription:") ->
+            ProfileReference.Subscription(sessionId.removePrefix("subscription:"))
+        else -> null
+    }
+
+    private data class FailoverCandidate(
+        val reference: String,
+        val name: String,
+        val favorite: Boolean,
+    )
+
     private fun cancelAutomaticReconnect() {
         networkReconnectRequested = false
         reconnectFuture?.cancel(false)
         reconnectFuture = null
         reconnectBackoff.reset()
         reconnectAttemptCount = 0
+    }
+
+    private fun cancelFailover() {
+        failoverState = ProfileFailover.onSuccess()
     }
 
     private fun isFatalReconnectError(error: Throwable): Boolean =
@@ -753,6 +852,7 @@ class OlcrtcVpnService : VpnService() {
 
     private fun stopVpn() {
         cancelAutomaticReconnect()
+        cancelFailover()
         cancelConnectionAttempt("VPN stopped")
         when (publishedState) {
             VpnState.PREPARING,
@@ -967,7 +1067,12 @@ class OlcrtcVpnService : VpnService() {
 
     private fun verifyDatapath(socksPort: Int, dns: DnsEndpoint) {
         try {
-            queryDnsThroughTunnel(socksPort, dns, DATAPATH_TIMEOUT_MILLIS)
+            queryDnsNameThroughTunnel(
+                socksPort,
+                dns,
+                TunnelHealthPolicy.DATAPATH_DNS_NAMES.first(),
+                TunnelHealthPolicy.DATAPATH_TIMEOUT_MILLIS,
+            )
         } catch (error: SocketTimeoutException) {
             throw IllegalStateException(
                 "VPN datapath timed out",
@@ -976,16 +1081,14 @@ class OlcrtcVpnService : VpnService() {
         }
     }
 
-    private fun queryDnsThroughTunnel(socksPort: Int, dns: DnsEndpoint, timeoutMillis: Int) {
+    private fun queryDnsNameThroughTunnel(
+        socksPort: Int,
+        dns: DnsEndpoint,
+        labels: List<Any>,
+        timeoutMillis: Int,
+    ) {
         val queryId = ThreadLocalRandom.current().nextInt(0x10000)
-        val query = byteArrayOf(
-            (queryId ushr 8).toByte(), queryId.toByte(),
-            1, 0, 0, 1, 0, 0, 0, 0, 0, 0,
-            7, 'a'.code.toByte(), 'n'.code.toByte(), 'd'.code.toByte(), 'r'.code.toByte(),
-            'o'.code.toByte(), 'i'.code.toByte(), 'd'.code.toByte(),
-            3, 'c'.code.toByte(), 'o'.code.toByte(), 'm'.code.toByte(),
-            0, 0, 1, 0, 1,
-        )
+        val query = buildDnsQuery(queryId, labels)
         tunnelSocket(socksPort, dns, timeoutMillis).use { socket ->
             val output = DataOutputStream(socket.getOutputStream())
             output.writeShort(query.size)
@@ -1122,8 +1225,8 @@ class OlcrtcVpnService : VpnService() {
         lastHealthProbeAt = lastTrafficSampleAt
         notificationTicker = commands.scheduleAtFixedRate(
             { sampleTrafficAndNotify() },
-            NOTIFICATION_SAMPLE_INTERVAL_SECONDS,
-            NOTIFICATION_SAMPLE_INTERVAL_SECONDS,
+            TunnelHealthPolicy.NOTIFICATION_SAMPLE_INTERVAL_SECONDS,
+            TunnelHealthPolicy.NOTIFICATION_SAMPLE_INTERVAL_SECONDS,
             TimeUnit.SECONDS,
         )
     }
@@ -1168,7 +1271,7 @@ class OlcrtcVpnService : VpnService() {
     }
 
     private fun scheduleTunnelHealthProbe(now: Long) {
-        if (healthProbeInFlight || now - lastHealthProbeAt < TUNNEL_HEALTH_INTERVAL_MILLIS) return
+        if (healthProbeInFlight || now - lastHealthProbeAt < TunnelHealthPolicy.TUNNEL_HEALTH_INTERVAL_MILLIS) return
         val session = nativeSession ?: return
         val socksPort = activeSocksPort ?: return
         val dns = activeDnsEndpoint ?: return
@@ -1192,10 +1295,12 @@ class OlcrtcVpnService : VpnService() {
                             healthProbeFailures++
                             diagnostics.append(
                                 "error",
-                                "VPN tunnel health probe failed ($healthProbeFailures/$HEALTH_FAILURES_BEFORE_RECONNECT)",
+                                "VPN tunnel health probe failed ($healthProbeFailures/${TunnelHealthPolicy.HEALTH_FAILURES_BEFORE_RECONNECT})",
                                 failure,
                             )
-                            if (shouldReconnectAfterHealthFailures(healthProbeFailures)) requestNetworkReconnect(0)
+                            if (TunnelHealthPolicy.shouldReconnectAfterFailures(healthProbeFailures)) {
+                                requestNetworkReconnect(0)
+                            }
                         }
                     }
                 }
@@ -1204,7 +1309,43 @@ class OlcrtcVpnService : VpnService() {
     }
 
     private fun probeTunnel(socksPort: Int, dns: DnsEndpoint) {
-        queryDnsThroughTunnel(socksPort, dns, TUNNEL_HEALTH_TIMEOUT_MILLIS)
+        var dnsSuccesses = 0
+        var lastDnsError: Throwable? = null
+        for (labels in TunnelHealthPolicy.DATAPATH_DNS_NAMES) {
+            runCatching {
+                queryDnsNameThroughTunnel(socksPort, dns, labels, TunnelHealthPolicy.TUNNEL_HEALTH_TIMEOUT_MILLIS)
+            }.onSuccess {
+                dnsSuccesses++
+            }.onFailure {
+                lastDnsError = it
+            }
+            if (dnsSuccesses > 0) break
+        }
+        var httpsSuccesses = 0
+        var lastHttpsError: Throwable? = null
+        if (dnsSuccesses == 0) {
+            for (url in TunnelHealthPolicy.DATAPATH_HTTPS_URLS) {
+                runCatching {
+                    measureSocksHttpLatency(socksPort, url, TunnelHealthPolicy.TUNNEL_HEALTH_TIMEOUT_MILLIS)
+                }.onSuccess {
+                    httpsSuccesses++
+                    break
+                }.onFailure {
+                    lastHttpsError = it
+                }
+            }
+        }
+        check(
+            TunnelHealthPolicy.isTunnelHealthy(
+                dnsSuccesses,
+                TunnelHealthPolicy.DATAPATH_DNS_NAMES.size,
+                httpsSuccesses,
+            ),
+        ) {
+            "VPN tunnel health probe failed: dns=$dnsSuccesses/${TunnelHealthPolicy.DATAPATH_DNS_NAMES.size} " +
+                "https=$httpsSuccesses/${TunnelHealthPolicy.DATAPATH_HTTPS_URLS.size} " +
+                "lastDns=${lastDnsError?.message} lastHttps=${lastHttpsError?.message}"
+        }
     }
 
     private fun tunnelSocket(socksPort: Int, dns: DnsEndpoint, timeoutMillis: Int): Socket {
@@ -1440,13 +1581,7 @@ class OlcrtcVpnService : VpnService() {
         const val VPN_MTU = 1500
         const val VPN_IPV4_ADDRESS = "10.0.0.2"
         const val VPN_IPV4_PREFIX = 32
-        const val DATAPATH_TIMEOUT_MILLIS = 10_000
         const val MAX_DNS_RESPONSE_BYTES = 65_535
-        private const val CONNECTION_TEST_URL = "https://www.google.com/generate_204"
-        private const val CONNECTION_TEST_TIMEOUT_MILLIS = 5_000
-        private const val NOTIFICATION_SAMPLE_INTERVAL_SECONDS = 5L
-        private const val TUNNEL_HEALTH_INTERVAL_MILLIS = 180_000L
-        private const val TUNNEL_HEALTH_TIMEOUT_MILLIS = 30_000
         private val RECONNECTABLE_STATES = setOf(
             VpnState.PREPARING,
             VpnState.CONNECTING,
@@ -1459,15 +1594,18 @@ class OlcrtcVpnService : VpnService() {
 internal fun requiresGeoAssets(policy: RoutingPolicy): Boolean =
     policy.preset == RoutingPolicy.Preset.RUSSIA_DIRECT
 
+// Legacy aliases kept for existing tests; the policy lives in TunnelHealthPolicy.
 internal fun shouldReconnectAfterHealthFailures(failures: Int): Boolean =
-    failures >= HEALTH_FAILURES_BEFORE_RECONNECT
+    TunnelHealthPolicy.shouldReconnectAfterFailures(failures)
 
-internal const val HEALTH_FAILURES_BEFORE_RECONNECT = 2
+internal const val HEALTH_FAILURES_BEFORE_RECONNECT =
+    TunnelHealthPolicy.HEALTH_FAILURES_BEFORE_RECONNECT
 
 internal fun networkReconnectDelay(replacingExistingNetwork: Boolean): Long =
-    if (replacingExistingNetwork) NETWORK_CHANGE_DEBOUNCE_MILLIS else 0L
+    TunnelHealthPolicy.networkReconnectDelay(replacingExistingNetwork)
 
-internal const val NETWORK_CHANGE_DEBOUNCE_MILLIS = 400L
+internal const val NETWORK_CHANGE_DEBOUNCE_MILLIS =
+    TunnelHealthPolicy.NETWORK_CHANGE_DEBOUNCE_MILLIS
 
 internal fun shouldAcceptConnectionResult(
     currentGeneration: Long?,

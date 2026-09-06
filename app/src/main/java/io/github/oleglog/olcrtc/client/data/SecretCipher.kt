@@ -1,14 +1,30 @@
 package io.github.oleglog.olcrtc.client.data
 
+import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import java.nio.ByteBuffer
 import java.security.KeyStore
+import java.security.ProviderException
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
+/**
+ * Storage model (issue #49 audit, 2026-09-06):
+ * - Encrypted with this key: roomPassword, keyHex, standard-profile secret
+ *   blobs, subscription URLs / mirror URLs / mirror keys, subscription
+ *   config JSON. The wbstream auth token was removed from the client
+ *   entirely (commit 25302ec), so there is no token left to protect.
+ * - Plaintext by design (identifiers needed for lists and display):
+ *   roomId, clientId, names, endpoints, DNS strings.
+ * - Auto Backup is fully disabled (allowBackup=false) and every storage
+ *   domain is excluded in res/xml/data_extraction_rules.xml, so the
+ *   database never leaves the device via backup or device transfer.
+ * - The key prefers StrongBox hardware backing and falls back to the
+ *   default (TEE/software) provider when StrongBox is unavailable.
+ */
 internal class SecretCipher(
     private val keyProvider: () -> SecretKey = ::loadOrCreateKey,
 ) {
@@ -43,19 +59,37 @@ internal class SecretCipher(
         fun loadOrCreateKey(): SecretKey {
             val keyStore = KeyStore.getInstance(KEYSTORE).apply { load(null) }
             (keyStore.getKey(KEY_ALIAS, null) as? SecretKey)?.let { return it }
-            return KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE).run {
-                init(
-                    KeyGenParameterSpec.Builder(
-                        KEY_ALIAS,
-                        KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
-                    )
-                        .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                        .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                        .setKeySize(256)
-                        .build(),
-                )
-                generateKey()
+            val generator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, KEYSTORE)
+            return try {
+                generator.init(spec(strongBox = true))
+                generator.generateKey()
+            } catch (error: ProviderException) {
+                // Device advertises StrongBox but cannot provision there
+                // (e.g. exhausted slots: StrongBoxUnavailableException is a
+                // ProviderException subclass). Retry in TEE/software so the
+                // app still works. Non-StrongBox failures on old devices
+                // are rethrown: the fallback spec is identical there.
+                if (!preferStrongBox()) throw error
+                generator.init(spec(strongBox = false))
+                generator.generateKey()
             }
         }
+
+        private fun spec(strongBox: Boolean): KeyGenParameterSpec {
+            val builder = KeyGenParameterSpec.Builder(
+                KEY_ALIAS,
+                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+            )
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .setKeySize(256)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                builder.setIsStrongBoxBacked(strongBox && preferStrongBox())
+            }
+            return builder.build()
+        }
+
+        private fun preferStrongBox(): Boolean =
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.P
     }
 }

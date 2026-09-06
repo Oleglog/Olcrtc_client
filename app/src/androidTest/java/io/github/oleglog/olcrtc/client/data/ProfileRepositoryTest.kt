@@ -54,7 +54,6 @@ class ProfileRepositoryTest {
             roomPassword = "password",
             clientId = "client",
             keyHex = "a".repeat(64),
-            authToken = "token",
             dnsServer = "[2001:db8::1]:53",
         )
 
@@ -63,7 +62,6 @@ class ProfileRepositoryTest {
 
         assertFalse(stored.roomPassword!!.contentEquals("password".encodeToByteArray()))
         assertFalse(stored.keyHex.contentEquals(profile.keyHex.encodeToByteArray()))
-        assertFalse(stored.authToken!!.contentEquals("token".encodeToByteArray()))
         assertEquals("current", stored.compatibilityMode)
         assertEquals(profile, repository.getOlcrtc(id))
     }
@@ -302,7 +300,6 @@ class ProfileRepositoryTest {
             roomPassword = "password",
             clientId = "client",
             keyHex = "a".repeat(64),
-            authToken = "token",
         ))
 
         val subscriptionId = repository.insertSubscription(subscriptionBundle(listOf(profile)), now = 1)
@@ -357,7 +354,6 @@ class ProfileRepositoryTest {
             roomPassword = "password",
             clientId = "client",
             keyHex = "a".repeat(64),
-            authToken = "token",
         )
         val standard = StandardProfile(
             name = "VLESS",

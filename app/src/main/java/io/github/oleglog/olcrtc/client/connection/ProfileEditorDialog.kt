@@ -118,7 +118,19 @@ internal object ProfileEditorDialog {
     ): () -> ProfileConfig {
         val name = field(fragment, form, R.string.profile_field_name, profile.name)
         val provider = choice(fragment, form, R.string.profile_field_provider, OlcrtcProfile.Provider.entries, profile.provider)
-        val transport = choice(fragment, form, R.string.profile_field_transport, OlcrtcProfile.Transport.entries, profile.transport)
+        // Issue #52: only the transports supported by the chosen provider are
+        // selectable (single option today, but filtered so saving cannot fail).
+        val transport = choice(
+            fragment,
+            form,
+            R.string.profile_field_transport,
+            compatibleTransports(provider.selected),
+            profile.transport,
+        )
+        provider.onSelectionChanged {
+            val allowed = compatibleTransports(provider.selected)
+            transport.retainOrDefault(allowed)
+        }
         val roomId = field(fragment, form, R.string.profile_field_room_id, profile.roomId)
         val roomPassword = field(fragment, form, R.string.profile_field_room_password, profile.roomPassword.orEmpty(), secret = true)
         val clientId = field(fragment, form, R.string.profile_field_client_id, profile.clientId)
@@ -378,8 +390,8 @@ internal object ProfileEditorDialog {
     }
 
     private class ChoiceField<T>(
-        input: MaterialAutoCompleteTextView,
-        private val values: List<T>,
+        private val input: MaterialAutoCompleteTextView,
+        private var values: List<T>,
         selected: T,
     ) {
         var selected: T = selected
@@ -396,7 +408,24 @@ internal object ProfileEditorDialog {
         fun onSelectionChanged(action: () -> Unit) {
             onSelectionChanged = action
         }
+
+        /** Replaces the dropdown options; keeps the selection when still valid. */
+        fun retainOrDefault(allowed: List<T>) {
+            require(allowed.isNotEmpty()) { "No compatible transports" }
+            values = allowed
+            input.setAdapter(
+                ArrayAdapter(input.context, android.R.layout.simple_list_item_1, allowed),
+            )
+            if (selected !in allowed) {
+                selected = allowed.first()
+                input.setText(selected.toString(), false)
+            }
+        }
     }
+
+/** Issue #52: selectable transports per provider. Mirrors carrier_compat.go. */
+internal fun compatibleTransports(provider: OlcrtcProfile.Provider): List<OlcrtcProfile.Transport> =
+    OlcrtcProfile.Transport.entries.filter(provider::supports)
 
     private data class FormField(
         val layout: TextInputLayout,

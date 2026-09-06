@@ -1,5 +1,6 @@
 package io.github.oleglog.olcrtc.client.diagnostics
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -60,5 +61,38 @@ class DiagnosticsRedactorTest {
         assertFalse(redacted.contains("client"))
         assertFalse(redacted.contains("token"))
         assertFalse(redacted.contains("mirror"))
+    }
+
+    @Test
+    fun redactsCamelCaseJsonAndQuerySecrets() {
+        val raw = """{"keyHex":"${"d".repeat(64)}","clientId":"my-client","roomId":"my-room","roomPassword":"s3cret","rp":"alias-secret"}?roomId=my-room&rp=alias-secret&keyHex=${"d".repeat(64)}"""
+
+        val redacted = DiagnosticsRedactor.redact(raw)
+
+        assertFalse(redacted.contains("${"d".repeat(64)}"))
+        assertFalse(redacted.contains("my-client"))
+        assertFalse(redacted.contains("my-room"))
+        assertFalse(redacted.contains("s3cret"))
+        assertFalse(redacted.contains("alias-secret"))
+    }
+
+    @Test
+    fun redactsGoCoreFieldForm() {
+        val raw = """RunWithReady args mismatch: transport="vp8channel" carrier="wbstream" room="secret-room" client="secret-client" keyHex=${"e".repeat(64)}"""
+
+        val redacted = DiagnosticsRedactor.redact(raw)
+
+        assertTrue(redacted.contains("transport=\"vp8channel\""))
+        assertTrue(redacted.contains("carrier=\"wbstream\""))
+        assertFalse(redacted.contains("secret-room"))
+        assertFalse(redacted.contains("secret-client"))
+        assertFalse(redacted.contains("${"e".repeat(64)}"))
+    }
+
+    @Test
+    fun leavesProseWithoutSeparatorIntact() {
+        val raw = "device ready, token refreshed, client connected"
+
+        assertEquals(raw, DiagnosticsRedactor.redact(raw))
     }
 }
