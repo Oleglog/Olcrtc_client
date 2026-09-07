@@ -50,13 +50,13 @@ for library in "${libraries[@]}"; do
   fi
   # The olcRTC module resolves to the Oleglog/Olcrtc_manager fork via a
   # go.mod replace (fork-only UDP relay commits do not exist upstream), so
-  # both the dep line and the replace line must carry the pinned version.
-  if grep -E 'github\.com/Oleglog/Olcrtc_manager([[:space:]]|$)' "$metadata"; then
-    if ! grep -F -- "$EXPECTED_OLCRTC_REPLACE" "$metadata"; then
-      printf 'mobilecore %s resolves olcRTC to an unexpected fork version (want %s)\n' \
-        "$abi" "$EXPECTED_OLCRTC_REPLACE" >&2
-      exit 1
-    fi
+  # the dep line carries the required version and ends with the "=>"
+  # replacement marker on the following line.
+  if ! grep -A1 -F -- "dep	github.com/openlibrecommunity/olcrtc	$EXPECTED_OLCRTC_VERSION" "$metadata" \
+    | grep -F -- "=>	$EXPECTED_OLCRTC_REPLACE" >/dev/null; then
+    printf 'mobilecore %s does not resolve olcRTC %s to %s\n' \
+      "$abi" "$EXPECTED_OLCRTC_VERSION" "$EXPECTED_OLCRTC_REPLACE" >&2
+    exit 1
   fi
   if ! awk -v expected="$EXPECTED_J_VERSION" \
     '$1 == "=>" && $2 == "github.com/Oleglog/j" && $3 == expected { found = 1 } END { exit !found }' \
