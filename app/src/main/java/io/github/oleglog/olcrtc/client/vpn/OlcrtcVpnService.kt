@@ -1014,7 +1014,11 @@ class OlcrtcVpnService : VpnService() {
                     "olcRTC runtime provider=${profile.value.provider.value} " +
                         "transport=${profile.value.transport.value} " +
                         "compatibility=${profile.value.compatibilityMode.value} " +
-                        "core=${GomobileCore.coreVersions().olcrtc} routing=${routingPolicy.preset}",
+                        "core=${GomobileCore.coreVersions().olcrtc} routing=${routingPolicy.preset} " +
+                        // Mirrors the ConnectionFragment UDP toggle; the relay needs
+                        // a server-v1.9.77+ peer, otherwise UDP falls back to TCP
+                        // silently and app calls (Discord/Telegram) stay broken.
+                        "udp=${if (olcrtcConfig.udpRelay) "on" else "off"}",
                 )
                 xraySocksPort = freeLoopbackPort(olcrtcConfig.socksPort)
                 xrayConfig = NativeConfig.xray(

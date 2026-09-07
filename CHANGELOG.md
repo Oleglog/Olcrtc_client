@@ -2,10 +2,15 @@
 
 ## Unreleased
 
+## 1.4.14 — 2026-09-07
+
+- Fixed the UDP relay being dead on device (server pair: server-v1.9.77). Two root bugs in the relay protocol: the client shipped raw SOCKS5 datagrams with the source address as destination (the target lives inside the RFC 1928 datagram header), so the server dialed its own loopback and every datagram died; and the server returned at most one reply per datagram, which cannot carry RTP/QUIC streams. The core pin now carries the SOCKS5 datagram codec (fragment/truncation refusal, IPv4/IPv6/domain targets, reply re-wrapping) and a NAT table with persistent per-destination sockets, per-socket reply pumps, idle reaping and bidirectional 30 s keepalives so muted calls do not kill the relay.
+- Diagnostics: the "olcRTC runtime" line now shows the effective `udp=on/off` state so a broken relay is visible in the exported log instead of apps silently falling back to TCP.
+
 ## 1.4.13 — 2026-09-07
 
 - Speed: VP8 writer now drains queued KCP frames immediately instead of waiting for the next frame tick (port of the server-v1.9.76 eager-drain), and standard TCP/WS outbounds enable TCP Fast Open — one RTT less on every fresh connect.
-- UDP relay (opt-in, server-v1.9.76+): new UDP toggle on the connection screen routes app UDP through the tunnel via SOCKS5 UDP ASSOCIATE; off by default, the server refuses with 0x07 while disabled. Latency probes use the same setting.
+- UDP relay (opt-in, server-v1.9.76+): new UDP toggle on the connection screen routes app UDP through the tunnel via SOCKS5 UDP ASSOCIATE; off by default, the server refuses with 0x07 while disabled. Latency probes use the same setting. (Relay itself was broken on device; the fix ships in 1.4.14.)
 - Usability: VP8 fps/batch advanced fields replaced by a speed preset dropdown (Economy 30/8, Balanced 60/32, Maximum 120/64); existing raw values are preserved until edited.
 - Core pin raised to the `Oleglog/Olcrtc_manager` fork at `2dc984e` (UDP ASSOCIATE relay + eager VP8 writer) via a same-module-path `replace`; legacy 32-byte VP8 transport ported to the new engine API.
 
