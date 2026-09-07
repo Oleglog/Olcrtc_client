@@ -4,7 +4,7 @@ set -euo pipefail
 readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly AAR="${1:-$ROOT/app/libs/mobilecore.aar}"
 readonly EXPECTED_OLCRTC_VERSION="v0.0.0-20260907074053-2dc984ec9c09"
-readonly EXPECTED_OLCRTC_REPLACE="github.com/Oleglog/Olcrtc_manager v0.0.0-20260907074053-2dc984ec9c09"
+readonly EXPECTED_OLCRTC_REPLACE="github.com/Oleglog/Olcrtc_manager"
 readonly EXPECTED_J_VERSION="v0.0.0-20260813164759-98b35e399132"
 readonly -a REQUIRED_LIBRARIES=(
   "jni/arm64-v8a/libgojni.so"
@@ -49,15 +49,14 @@ for library in "${libraries[@]}"; do
     exit 1
   fi
   # The olcRTC module resolves to the Oleglog/Olcrtc_manager fork via a
-  # go.mod replace (fork-only UDP relay commits do not exist upstream), so
-  # the dep line carries the required version plus the h1 hash, and the
-  # following line carries the "=>" replacement marker. Note: go version -m
-  # separates columns with tabs here (the log view renders them as spaces),
-  # so the patterns below must use literal tabs, not spaces.
-  if ! grep -A1 -F -- "$(printf 'dep\tgithub.com/openlibrecommunity/olcrtc\t%s' "$EXPECTED_OLCRTC_VERSION")" "$metadata" \
-    | grep -F -- "$(printf '=>\t%s' "$EXPECTED_OLCRTC_REPLACE")" >/dev/null; then
-    printf 'mobilecore %s does not resolve olcRTC %s to %s\n' \
-      "$abi" "$EXPECTED_OLCRTC_VERSION" "$EXPECTED_OLCRTC_REPLACE" >&2
+  # go.mod replace (fork-only UDP relay commits do not exist upstream).
+  # awk splits on any whitespace, so tabs vs spaces in `go version -m`
+  # output do not matter here.
+  if ! awk -v path="$EXPECTED_OLCRTC_REPLACE" -v expected="$EXPECTED_OLCRTC_VERSION" \
+    '$1 == "=>" && $2 == path && $3 == expected { found = 1 } END { exit !found }' \
+    "$metadata"; then
+    printf 'mobilecore %s does not resolve olcRTC %s to the pinned fork\n' \
+      "$abi" "$EXPECTED_OLCRTC_VERSION" >&2
     exit 1
   fi
   if ! awk -v expected="$EXPECTED_J_VERSION" \
