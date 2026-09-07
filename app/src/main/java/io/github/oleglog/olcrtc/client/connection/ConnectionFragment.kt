@@ -171,6 +171,23 @@ class ConnectionFragment : Fragment() {
                 }
             }
         }
+        // UDP relay over the olcRTC carrier (server-v1.9.76+). Default off;
+        // takes effect on the next connect, same as auto failover.
+        binding.udpRelay.isChecked = settings.getUdpRelay()
+        binding.udpRelay.setOnCheckedChangeListener { _, checked ->
+            storage.execute {
+                val saved = runCatching { settings.setUdpRelayBlocking(checked) }
+                activity?.runOnUiThread {
+                    if (_binding == null) return@runOnUiThread
+                    saved.onFailure { showStatus(it.message) }
+                    showStatus(
+                        getString(
+                            if (checked) R.string.udp_relay_enabled else R.string.udp_relay_disabled,
+                        ),
+                    )
+                }
+            }
+        }
         updateConnectPulse()
     }
 
@@ -564,6 +581,7 @@ class ConnectionFragment : Fragment() {
             requireContext().applicationContext,
             settings.getDnsServer(),
             profileProbeWorkers,
+            udpRelay = settings.getUdpRelay(),
         )
         activeProfileProbe = probe
         profileProbeInProgress = true

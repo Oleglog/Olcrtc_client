@@ -167,8 +167,13 @@ internal object NativeConfig {
 
     private fun streamSettings(profile: StandardProfile): String {
         val transport = when (profile.transport) {
-            StandardProfile.Transport.TCP -> "\"tcpSettings\": { \"header\": { \"type\": \"none\" } }"
-            StandardProfile.Transport.WS -> "\"wsSettings\": { \"path\": \"${profile.json(profile.webSocketPath!!)}\"${profile.webSocketHost?.let { ", \"headers\": { \"Host\": \"${profile.json(it)}\" }" } ?: ""} }"
+            StandardProfile.Transport.TCP ->
+                // TFO trims one RTT on every fresh TCP connect (handshake +
+                // data in one shot). Server opt-in; harmless when ignored.
+                "\"tcpSettings\": { \"header\": { \"type\": \"none\" } }," +
+                    " \"sockopt\": { \"tcpFastOpen\": true }"
+            StandardProfile.Transport.WS -> "\"wsSettings\": { \"path\": \"${profile.json(profile.webSocketPath!!)}\"${profile.webSocketHost?.let { ", \"headers\": { \"Host\": \"${profile.json(it)}\" }" } ?: ""} }," +
+                " \"sockopt\": { \"tcpFastOpen\": true }"
             StandardProfile.Transport.GRPC -> "\"grpcSettings\": { \"serviceName\": \"${profile.json(profile.grpcServiceName!!)}\" }"
             StandardProfile.Transport.XHTTP -> "\"xhttpSettings\": { \"mode\": \"${profile.json(profile.xhttpMode!!)}\", \"path\": \"${profile.json(profile.xhttpPath!!)}\"${profile.xhttpHost?.let { ", \"host\": \"${profile.json(it)}\"" } ?: ""}${profile.xhttpExtraJson?.let { ", \"extra\": $it" } ?: ""} }"
         }

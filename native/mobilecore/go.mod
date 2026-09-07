@@ -3,7 +3,7 @@ module github.com/openlibrecommunity/olcrtc/mobilecore
 go 1.26.3
 
 require (
-	github.com/openlibrecommunity/olcrtc v0.0.0-20260811121518-3339cd367168
+	github.com/openlibrecommunity/olcrtc v0.0.0-20260907074053-2dc984ec9c09
 	github.com/pion/rtp v1.10.2
 	github.com/pion/webrtc/v4 v4.2.15
 	github.com/xtaci/kcp-go/v5 v5.6.72
@@ -122,3 +122,10 @@ require (
 // per-session Jitsi HTTP signaling, anonymousdomain, and ICE-disco fixes.
 // CI's `go mod tidy` regenerates go.sum; bump the pseudo-version on re-cherry-pick.
 replace github.com/zarazaex69/j => github.com/Oleglog/j v0.0.0-20260813164759-98b35e399132
+
+// Tunnel core comes from the Oleglog/Olcrtc_manager fork (UDP ASSOCIATE
+// relay, eager vp8 writer, carrier/transport matrix). Same module path, so
+// this is a replace — not a second require. The fork-only commits do not
+// exist upstream, so the openlibrecommunity pseudo-version above would not
+// resolve without it. CI's `go mod tidy` keeps go.sum for the replacement.
+replace github.com/openlibrecommunity/olcrtc => github.com/Oleglog/Olcrtc_manager v0.0.0-20260907074053-2dc984ec9c09

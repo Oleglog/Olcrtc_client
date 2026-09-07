@@ -109,6 +109,19 @@ internal class RoutingSettings private constructor(
         store.edit { preferences -> preferences[AUTO_FAILOVER] = value }
     }
 
+    /** UDP relay over the olcRTC carrier (server-v1.9.76+). Default off (opt-in). */
+    fun getUdpRelay(): Boolean = runBlocking {
+        store.data.first()[UDP_RELAY] ?: false
+    }
+
+    suspend fun setUdpRelay(value: Boolean) {
+        store.edit { preferences -> preferences[UDP_RELAY] = value }
+    }
+
+    fun setUdpRelayBlocking(value: Boolean) = runBlocking {
+        store.edit { preferences -> preferences[UDP_RELAY] = value }
+    }
+
     suspend fun setDnsServer(value: String?) {
         val normalized = value?.let { DnsEndpoint.parse(it).toString() }
         store.edit { preferences ->
@@ -242,6 +255,7 @@ internal class RoutingSettings private constructor(
         private val FAVORITE_LOCAL_PROFILES = stringSetPreferencesKey("favorite_local_profiles")
         private val LAST_SUCCESSFUL_PROFILE = stringPreferencesKey("last_successful_profile")
         private val AUTO_SUBSCRIPTION_REFRESH = booleanPreferencesKey("auto_subscription_refresh")
+        private val UDP_RELAY = booleanPreferencesKey("udp_relay")
         private val AUTO_FAILOVER = booleanPreferencesKey("auto_failover")
 
         @Volatile

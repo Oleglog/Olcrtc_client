@@ -23,6 +23,7 @@ internal object GomobileCore : NativeCore {
             config.vp8Fps.toLong(),
             config.vp8BatchSize.toLong(),
             config.keepaliveSeconds.toLong(),
+            config.udpRelay,
             config.socksPort.toLong(),
         )
     }
@@ -64,6 +65,7 @@ internal object GomobileCore : NativeCore {
             config.vp8Fps.toLong(),
             config.vp8BatchSize.toLong(),
             config.keepaliveSeconds.toLong(),
+            config.udpRelay,
             config.socksPort.toLong(),
         )
     }

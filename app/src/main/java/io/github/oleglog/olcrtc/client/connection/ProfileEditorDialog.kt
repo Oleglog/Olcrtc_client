@@ -137,8 +137,31 @@ internal object ProfileEditorDialog {
         val key = field(fragment, form, R.string.profile_field_key, profile.keyHex, secret = true)
         val dns = field(fragment, form, R.string.profile_field_dns, profile.dnsServer.orEmpty())
         val advanced = advancedSection(fragment, form)
+        val speedPreset = choice(
+            fragment,
+            advanced,
+            R.string.profile_field_speed_preset,
+            OlcrtcProfile.Companion.SpeedPreset.entries,
+            OlcrtcProfile.Companion.SpeedPreset.matching(profile.vp8Fps, profile.vp8BatchSize)
+                ?: OlcrtcProfile.Companion.SpeedPreset.MAX,
+        ) { preset ->
+            fragment.getString(when (preset) {
+                OlcrtcProfile.Companion.SpeedPreset.ECO -> R.string.profile_speed_preset_eco
+                OlcrtcProfile.Companion.SpeedPreset.BALANCED -> R.string.profile_speed_preset_balanced
+                OlcrtcProfile.Companion.SpeedPreset.MAX -> R.string.profile_speed_preset_max
+            })
+        }
         val fps = field(fragment, advanced, R.string.profile_field_vp8_fps, profile.vp8Fps.toString(), numeric = true)
         val batch = field(fragment, advanced, R.string.profile_field_vp8_batch, profile.vp8BatchSize.toString(), numeric = true)
+        // Tapping the preset applies it to the two read-only numbers below,
+        // so unusual stored values (e.g. from QR links) stay visible but save
+        // as the chosen preset.
+        speedPreset.onSelectionChanged {
+            fps.setValue(speedPreset.selected.fps.toString())
+            batch.setValue(speedPreset.selected.batchSize.toString())
+        }
+        fps.makeReadOnly()
+        batch.makeReadOnly()
         val keepalive = field(
             fragment,
             advanced,
@@ -160,8 +183,8 @@ internal object ProfileEditorDialog {
                         it.length == 64 && it.all(Char::isHexDigit)
                     },
                     dnsServer = dns.optionalValue(),
-                    vp8Fps = fps.intValue(1..120, fragment.getString(R.string.profile_value_invalid)),
-                    vp8BatchSize = batch.intValue(1..64, fragment.getString(R.string.profile_value_invalid)),
+                    vp8Fps = speedPreset.selected.fps,
+                    vp8BatchSize = speedPreset.selected.batchSize,
                     keepaliveIntervalSeconds = keepalive.intValue(0..3600, fragment.getString(R.string.profile_value_invalid)),
                 ),
             )
@@ -358,11 +381,12 @@ internal object ProfileEditorDialog {
         label: Int,
         values: List<T>,
         selected: T,
+        labels: ((T) -> String?)? = null,
     ): ChoiceField<T> {
         val input = MaterialAutoCompleteTextView(fragment.requireContext()).apply {
             inputType = InputType.TYPE_NULL
-            setAdapter(ArrayAdapter(fragment.requireContext(), android.R.layout.simple_list_item_1, values))
-            setText(selected.toString(), false)
+            setAdapter(ArrayAdapter(fragment.requireContext(), android.R.layout.simple_list_item_1, values.map { labels?.invoke(it) ?: it.toString() }))
+            setText(labels?.invoke(selected) ?: selected.toString(), false)
         }
         val layout = TextInputLayout(fragment.requireContext()).apply {
             hint = fragment.getString(label)
@@ -393,6 +417,7 @@ internal object ProfileEditorDialog {
         private val input: MaterialAutoCompleteTextView,
         private var values: List<T>,
         selected: T,
+        private val labels: ((T) -> String?)? = null,
     ) {
         var selected: T = selected
             private set
@@ -414,11 +439,11 @@ internal object ProfileEditorDialog {
             require(allowed.isNotEmpty()) { "No compatible transports" }
             values = allowed
             input.setAdapter(
-                ArrayAdapter(input.context, android.R.layout.simple_list_item_1, allowed),
+                ArrayAdapter(input.context, android.R.layout.simple_list_item_1, allowed.map { labels?.invoke(it) ?: it.toString() }),
             )
             if (selected !in allowed) {
                 selected = allowed.first()
-                input.setText(selected.toString(), false)
+                input.setText(labels?.invoke(selected) ?: selected.toString(), false)
             }
         }
     }
@@ -432,6 +457,10 @@ internal fun compatibleTransports(provider: OlcrtcProfile.Provider): List<Olcrtc
         val input: TextInputEditText,
     ) {
         fun value(): String = input.text?.toString()?.trim().orEmpty()
+        fun setValue(value: String) {
+            layout.error = null
+            input.setText(value)
+        }
         fun optionalValue(): String? = value().takeIf(String::isNotEmpty)
         fun requiredValue(message: String): String {
             val current = value()
@@ -459,6 +488,10 @@ internal fun compatibleTransports(provider: OlcrtcProfile.Provider): List<Olcrtc
         fun hide() {
             layout.error = null
             layout.visibility = View.GONE
+        }
+        fun makeReadOnly() {
+            input.isEnabled = false
+            input.isFocusable = false
         }
     }
 

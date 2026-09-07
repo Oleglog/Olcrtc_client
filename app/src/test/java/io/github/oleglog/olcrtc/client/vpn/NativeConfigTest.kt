@@ -241,6 +241,49 @@ class NativeConfigTest {
         action: RoutingRule.Action,
     ) = RoutingRule.create(matchType = type, value = value, action = action)
 
+    @Test
+    fun tcpAndWsOutboundsEnableTcpFastOpen() {
+        val tcp = NativeConfig.xray(1080, StandardProfile(
+            name = "VLESS",
+            protocol = StandardProfile.Protocol.VLESS,
+            address = "example.com",
+            port = 443,
+            uuid = UUID,
+            transport = StandardProfile.Transport.TCP,
+            security = StandardProfile.Security.REALITY,
+            flow = StandardProfile.VISION_FLOW,
+            serverName = "www.example.com",
+            fingerprint = "chrome",
+            realityPublicKey = "key",
+            realityShortId = "short",
+        ))
+        val ws = NativeConfig.xray(1080, StandardProfile(
+            name = "VMess",
+            protocol = StandardProfile.Protocol.VMESS,
+            address = "example.com",
+            port = 443,
+            uuid = UUID,
+            transport = StandardProfile.Transport.WS,
+            security = StandardProfile.Security.TLS,
+            webSocketPath = "/vmess",
+            webSocketHost = "cdn.example.com",
+        ))
+        val grpc = NativeConfig.xray(1080, StandardProfile(
+            name = "Trojan",
+            protocol = StandardProfile.Protocol.TROJAN,
+            address = "example.com",
+            port = 443,
+            password = "secret",
+            transport = StandardProfile.Transport.GRPC,
+            security = StandardProfile.Security.TLS,
+            grpcServiceName = "trojan",
+        ))
+
+        assertTrue(tcp.contains("\"sockopt\": { \"tcpFastOpen\": true }"))
+        assertTrue(ws.contains("\"sockopt\": { \"tcpFastOpen\": true }"))
+        assertFalse(grpc.contains("tcpFastOpen"))
+    }
+
     private companion object {
         const val UUID = "00000000-0000-0000-0000-000000000001"
     }

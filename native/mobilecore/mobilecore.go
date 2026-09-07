@@ -216,6 +216,7 @@ func StartProfileProbeOlcrtc(
 	vp8FPS int,
 	vp8BatchSize int,
 	keepaliveSeconds int,
+	udpEnabled bool,
 	socksPort int,
 ) error {
 	profileProbeMu.Lock()
@@ -231,6 +232,7 @@ func StartProfileProbeOlcrtc(
 		vp8FPS,
 		vp8BatchSize,
 		keepaliveSeconds,
+		udpEnabled,
 		socksPort,
 	); err != nil {
 		return err
@@ -336,6 +338,7 @@ func StartOlcrtc(
 	vp8FPS int,
 	vp8BatchSize int,
 	keepaliveSeconds int,
+	udpEnabled bool,
 	socksPort int,
 ) error {
 	olcrtcStartMu.Lock()
@@ -352,6 +355,7 @@ func StartOlcrtc(
 	olcrtc.SetDNS(dnsServer)
 	olcrtc.SetVP8Options(vp8FPS, vp8BatchSize)
 	olcrtc.SetLivenessOptions(keepaliveSeconds*1000, 0, 0)
+	olcrtc.SetUDPEnabled(udpEnabled)
 	if err := olcrtc.StartWithTransport(
 		provider,
 		transport,

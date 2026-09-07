@@ -3,7 +3,8 @@ set -euo pipefail
 
 readonly ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly AAR="${1:-$ROOT/app/libs/mobilecore.aar}"
-readonly EXPECTED_OLCRTC_VERSION="v0.0.0-20260811121518-3339cd367168"
+readonly EXPECTED_OLCRTC_VERSION="v0.0.0-20260907074053-2dc984ec9c09"
+readonly EXPECTED_OLCRTC_REPLACE="github.com/Oleglog/Olcrtc_manager v0.0.0-20260907074053-2dc984ec9c09"
 readonly EXPECTED_J_VERSION="v0.0.0-20260813164759-98b35e399132"
 readonly -a REQUIRED_LIBRARIES=(
   "jni/arm64-v8a/libgojni.so"
@@ -47,9 +48,15 @@ for library in "${libraries[@]}"; do
       "$abi" "$EXPECTED_OLCRTC_VERSION" >&2
     exit 1
   fi
+  # The olcRTC module resolves to the Oleglog/Olcrtc_manager fork via a
+  # go.mod replace (fork-only UDP relay commits do not exist upstream), so
+  # both the dep line and the replace line must carry the pinned version.
   if grep -E 'github\.com/Oleglog/Olcrtc_manager([[:space:]]|$)' "$metadata"; then
-    printf 'mobilecore %s contains a forbidden legacy dependency\n' "$abi" >&2
-    exit 1
+    if ! grep -F -- "$EXPECTED_OLCRTC_REPLACE" "$metadata"; then
+      printf 'mobilecore %s resolves olcRTC to an unexpected fork version (want %s)\n' \
+        "$abi" "$EXPECTED_OLCRTC_REPLACE" >&2
+      exit 1
+    fi
   fi
   if ! awk -v expected="$EXPECTED_J_VERSION" \
     '$1 == "=>" && $2 == "github.com/Oleglog/j" && $3 == expected { found = 1 } END { exit !found }' \

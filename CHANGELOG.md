@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.4.13 — 2026-09-07
+
+- Speed: VP8 writer now drains queued KCP frames immediately instead of waiting for the next frame tick (port of the server-v1.9.76 eager-drain), and standard TCP/WS outbounds enable TCP Fast Open — one RTT less on every fresh connect.
+- UDP relay (opt-in, server-v1.9.76+): new UDP toggle on the connection screen routes app UDP through the tunnel via SOCKS5 UDP ASSOCIATE; off by default, the server refuses with 0x07 while disabled. Latency probes use the same setting.
+- Usability: VP8 fps/batch advanced fields replaced by a speed preset dropdown (Economy 30/8, Balanced 60/32, Maximum 120/64); existing raw values are preserved until edited.
+- Core pin raised to the `Oleglog/Olcrtc_manager` fork at `2dc984e` (UDP ASSOCIATE relay + eager VP8 writer) via a same-module-path `replace`; legacy 32-byte VP8 transport ported to the new engine API.
+
 ## 1.4.12 — 2026-09-06
 
 - Fixed in-app update failing with "SHA256SUMS.txt is missing" when the update check ran while the VPN was up: UpdateCheckWire packed only the selected APK across the AIDL boundary and dropped the rest of the release assets, so the installer could not find the checksum file. The full asset list now survives the VPN-proxy path.

@@ -1003,7 +1003,12 @@ class OlcrtcVpnService : VpnService() {
         val olcrtcConfig: NativeOlcrtcConfig?
         when (profile) {
             is ProfileConfig.Olcrtc -> {
-                olcrtcConfig = NativeOlcrtcConfig.from(profile.value, freeLoopbackPort(), checkNotNull(dns.carrier))
+                olcrtcConfig = NativeOlcrtcConfig.from(
+                    profile.value,
+                    freeLoopbackPort(),
+                    checkNotNull(dns.carrier),
+                    udpRelay = routingSettings.getUdpRelay(),
+                )
                 diagnostics.append(
                     "info",
                     "olcRTC runtime provider=${profile.value.provider.value} " +

@@ -28,6 +28,9 @@
     <string name="profile_field_dns">DNS server</string>
     <string name="profile_field_vp8_fps">VP8 frames per second</string>
     <string name="profile_field_vp8_batch">VP8 batch size</string>
+    <string name="profile_speed_preset_balanced">Balanced (60 fps · batch 32)</string>
+    <string name="profile_speed_preset_max">Maximum (120 fps · batch 64)</string>
+    <string name="profile_speed_preset_eco">Economy (30 fps · batch 8)</string>
     <string name="profile_field_keepalive">Keepalive interval, seconds</string>
     <string name="profile_field_protocol">Protocol</string>
     <string name="profile_field_address">Server address</string>
@@ -117,6 +120,11 @@
     <string name="failover_auto">Auto: try other connections on failure</string>
     <string name="failover_enabled">Auto failover on: the app will try other connections after 2 failed attempts</string>
     <string name="failover_disabled">Auto failover off: the app will keep retrying the same connection</string>
+    <string name="udp_relay">UDP: send app traffic over UDP (experimental)</string>
+    <string name="udp_relay_enabled">UDP relay on: app UDP goes through the tunnel (needs server v1.9.76+)</string>
+    <string name="udp_relay_disabled">UDP relay off: UDP keeps the TCP fallback</string>
+    <string name="udp_relay_description">Route app UDP through the tunnel. Needs server v1.9.76+ with the relay on; otherwise UDP keeps the TCP fallback and the server refuses with 0x07.</string>
+    <string name="profile_field_speed_preset">Speed preset</string>
     <string name="profile_delete_title">Delete profile?</string>
     <string name="profile_delete_message">Delete %1$s?</string>
     <string name="delete">Delete</string>

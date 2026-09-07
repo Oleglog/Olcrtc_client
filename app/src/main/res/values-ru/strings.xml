@@ -29,6 +29,9 @@
     <string name="profile_field_dns">DNS-сервер</string>
     <string name="profile_field_vp8_fps">Кадров VP8 в секунду</string>
     <string name="profile_field_vp8_batch">Размер пакета VP8</string>
+    <string name="profile_speed_preset_balanced">Сбаланс. (60 fps · пакет 32)</string>
+    <string name="profile_speed_preset_max">Максимум (120 fps · пакет 64)</string>
+    <string name="profile_speed_preset_eco">Эконом (30 fps · пакет 8)</string>
     <string name="profile_field_keepalive">Интервал keepalive, секунд</string>
     <string name="profile_field_protocol">Протокол</string>
     <string name="profile_field_address">Адрес сервера</string>
@@ -118,6 +121,11 @@
     <string name="failover_auto">Авто: пробовать другие подключения при сбое</string>
     <string name="failover_enabled">Авто-переключение включено: после 2 неудачных попыток приложение попробует другие подключения</string>
     <string name="failover_disabled">Авто-переключение выключено: приложение будет повторять то же подключение</string>
+    <string name="udp_relay">UDP: отправлять трафик приложений по UDP (экспериментально)</string>
+    <string name="udp_relay_enabled">UDP-реле включено: UDP приложений идёт через туннель (нужен сервер v1.9.76+)</string>
+    <string name="udp_relay_disabled">UDP-реле выключено: UDP остаётся на TCP</string>
+    <string name="udp_relay_description">Направлять UDP приложений через туннель. Нужен сервер v1.9.76+ с включённым реле, иначе UDP остаётся на TCP, а сервер отвечает отказом 0x07.</string>
+    <string name="profile_field_speed_preset">Пресет скорости</string>
     <string name="profile_delete_title">Удалить профиль?</string>
     <string name="profile_delete_message">Удалить %1$s?</string>
     <string name="delete">Удалить</string>

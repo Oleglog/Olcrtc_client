@@ -29,10 +29,10 @@
       "license": "MPL-2.0"
     },
     {
-      "name": "olcRTC mobile/core",
+      "name": "olcRTC mobile/core (via Oleglog/Olcrtc_manager fork replace)",
       "source": "https://github.com/openlibrecommunity/olcrtc",
-      "ref": "v0.0.0-20260713124136-42ae4e0c6a1a",
-      "commit": "42ae4e0c6a1af3e01c52cf0149502cc13c326a3f",
+      "ref": "v0.0.0-20260907074053-2dc984ec9c09",
+      "commit": "2dc984ec9c090d45778784817fbb64453b46a061",
       "license": "WTFPL"
     },
     {

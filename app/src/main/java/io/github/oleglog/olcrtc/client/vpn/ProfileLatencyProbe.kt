@@ -15,6 +15,7 @@ internal class ProfileLatencyProbe(
     context: Context,
     private val dnsServer: String?,
     private val workers: ExecutorService,
+    private val udpRelay: Boolean = false,
 ) {
     private val assetDirectory = context.noBackupFilesDir.absolutePath
 
@@ -74,7 +75,12 @@ internal class ProfileLatencyProbe(
         onStarted(listOf(target.reference))
         val profile = target.config as ProfileConfig.Olcrtc
         val dns = sessionDns(profile, dnsServer)
-        val olcrtc = NativeOlcrtcConfig.from(profile.value, freeLoopbackPort(), checkNotNull(dns.carrier))
+        val olcrtc = NativeOlcrtcConfig.from(
+            profile.value,
+            freeLoopbackPort(),
+            checkNotNull(dns.carrier),
+            udpRelay = udpRelay,
+        )
         val xrayPort = freeLoopbackPort(olcrtc.socksPort)
         val result = runCatching {
             GomobileCore.startProfileProbeOlcrtc(olcrtc)

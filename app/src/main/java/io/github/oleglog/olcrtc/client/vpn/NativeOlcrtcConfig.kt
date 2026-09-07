@@ -30,11 +30,17 @@ internal data class NativeOlcrtcConfig(
     val vp8Fps: Int,
     val vp8BatchSize: Int,
     val keepaliveSeconds: Int,
+    val udpRelay: Boolean = false,
     val socksPort: Int,
     val readyTimeoutMillis: Int = DEFAULT_READY_TIMEOUT_MILLIS,
 ) {
     companion object {
-        fun from(profile: OlcrtcProfile, socksPort: Int, dns: DnsEndpoint) = NativeOlcrtcConfig(
+        fun from(
+            profile: OlcrtcProfile,
+            socksPort: Int,
+            dns: DnsEndpoint,
+            udpRelay: Boolean = false,
+        ) = NativeOlcrtcConfig(
             provider = profile.provider.value,
             transport = profile.transport.value,
             compatibilityMode = profile.compatibilityMode.value,
@@ -45,6 +51,7 @@ internal data class NativeOlcrtcConfig(
             vp8Fps = profile.vp8Fps,
             vp8BatchSize = profile.vp8BatchSize,
             keepaliveSeconds = profile.keepaliveIntervalSeconds,
+            udpRelay = udpRelay,
             socksPort = socksPort,
             readyTimeoutMillis = when (profile.provider) {
                 OlcrtcProfile.Provider.WBSTREAM -> WBSTREAM_READY_TIMEOUT_MILLIS

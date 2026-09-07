@@ -343,6 +343,13 @@
                     android:layout_marginTop="@dimen/space_2"
                     android:text="@string/failover_auto" />
 
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/udp_relay"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/space_2"
+                    android:text="@string/udp_relay" />
+
                 <com.google.android.material.card.MaterialCardView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

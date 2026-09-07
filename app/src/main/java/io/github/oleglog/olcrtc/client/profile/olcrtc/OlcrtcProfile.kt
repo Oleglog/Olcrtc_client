@@ -74,6 +74,22 @@ data class OlcrtcProfile(
         const val DEFAULT_KEEPALIVE_SECONDS = 15
         private val KEY_REGEX = Regex("^[0-9a-fA-F]{64}$")
 
+        /**
+         * VP8 pacing presets. fps sets the writer tick rate, batchSize caps
+         * KCP packets coalesced into one video sample. MAX matches the
+         * defaults; lower presets trade throughput for battery/CPU.
+         */
+        enum class SpeedPreset(val fps: Int, val batchSize: Int) {
+            ECO(30, 8),
+            BALANCED(60, 32),
+            MAX(120, 64);
+
+            companion object {
+                fun matching(fps: Int, batchSize: Int): SpeedPreset? =
+                    entries.firstOrNull { it.fps == fps && it.batchSize == batchSize }
+            }
+        }
+
         fun manual(
             name: String,
             roomId: String,
