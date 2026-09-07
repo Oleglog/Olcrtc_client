@@ -173,8 +173,8 @@ github.com/opencontainers/image-spec v1.1.1 h1:y0fUlFfIZhPF1W537XOLg0/fcx6zcHCJw
 github.com/opencontainers/image-spec v1.1.1/go.mod h1:qpqAh3Dmcf36wStyyWU+kCeDgrGnAve2nCC8+7h8Q0M=
 github.com/opencontainers/runc v1.3.3 h1:qlmBbbhu+yY0QM7jqfuat7M1H3/iXjju3VkP9lkFQr4=
 github.com/opencontainers/runc v1.3.3/go.mod h1:D7rL72gfWxVs9cJ2/AayxB0Hlvn9g0gaF1R7uunumSI=
-github.com/oleglog/olcrtc_manager v0.0.0-20260907182615-ee7a58e65586 h1:PeKb6ddaYG1vDLX7vwzOveA/T43sFWSlOTaLONMptFI=
-github.com/oleglog/olcrtc_manager v0.0.0-20260907182615-ee7a58e65586/go.mod h1:fKmM5Tspj/Ns4/Xmulrp84yrcpYYgateLsudxIE7gQU=
+github.com/oleglog/olcrtc_manager v0.0.0-20260907185024-d3adc2cab773 h1:n7YsQD2Umi1DBaZ2xZf5ruaFlQDgVGpRzadaGscC34w=
+github.com/oleglog/olcrtc_manager v0.0.0-20260907185024-d3adc2cab773/go.mod h1:fKmM5Tspj/Ns4/Xmulrp84yrcpYYgateLsudxIE7gQU=
 github.com/openlibrecommunity/olcrtc v0.0.0-20260713124136-42ae4e0c6a1a h1:d5QnquCU3/VlA0TMPaO05aFTArdqqfiAsZmf57L/hIM=
 github.com/openlibrecommunity/olcrtc v0.0.0-20260713124136-42ae4e0c6a1a/go.mod h1:t8ua2CbTgTmvHXPdi0TTwfZHu9k6Yml8JQpCeYNIEQE=
 github.com/ory/dockertest/v3 v3.12.0 h1:3oV9d0sDzlSQfHtIaB5k6ghUCVMVLpAY8hwrqoCyRCw=
