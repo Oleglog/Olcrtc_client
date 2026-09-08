@@ -93,31 +93,31 @@
                     android:padding="@dimen/space_4">
 
                     <FrameLayout
-                        android:layout_width="94dp"
-                        android:layout_height="94dp">
+                        android:layout_width="72dp"
+                        android:layout_height="72dp">
 
                         <View
                             android:id="@+id/preview_glow"
-                            android:layout_width="94dp"
-                            android:layout_height="94dp"
+                            android:layout_width="72dp"
+                            android:layout_height="72dp"
                             android:background="@drawable/bg_connection_halo"
                             android:importantForAccessibility="no" />
 
                         <com.google.android.material.card.MaterialCardView
                             android:id="@+id/preview_connect"
-                            android:layout_width="86dp"
-                            android:layout_height="86dp"
+                            android:layout_width="64dp"
+                            android:layout_height="64dp"
                             android:layout_gravity="center"
                             app:cardBackgroundColor="?attr/colorSurfaceContainerHigh"
-                            app:cardCornerRadius="43dp"
+                            app:cardCornerRadius="32dp"
                             app:cardElevation="0dp"
                             app:strokeColor="?attr/colorOutline"
                             app:strokeWidth="1dp">
 
                             <ImageView
                                 android:id="@+id/preview_icon"
-                                android:layout_width="30dp"
-                                android:layout_height="30dp"
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
                                 android:layout_gravity="center"
                                 android:contentDescription="@null"
                                 android:src="@drawable/ic_shield_24" />

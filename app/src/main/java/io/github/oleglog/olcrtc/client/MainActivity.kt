@@ -17,6 +17,7 @@ import android.os.SystemClock
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.addCallback
+import android.view.HapticFeedbackConstants
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -191,6 +192,7 @@ class MainActivity : AppCompatActivity() {
         )
         navigationItems.forEachIndexed { page, item ->
             item.setOnClickListener {
+                item.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                 if (binding.mainPager.currentItem != page) {
                     binding.mainPager.setCurrentItem(page, appearance.motionEnabled)
                 }

@@ -1,25 +1,18 @@
 package io.github.oleglog.olcrtc.client.statistics
 
-import android.content.res.ColorStateList
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.LinearLayout
-import android.widget.TextView
-import androidx.appcompat.app.AlertDialog
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
-import com.google.android.material.card.MaterialCardView
 import io.github.oleglog.olcrtc.client.MainActivity
 import io.github.oleglog.olcrtc.client.R
 import io.github.oleglog.olcrtc.client.data.ConnectionSessionEntity
 import io.github.oleglog.olcrtc.client.databinding.FragmentStatisticsBinding
 import io.github.oleglog.olcrtc.client.vpn.VpnState
-import java.text.DateFormat
-import java.util.Date
 import java.util.Locale
 import java.util.concurrent.Executors
 
@@ -35,15 +28,21 @@ class StatisticsFragment : Fragment() {
     private val refreshCurrent = object : Runnable {
         override fun run() {
             val b = _binding ?: return
-            val state = (activity as? MainActivity)?.currentVpnState() ?: VpnState.DISCONNECTED
-            when {
-                currentSession != null && state in INACTIVE_STATES -> {
+            val connected = (activity as? MainActivity)?.currentVpnState() == VpnState.CONNECTED
+            if (!connected) {
+                if (currentSession != null) {
                     currentSession = null
                     renderCurrentSession(null)
                     loadStatistics()
+                } else {
+                    renderCurrentSession(null)
                 }
-                currentSession == null && state == VpnState.CONNECTED -> loadStatistics()
-                else -> renderCurrentSession(currentSession)
+            } else {
+                if (currentSession == null) {
+                    loadStatistics()
+                } else {
+                    renderCurrentSession(currentSession)
+                }
             }
             ticker.postDelayed(this, CURRENT_SESSION_REFRESH_MILLIS)
         }
@@ -51,7 +50,6 @@ class StatisticsFragment : Fragment() {
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, state: Bundle?): View {
         _binding = FragmentStatisticsBinding.inflate(inflater, container, false)
-        binding.clearHistory.setOnClickListener { confirmClearHistory() }
         binding.rangeToggle.check(binding.rangeToday.id)
         binding.rangeToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (!isChecked) return@addOnButtonCheckedListener
@@ -96,140 +94,52 @@ class StatisticsFragment : Fragment() {
             host.runOnUiThread {
                 loadInFlight = false
                 val b = _binding ?: return@runOnUiThread
-                result.onSuccess(::showSummary).onFailure {
+                result.onSuccess { summary ->
+                    summarySnapshot = summary
+                    val connected = (activity as? MainActivity)?.currentVpnState() == VpnState.CONNECTED
+                    currentSession = if (connected) summary.current else null
+                    renderCurrentSession(currentSession)
+                    renderTotals(selected(summary))
+                }.onFailure {
                     currentSession = null
-                    b.activeProfile.text = it.message ?: getString(R.string.statistics_error)
-                    b.activeMeta.isVisible = false
-                    b.activeMetrics.isVisible = false
+                    renderCurrentSession(null)
                     clearTotals()
-                    b.clearHistory.visibility = View.GONE
-                    b.historyEmpty.visibility = View.VISIBLE
-                    b.historyList.removeAllViews()
                 }
             }
-        }
-    }
-
-    private fun showSummary(summary: StatisticsSummary) {
-        val b = binding
-        summarySnapshot = summary
-        currentSession = summary.current
-        renderCurrentSession(summary.current)
-        renderTotals(selected(summary))
-        b.historyList.removeAllViews()
-        b.clearHistory.visibility = if (summary.recent.isEmpty()) View.GONE else View.VISIBLE
-        if (summary.recent.isEmpty()) {
-            b.historyEmpty.visibility = View.VISIBLE
-        } else {
-            b.historyEmpty.visibility = View.GONE
-            summary.recent.take(5).forEach { b.historyList.addView(recentSessionRow(it)) }
         }
     }
 
     private fun selected(summary: StatisticsSummary): StatisticsTotals =
         if (trafficRangeIsToday) summary.today else summary.month
 
-    private fun recentSessionRow(session: ConnectionSessionEntity): View {
-        val started = DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(session.startedAt))
-        val endedAt = session.endedAt ?: System.currentTimeMillis()
-        return MaterialCardView(requireContext()).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-            ).apply { topMargin = 6.dp }
-            radius = 12.dp.toFloat()
-            cardElevation = 0f
-            isClickable = true
-            isFocusable = true
-            setRippleColor(ColorStateList.valueOf(
-                resolveColor(com.google.android.material.R.attr.colorPrimaryContainer),
-            ))
-            setCardBackgroundColor(resolveColor(com.google.android.material.R.attr.colorSurfaceVariant))
-            addView(LinearLayout(requireContext()).apply {
-                orientation = LinearLayout.VERTICAL
-                setPadding(12.dp, 12.dp, 12.dp, 12.dp)
-                addView(LinearLayout(requireContext()).apply {
-                    gravity = android.view.Gravity.CENTER_VERTICAL
-                    addView(TextView(requireContext()).apply {
-                        text = session.profileNameSnapshot
-                        setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_TitleSmall)
-                        setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurface))
-                    }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                    addView(TextView(requireContext()).apply {
-                        text = formatDuration(endedAt - session.startedAt)
-                        setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelLarge)
-                        typeface = android.graphics.Typeface.MONOSPACE
-                        setTextColor(resolveColor(androidx.appcompat.R.attr.colorPrimary))
-                    })
-                })
-                addView(TextView(requireContext()).apply {
-                    text = "$started · ${disconnectReasonLabel(session.disconnectReason)}"
-                    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
-                    setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
-                    setPadding(0, 4.dp, 0, 0)
-                })
-                addView(TextView(requireContext()).apply {
-                    text = "↑ ${formatBytes(session.bytesUp)} · ↓ ${formatBytes(session.bytesDown)}"
-                    setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_LabelSmall)
-                    setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
-                    setPadding(0, 4.dp, 0, 0)
-                })
-            })
-            setOnClickListener { showReasonDialog(session) }
-        }
-    }
-
-    private fun showReasonDialog(session: ConnectionSessionEntity) {
-        AlertDialog.Builder(requireContext())
-            .setTitle(session.profileNameSnapshot)
-            .setMessage(
-                getString(
-                    R.string.statistics_session_details_format,
-                    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(session.startedAt)),
-                    session.endedAt?.let {
-                        DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it))
-                    } ?: getString(R.string.statistics_session_active),
-                    formatDuration((session.endedAt ?: System.currentTimeMillis()) - session.startedAt),
-                    formatBytes(session.bytesUp),
-                    formatBytes(session.bytesDown),
-                    disconnectReasonLabel(session.disconnectReason),
-                    networkTypeLabel(session.networkType),
-                ),
-            )
-            .setPositiveButton(android.R.string.ok, null)
-            .show()
-    }
-
-    private fun confirmClearHistory() {
-        AlertDialog.Builder(requireContext())
-            .setTitle(R.string.statistics_clear_history)
-            .setMessage(R.string.statistics_clear_history_message)
-            .setNegativeButton(R.string.cancel, null)
-            .setPositiveButton(R.string.delete) { _, _ ->
-                storage.execute {
-                    runCatching { statistics.clear() }
-                    activity?.runOnUiThread { loadStatistics() }
-                }
-            }
-            .show()
-    }
-
     private val binding get() = requireNotNull(_binding)
 
     private fun renderCurrentSession(session: ConnectionSessionEntity?) {
-        val b = binding
-        if (session == null) {
+        val b = _binding ?: return
+        val connected = (activity as? MainActivity)?.currentVpnState() == VpnState.CONNECTED
+        if (!connected || session == null) {
             b.activeProfile.setText(R.string.statistics_no_active_session)
             b.activeMeta.isVisible = false
             b.activeMetrics.isVisible = false
+            b.activeCard.setCardBackgroundColor(
+                com.google.android.material.color.MaterialColors.getColor(
+                    b.root,
+                    com.google.android.material.R.attr.colorSurfaceContainer,
+                )
+            )
             return
         }
+        b.activeCard.setCardBackgroundColor(
+            com.google.android.material.color.MaterialColors.getColor(
+                b.root,
+                com.google.android.material.R.attr.colorPrimaryContainer,
+            )
+        )
         val traffic = (activity as? MainActivity)?.trafficSnapshot()?.takeIf { it.size >= 4 }
         val bytesUp = traffic?.get(0) ?: session.bytesUp
         val bytesDown = traffic?.get(1) ?: session.bytesDown
-        val connected = (activity as? MainActivity)?.currentVpnState() == VpnState.CONNECTED
-        val upSpeed = if (connected) traffic?.get(2) ?: 0 else 0
-        val downSpeed = if (connected) traffic?.get(3) ?: 0 else 0
+        val upSpeed = traffic?.get(2) ?: 0
+        val downSpeed = traffic?.get(3) ?: 0
         b.activeProfile.text = session.profileNameSnapshot
         b.activeMeta.text = getString(
             R.string.statistics_active_meta,
@@ -289,19 +199,6 @@ class StatisticsFragment : Fragment() {
 
     private fun formatBytesPerSecond(bytes: Long): String = "${formatBytes(bytes)}/s"
 
-    private fun disconnectReasonLabel(reason: String?): String = getString(when {
-        reason == null -> R.string.statistics_disconnect_active
-        reason.startsWith("manual", ignoreCase = true) || reason.contains("user", ignoreCase = true) ->
-            R.string.statistics_disconnect_manual
-        reason.contains("reconnect", ignoreCase = true) || reason.contains("network", ignoreCase = true) ->
-            R.string.statistics_disconnect_network
-        reason.startsWith("error", ignoreCase = true) || reason.contains("fail", ignoreCase = true) ->
-            R.string.statistics_disconnect_error
-        reason.contains("destroy", ignoreCase = true) || reason.contains("service", ignoreCase = true) ->
-            R.string.statistics_disconnect_service
-        else -> R.string.statistics_disconnect_unknown
-    })
-
     private fun networkTypeLabel(type: String): String = getString(when (type.lowercase(Locale.ROOT)) {
         "wifi" -> R.string.settings_diagnostics_network_wifi
         "mobile" -> R.string.settings_diagnostics_network_mobile
@@ -310,15 +207,7 @@ class StatisticsFragment : Fragment() {
         else -> R.string.settings_diagnostics_network_other
     })
 
-    private fun resolveColor(attribute: Int): Int {
-        val values = requireContext().obtainStyledAttributes(intArrayOf(attribute))
-        return values.getColor(0, 0).also { values.recycle() }
-    }
-
-    private val Int.dp get() = (this * resources.displayMetrics.density).toInt()
-
     private companion object {
         const val CURRENT_SESSION_REFRESH_MILLIS = 1_000L
-        val INACTIVE_STATES = setOf(VpnState.NO_PROFILE, VpnState.DISCONNECTED, VpnState.ERROR)
     }
 }

@@ -142,6 +142,7 @@
     <string name="statistics_no_active_session">No active VPN session</string>
     <string name="statistics_today">Today</string>
     <string name="statistics_month">This month</string>
+    <string name="statistics_sessions_label">Sessions</string>
     <string name="statistics_recent_sessions">Recent sessions</string>
     <string name="statistics_no_history">No recorded sessions yet</string>
     <string name="statistics_active_session_format">%1$s · %2$s\nDuration: %3$s · Network: %4$s\nUpload: %5$s · Download: %6$s\nCurrent speed: ↑ %7$s · ↓ %8$s</string>

@@ -4,10 +4,12 @@
 
 ## 1.4.16 — 2026-09-08
 
-- UI: grouped quick settings card for Auto Failover and UDP Relay with descriptive icons, titles and subtitles.
+- UI: modern compact floating navigation bar (66dp height, 24dp icons, 32dp pill indicator) with haptic feedback.
+- UI: grouped quick settings card for Auto Failover and UDP Relay with silent state toggles.
 - UI: dynamic latency pill badge with colored quality tiers (green < 100ms, amber < 200ms, coral >= 200ms).
-- UI: tactile haptic feedback on connect toggle, profile card tap, and setting switches.
-- CI: enabled mobilecore AAR caching and parallel Gradle builds for fast release cycles; output release as draft.
+- UI: traffic statistics redesign — full-width segmented Today/Month toggle, clean labeled metrics, removed recent sessions clutter, fixed 1-second state jitter.
+- UI: streamlined diagnostics dialog with clear non-technical terminology and outlined action buttons.
+- CI: enabled mobilecore AAR caching and parallel Gradle builds (release build under 5 minutes); output release as draft.
 
 ## 1.4.15 — 2026-09-08
 

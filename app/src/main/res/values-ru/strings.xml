@@ -143,6 +143,7 @@
     <string name="statistics_no_active_session">Нет активной VPN-сессии</string>
     <string name="statistics_today">Сегодня</string>
     <string name="statistics_month">Этот месяц</string>
+    <string name="statistics_sessions_label">Сессий</string>
     <string name="statistics_recent_sessions">Последние сессии</string>
     <string name="statistics_no_history">История подключений пока пуста</string>
     <string name="statistics_active_session_format">%1$s · %2$s\nДлительность: %3$s · Сеть: %4$s\nОтправлено: %5$s · Получено: %6$s\nТекущая скорость: ↑ %7$s · ↓ %8$s</string>
