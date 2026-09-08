@@ -866,7 +866,12 @@ class SettingsFragment : Fragment() {
             addView(TextView(requireContext()).apply {
                 text = getString(R.string.settings_diagnostics_description)
                 setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
-                setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
+                setTextColor(
+                    com.google.android.material.color.MaterialColors.getColor(
+                        this,
+                        com.google.android.material.R.attr.colorOnSurfaceVariant,
+                    ),
+                )
                 setPadding(0, 10.dp, 0, 14.dp)
             })
             listOf(
