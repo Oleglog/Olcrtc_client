@@ -79,7 +79,6 @@ jobs:
         env:
           ANDROID_HOME: ${{ env.ANDROID_HOME }}
           ANDROID_NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/28.2.13676358
-          FORCE_NATIVE_REBUILD: "1"
           MOBILECORE_TARGET: android
 
       - name: Verify mobilecore AAR dependency metadata
