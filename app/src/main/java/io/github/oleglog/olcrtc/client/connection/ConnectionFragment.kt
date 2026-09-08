@@ -12,6 +12,7 @@ import android.os.Looper
 import android.text.format.Formatter
 import android.util.TypedValue
 import android.view.Gravity
+import android.view.HapticFeedbackConstants
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -143,6 +144,7 @@ class ConnectionFragment : Fragment() {
         binding.testSelected.isEnabled = false
         renderContentState(ConnectionContentState.LOADING)
         binding.connect.setOnClickListener {
+            binding.connect.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
             when {
                 currentState in BUSY_STATES -> activityHost.stopVpn()
                 shouldSwitchProfile(currentState, hasPendingProfileSwitch()) -> connectSelected()
@@ -158,6 +160,7 @@ class ConnectionFragment : Fragment() {
         // default off; the service reads it on each failure.
         binding.autoFailover.isChecked = settings.getAutoFailover()
         binding.autoFailover.setOnCheckedChangeListener { _, checked ->
+            binding.autoFailover.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
             storage.execute {
                 val saved = runCatching { settings.setAutoFailoverBlocking(checked) }
                 activity?.runOnUiThread {
@@ -175,6 +178,7 @@ class ConnectionFragment : Fragment() {
         // takes effect on the next connect, same as auto failover.
         binding.udpRelay.isChecked = settings.getUdpRelay()
         binding.udpRelay.setOnCheckedChangeListener { _, checked ->
+            binding.udpRelay.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
             storage.execute {
                 val saved = runCatching { settings.setUdpRelayBlocking(checked) }
                 activity?.runOnUiThread {
@@ -350,6 +354,7 @@ class ConnectionFragment : Fragment() {
             views.profileActions.contentDescription = getString(R.string.connection_profile_actions, item.name)
             views.profileActions.setOnClickListener { showProfileActions(it, item) }
             views.root.setOnClickListener {
+                views.root.performHapticFeedback(HapticFeedbackConstants.VIRTUAL_KEY)
                 item.localId?.let(::selectProfile)
                     ?: selectSubscriptionProfile(requireNotNull(item.subscriptionProfileId))
             }
@@ -456,11 +461,12 @@ class ConnectionFragment : Fragment() {
             state == ConnectionCardState.SELECTED -> getString(R.string.connection_card_selected)
             else -> null
         }
+        val latencyMs = profileProbeResults[item.reference]
         val probeStatus = when {
             checkingProfiles.contains(item.reference) -> null
             !profileProbeResults.containsKey(item.reference) -> null
-            profileProbeResults[item.reference] == null -> getString(R.string.profile_test_unavailable)
-            else -> getString(R.string.connection_latency_value, profileProbeResults.getValue(item.reference))
+            latencyMs == null -> getString(R.string.profile_test_unavailable)
+            else -> getString(R.string.connection_latency_value, latencyMs)
         }
         views.profileDetail.text = listOfNotNull(
             item.type,
@@ -468,6 +474,16 @@ class ConnectionFragment : Fragment() {
         ).joinToString(" · ")
         views.profileLatency.text = probeStatus
         views.profileLatency.isVisible = probeStatus != null
+        if (latencyMs != null) {
+            val colorRes = when {
+                latencyMs < 100 -> R.color.latency_good
+                latencyMs < 200 -> R.color.latency_moderate
+                else -> R.color.latency_poor
+            }
+            views.profileLatency.setTextColor(ContextCompat.getColor(card.context, colorRes))
+        } else {
+            views.profileLatency.setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
+        }
         views.profileProgress.isVisible = checkingProfiles.contains(item.reference) ||
             connectionStatus != null && currentState in CARD_PROGRESS_STATES
         card.contentDescription = listOfNotNull(

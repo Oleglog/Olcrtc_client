@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 1.4.16 — 2026-09-08
+
+- UI: grouped quick settings card for Auto Failover and UDP Relay with descriptive icons, titles and subtitles.
+- UI: dynamic latency pill badge with colored quality tiers (green < 100ms, amber < 200ms, coral >= 200ms).
+- UI: tactile haptic feedback on connect toggle, profile card tap, and setting switches.
+- CI: enabled mobilecore AAR caching and parallel Gradle builds for fast release cycles; output release as draft.
+
 ## 1.4.15 — 2026-09-08
 
 - UDP relay: user-friendly UI toggle descriptions (removed technical server version requirements and error codes from strings), MTU lowered to 1400 in HEV tunnel config to prevent datagram fragmentation and dropped packets.

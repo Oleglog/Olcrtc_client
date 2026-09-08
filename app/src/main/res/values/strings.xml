@@ -118,9 +118,13 @@
     <string name="profile_copy_link">Copy link</string>
     <string name="profile_link_copied">Profile link copied. It will be cleared from the clipboard in a minute.</string>
     <string name="failover_auto">Auto: try other connections on failure</string>
+    <string name="failover_auto_title">Auto failover</string>
+    <string name="failover_auto_subtitle">Try other connections on failure</string>
     <string name="failover_enabled">Auto failover on: the app will try other connections after 2 failed attempts</string>
     <string name="failover_disabled">Auto failover off: the app will keep retrying the same connection</string>
     <string name="udp_relay">UDP relay: calls &amp; games (experimental)</string>
+    <string name="udp_relay_title">UDP relay</string>
+    <string name="udp_relay_subtitle">For voice calls and online games</string>
     <string name="udp_relay_enabled">UDP relay on: for voice calls and online games</string>
     <string name="udp_relay_disabled">UDP relay off: calls and app traffic route over TCP</string>
     <string name="udp_relay_description">Route application UDP traffic through the tunnel. Needed for voice calls (Discord, Telegram) and online games. Does not affect web browsing or Speedtest.</string>

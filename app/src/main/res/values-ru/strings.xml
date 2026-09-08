@@ -119,9 +119,13 @@
     <string name="profile_copy_link">Копировать ссылку</string>
     <string name="profile_link_copied">Ссылка профиля скопирована. Через минуту она будет удалена из буфера обмена.</string>
     <string name="failover_auto">Авто: пробовать другие подключения при сбое</string>
+    <string name="failover_auto_title">Автопереключение</string>
+    <string name="failover_auto_subtitle">Пробовать другие подключения при сбое</string>
     <string name="failover_enabled">Авто-переключение включено: после 2 неудачных попыток приложение попробует другие подключения</string>
     <string name="failover_disabled">Авто-переключение выключено: приложение будет повторять то же подключение</string>
     <string name="udp_relay">UDP-реле: звонки и игры (экспериментально)</string>
+    <string name="udp_relay_title">UDP-реле</string>
+    <string name="udp_relay_subtitle">Для голосовых звонков и онлайн-игр</string>
     <string name="udp_relay_enabled">UDP-реле включено: для голосовых звонков и онлайн-игр</string>
     <string name="udp_relay_disabled">UDP-реле выключено: звонки и трафик приложений идут через TCP</string>
     <string name="udp_relay_description">Направляет UDP-трафик приложений через туннель. Необходимо для голосовых звонков (Discord, Telegram) и онлайн-игр. Не влияет на веб-серфинг и Speedtest.</string>

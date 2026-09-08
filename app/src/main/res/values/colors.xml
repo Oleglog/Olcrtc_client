@@ -15,6 +15,9 @@
     <color name="olcrtc_outline">#778087</color>
     <color name="olcrtc_error">#9C3A2A</color>
     <color name="olcrtc_on_error">#FFFFFF</color>
+    <color name="latency_good">#2E7D32</color>
+    <color name="latency_moderate">#D97706</color>
+    <color name="latency_poor">#D32F2F</color>
 
     <color name="olcrtc_bronze_primary">#8B5E2E</color>
     <color name="olcrtc_bronze_on_primary">#FFFFFF</color>

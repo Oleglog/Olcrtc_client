@@ -55,11 +55,16 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="@dimen/space_3"
+            android:background="@drawable/bg_latency_badge"
             android:fontFamily="monospace"
-            android:gravity="end"
-            android:maxWidth="88dp"
-            android:textAppearance="?attr/textAppearanceLabelLarge"
-            android:textColor="?attr/colorPrimary"
+            android:gravity="center"
+            android:minWidth="52dp"
+            android:paddingStart="8dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="4dp"
+            android:textAppearance="?attr/textAppearanceLabelMedium"
+            android:textStyle="bold"
             android:visibility="gone" />
 
         <com.google.android.material.progressindicator.CircularProgressIndicator

@@ -165,6 +165,7 @@ jobs:
           name: olcRTC Client ${{ github.event.inputs.tag || github.ref_name }}
           files: release-artifacts/*
           generate_release_notes: true
+          draft: true
 
       - name: Keep latest fifteen GitHub Releases
         shell: bash
