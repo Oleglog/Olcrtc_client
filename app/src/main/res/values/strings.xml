@@ -211,7 +211,7 @@
     <string name="settings_row_summary">%1$s\n%2$s</string>
     <string name="settings_system_row_summary">Language, background operation and Android VPN options</string>
     <string name="settings_version_summary">Version %1$s</string>
-    <string name="settings_diagnostics_row_summary">State, versions and redacted local journal</string>
+    <string name="settings_diagnostics_row_summary">Tunnel state, component versions, and connection logs</string>
     <string name="settings_apps_row_summary">%1$s · selected: %2$d</string>
     <string name="settings_manage_rules">Routing rules</string>
     <string name="settings_routing_preset">Routing mode</string>
@@ -311,10 +311,10 @@
     <string name="traffic_zero">0 B</string>
     <string name="traffic_zero_rate">0 B/s</string>
     <string name="traffic_rate_format">%1$s/s</string>
-    <string name="settings_diagnostics_description">Local troubleshooting logs with secrets removed. Nothing is sent automatically.</string>
-    <string name="settings_view_diagnostics">View redacted diagnostics</string>
-    <string name="settings_copy_diagnostics">Copy redacted diagnostics</string>
-    <string name="settings_export_diagnostics">Export redacted diagnostics</string>
+    <string name="settings_diagnostics_description">Local connection logs with passwords and encryption keys removed. Safe to share for technical support.</string>
+    <string name="settings_view_diagnostics">View connection log</string>
+    <string name="settings_copy_diagnostics">Copy connection log</string>
+    <string name="settings_export_diagnostics">Share connection log</string>
     <string name="settings_report_issue">Report a problem</string>
     <string name="settings_no_diagnostics">No diagnostic logs yet</string>
     <string name="settings_diagnostics_summary">App: %1$s\nXray: %2$s\nolcRTC core: %3$s\nState: %4$s\nProfile: %5$s\nNetwork: %6$s\nLast error: %7$s</string>
@@ -328,7 +328,7 @@
     <string name="settings_diagnostics_network_other">Other</string>
     <string name="settings_diagnostics_network_unknown">Unavailable</string>
     <string name="settings_diagnostics_reconnecting">Restoring connection</string>
-    <string name="settings_diagnostics_copied">Redacted diagnostics copied</string>
+    <string name="settings_diagnostics_copied">Connection log copied to clipboard</string>
     <string name="settings_run_network_check">Check carrier reachability</string>
     <string name="settings_network_check_title">Network check</string>
     <string name="settings_network_check_running">Probing Jitsi, Telemost and WBStream front doors…</string>

@@ -166,11 +166,6 @@ class ConnectionFragment : Fragment() {
                 activity?.runOnUiThread {
                     if (_binding == null) return@runOnUiThread
                     saved.onFailure { showStatus(it.message) }
-                    showStatus(
-                        getString(
-                            if (checked) R.string.failover_enabled else R.string.failover_disabled,
-                        ),
-                    )
                 }
             }
         }
@@ -184,11 +179,6 @@ class ConnectionFragment : Fragment() {
                 activity?.runOnUiThread {
                     if (_binding == null) return@runOnUiThread
                     saved.onFailure { showStatus(it.message) }
-                    showStatus(
-                        getString(
-                            if (checked) R.string.udp_relay_enabled else R.string.udp_relay_disabled,
-                        ),
-                    )
                 }
             }
         }

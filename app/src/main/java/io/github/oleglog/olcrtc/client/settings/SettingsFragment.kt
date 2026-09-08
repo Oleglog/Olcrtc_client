@@ -857,10 +857,17 @@ class SettingsFragment : Fragment() {
         )
         val content = LinearLayout(requireContext()).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(24.dp, 8.dp, 24.dp, 0)
+            setPadding(24.dp, 12.dp, 24.dp, 8.dp)
             addView(TextView(requireContext()).apply {
                 text = summary
                 setTextIsSelectable(true)
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
+            })
+            addView(TextView(requireContext()).apply {
+                text = getString(R.string.settings_diagnostics_description)
+                setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodySmall)
+                setTextColor(resolveColor(com.google.android.material.R.attr.colorOnSurfaceVariant))
+                setPadding(0, 10.dp, 0, 14.dp)
             })
             listOf(
                 R.string.settings_run_network_check to ::runNetworkCheck,
@@ -869,8 +876,20 @@ class SettingsFragment : Fragment() {
                 R.string.settings_export_diagnostics to ::exportDiagnostics,
                 R.string.settings_report_issue to ::reportIssue,
             ).forEach { (label, action) ->
-                addView(com.google.android.material.button.MaterialButton(requireContext()).apply {
+                addView(com.google.android.material.button.MaterialButton(
+                    requireContext(),
+                    null,
+                    com.google.android.material.R.attr.materialButtonOutlinedStyle,
+                ).apply {
                     setText(label)
+                    cornerRadius = 10.dp
+                    minHeight = 44.dp
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                    ).apply {
+                        bottomMargin = 8.dp
+                    }
                     setOnClickListener { action() }
                 })
             }

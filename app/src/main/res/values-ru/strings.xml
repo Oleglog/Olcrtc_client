@@ -212,7 +212,7 @@
     <string name="settings_row_summary">%1$s\n%2$s</string>
     <string name="settings_system_row_summary">Язык, фоновая работа и системные параметры VPN</string>
     <string name="settings_version_summary">Версия %1$s</string>
-    <string name="settings_diagnostics_row_summary">Состояние, версии и очищенный локальный журнал</string>
+    <string name="settings_diagnostics_row_summary">Состояние туннеля, версии компонентов и журнал работы</string>
     <string name="settings_apps_row_summary">%1$s · выбрано: %2$d</string>
     <string name="settings_manage_rules">Правила маршрутизации</string>
     <string name="settings_routing_preset">Режим маршрутизации</string>
@@ -307,10 +307,10 @@
     <string name="traffic_zero">0 Б</string>
     <string name="traffic_zero_rate">0 Б/с</string>
     <string name="traffic_rate_format">%1$s/с</string>
-    <string name="settings_diagnostics_description">Локальные журналы без секретных данных. Ничего не отправляется автоматически.</string>
-    <string name="settings_view_diagnostics">Открыть очищенный журнал</string>
-    <string name="settings_copy_diagnostics">Копировать очищенный журнал</string>
-    <string name="settings_export_diagnostics">Экспортировать очищенный журнал</string>
+    <string name="settings_diagnostics_description">Локальный журнал работы без паролей и ключей шифрования. Безопасно для отправки разработчикам при сбоях.</string>
+    <string name="settings_view_diagnostics">Просмотреть журнал работы</string>
+    <string name="settings_copy_diagnostics">Скопировать журнал</string>
+    <string name="settings_export_diagnostics">Поделиться журналом</string>
     <string name="settings_report_issue">Сообщить о проблеме</string>
     <string name="settings_diagnostics_summary">Приложение: %1$s\nXray: %2$s\nolcRTC core: %3$s\nСостояние: %4$s\nПрофиль: %5$s\nСеть: %6$s\nПоследняя ошибка: %7$s</string>
     <string name="settings_diagnostics_profile_local">Сохранённое подключение</string>
@@ -324,7 +324,7 @@
     <string name="settings_diagnostics_network_unknown">Недоступна</string>
     <string name="settings_diagnostics_reconnecting">Восстановление соединения</string>
     <string name="settings_no_diagnostics">Диагностических записей пока нет</string>
-    <string name="settings_diagnostics_copied">Очищенный журнал скопирован</string>
+    <string name="settings_diagnostics_copied">Журнал работы скопирован</string>
     <string name="settings_run_network_check">Проверить доступность провайдеров</string>
     <string name="settings_network_check_title">Проверка сети</string>
     <string name="settings_network_check_running">Проверяю Jitsi, Telemost и WBStream…</string>
