@@ -31,8 +31,8 @@
     {
       "name": "olcRTC mobile/core (via Oleglog/Olcrtc_manager fork replace)",
       "source": "https://github.com/openlibrecommunity/olcrtc",
-      "ref": "v0.0.0-20260907185024-d3adc2cab773",
-      "commit": "d3adc2cab773159a80057c54c6faa3654a36b0b6",
+      "ref": "v0.0.0-20260908093413-a2adb350f5cc",
+      "commit": "a2adb350f5ccac0bded4467c4fe3cd533ed57e8d",
       "license": "WTFPL"
     },
     {

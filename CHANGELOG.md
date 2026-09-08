@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+## 1.4.15 — 2026-09-08
+
+- UDP relay: user-friendly UI toggle descriptions (removed technical server version requirements and error codes from strings), MTU lowered to 1400 in HEV tunnel config to prevent datagram fragmentation and dropped packets.
+- Core pin raised to `Oleglog/Olcrtc_manager` at `a2adb35` (server-v1.9.78): optimized NAT table locking (IP parsing and DNS resolution outside table mutex), UDP session datagram counters logged on finish.
+
 ## 1.4.14 — 2026-09-07
 
 - Fixed the UDP relay being dead on device (server pair: server-v1.9.77). Two root bugs in the relay protocol: the client shipped raw SOCKS5 datagrams with the source address as destination (the target lives inside the RFC 1928 datagram header), so the server dialed its own loopback and every datagram died; and the server returned at most one reply per datagram, which cannot carry RTP/QUIC streams. The core pin now carries the SOCKS5 datagram codec (fragment/truncation refusal, IPv4/IPv6/domain targets, reply re-wrapping) and a NAT table with persistent per-destination sockets, per-socket reply pumps, idle reaping and bidirectional 30 s keepalives so muted calls do not kill the relay.
