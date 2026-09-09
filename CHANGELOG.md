@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 1.5.0 — 2026-09-09
+
+- Tunnel & Web Surfing: restore tunnel MTU to 1500 to match Android VpnService MTU, completely resolving issues with stalled websites or timeouts on packets > 1400 bytes (TLS 1.3 ClientHello with post-quantum ML-KEM/Kyber keys in Chrome, large HTTP payloads).
+- Transport: remove spurious keepalive injection from eager VP8 writer loop in `legacyvp8channel`, keeping RTP timestamps linear and avoiding WebRTC SFU track stalls.
+- UI: modern floating navigation bar (Material 3 NavigationBar) with haptic feedback.
+- UI: grouped quick settings card for Auto Failover and UDP Relay with silent state toggles.
+- UI: dynamic latency pill badge with colored quality tiers (green < 100ms, amber < 200ms, coral >= 200ms).
+- UI: traffic statistics redesign — full-width segmented Today/Month toggle, clean labeled metrics, removed recent sessions clutter, eliminated 1-second state jitter.
+- UI: streamlined diagnostics dialog with clear non-technical terminology and outlined action buttons.
+- UDP Relay: full support for SOCKS5 UDP ASSOCIATE over smux multiplexer with persistent NAT table on server and friendly UI toggles.
+- CI: enabled mobilecore AAR caching and parallel Gradle builds.
+- Core: raised core pin to OlCRTC Server `server-v2.0.0` at `c267dd3`.
+
 ## 1.4.17 — 2026-09-09
 
 - Fix: restore tunnel MTU to 1500 to match Android VpnService MTU, fixing websites stalling or timing out due to packet drops on segments > 1400 bytes (TLS ClientHello with post-quantum ML-KEM/Kyber, large HTTP requests).
