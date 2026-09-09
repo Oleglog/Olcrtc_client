@@ -58,7 +58,7 @@ internal object NativeConfig {
 
     fun hev(socksPort: Int): ByteArray = """
         tunnel:
-          mtu: 1400
+          mtu: 1500
           ipv4: 10.0.0.2
         socks5:
           port: $socksPort

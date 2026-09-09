@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+## 1.4.17 — 2026-09-09
+
+- Fix: restore tunnel MTU to 1500 to match Android VpnService MTU, fixing websites stalling or timing out due to packet drops on segments > 1400 bytes (TLS ClientHello with post-quantum ML-KEM/Kyber, large HTTP requests).
+- Transport: remove spurious keepalive injection from eager VP8 writer loop, keeping RTP timestamps linear and avoiding SFU track stalls.
+- Core pin raised to `Oleglog/Olcrtc_manager` at `3eaf8dd` (server-v1.9.79).
+
 ## 1.4.16 — 2026-09-08
 
 - UI: modern compact floating navigation bar (66dp height, 24dp icons, 32dp pill indicator) with haptic feedback.

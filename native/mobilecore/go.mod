@@ -3,7 +3,7 @@ module github.com/openlibrecommunity/olcrtc/mobilecore
 go 1.26.3
 
 require (
-	github.com/openlibrecommunity/olcrtc v0.0.0-20260908093413-a2adb350f5cc
+	github.com/openlibrecommunity/olcrtc v0.0.0-20260909095828-3eaf8dd32a5a
 	github.com/pion/rtp v1.10.2
 	github.com/pion/webrtc/v4 v4.2.15
 	github.com/xtaci/kcp-go/v5 v5.6.72
@@ -128,4 +128,4 @@ replace github.com/zarazaex69/j => github.com/Oleglog/j v0.0.0-20260813164759-98
 // this is a replace — not a second require. The fork-only commits do not
 // exist upstream, so the openlibrecommunity pseudo-version above would not
 // resolve without it. CI's `go mod tidy` keeps go.sum for the replacement.
-replace github.com/openlibrecommunity/olcrtc => github.com/Oleglog/Olcrtc_manager v0.0.0-20260908093413-a2adb350f5cc
+replace github.com/openlibrecommunity/olcrtc => github.com/Oleglog/Olcrtc_manager v0.0.0-20260909095828-3eaf8dd32a5a

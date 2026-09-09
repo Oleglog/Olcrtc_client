@@ -12,7 +12,7 @@ olcRTC Client is proprietary software and uses separately licensed components.
 | JUnit 4 | EPL-1.0 | Unit tests only |
 | Espresso | Apache-2.0 | Instrumentation tests only |
 | Xray-core `v26.2.6` (`12ee51e4bb1d02ece4ef4b7114efa2bcdc130995`) | MPL-2.0 | Proxy core and routing |
-| olcRTC mobile/core `v0.0.0-20260908093413-a2adb350f5cc` (`a2adb350f5ccac0bded4467c4fe3cd533ed57e8d`, via `Oleglog/Olcrtc_manager` fork replace) | WTFPL | Current olcRTC runtime and transport |
+| olcRTC mobile/core `v0.0.0-20260909095828-3eaf8dd32a5a` (`3eaf8dd32a5a550895cdd9e3d354a912b4c7cd2c`, via `Oleglog/Olcrtc_manager` fork replace) | WTFPL | Current olcRTC runtime and transport |
 | Olcrtc_manager legacy VP8 transport `server-v1.9.64` (`ec536083969fbb0398172192dfb780eb3f031890`) | WTFPL | 32-byte VP8 wire compatibility |
 | hev-socks5-tunnel `2.15.0` (`00c7eb9ad7ca381b0f1fee880abc1077fe9b93be`) | MIT | TUN to SOCKS5 adapter |
 | gomobile `v0.0.0-20260410095206-2cfb76559b7b` (`2cfb76559b7b64602788d193d8f1387d81bbb481`) | BSD-3-Clause | Go Android bindings tool |
