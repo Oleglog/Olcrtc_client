@@ -17,8 +17,12 @@ fi
 gomobile init
 (
   cd "$MODULE"
+  echo "Running go mod tidy..."
   go mod tidy
-  test -z "$(gofmt -l .)"
-  go test ./...
+  echo "Checking gofmt..."
+  test -z "$(gofmt -l .)" || { echo "gofmt failed on:"; gofmt -l .; exit 1; }
+  echo "Running go test..."
+  go test -v ./...
+  echo "Running gomobile bind..."
   gomobile bind -target="${MOBILECORE_TARGET:-android}" -androidapi 26 -ldflags="-s -w -checklinkname=0" -o "$OUTPUT" .
 )
