@@ -178,6 +178,7 @@ internal class SubscriptionRefresher(
 
     private fun identity(profile: ImportedProfile): String = when (profile) {
         is ImportedProfile.Olcrtc -> ProfileIdentity.hash(profile.value)
+        is ImportedProfile.OpenFlux -> ProfileIdentity.hash(profile.value)
         is ImportedProfile.Standard -> ProfileIdentity.hash(profile.value)
     }
 

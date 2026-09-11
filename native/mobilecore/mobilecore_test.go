@@ -59,6 +59,17 @@ func TestWaitXrayReadyRejectsInvalidArguments(t *testing.T) {
 	if err := WaitXrayReady(0, 100); err == nil {
 		t.Fatal("WaitXrayReady accepted an invalid port")
 	}
+}
+
+func TestOpenFluxStartStop(t *testing.T) {
+	if IsOpenFluxRunning() {
+		t.Fatal("OpenFlux should not be running initially")
+	}
+	StopOpenFlux()
+	if IsOpenFluxRunning() {
+		t.Fatal("OpenFlux should still be stopped")
+	}
+}
 	if err := WaitXrayReady(1080, 0); err == nil {
 		t.Fatal("WaitXrayReady accepted an invalid timeout")
 	}

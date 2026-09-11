@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">olcRTC Client</string>
+    <string name="app_name">OlConnect</string>
     <string name="navigation_connection">VPN</string>
     <string name="navigation_profiles">Subscriptions</string>
     <string name="navigation_statistics">Traffic</string>

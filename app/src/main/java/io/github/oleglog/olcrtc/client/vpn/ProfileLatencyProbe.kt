@@ -32,6 +32,11 @@ internal class ProfileLatencyProbe(
             }
             targets.filter { it.config is ProfileConfig.Olcrtc }
                 .forEach { testOlcrtc(it, onStarted, onResult) }
+            targets.filter { it.config is ProfileConfig.OpenFlux }
+                .forEach { target ->
+                    onStarted(listOf(target.reference))
+                    onResult(target.reference, Result.failure(UnsupportedOperationException("Latency test not supported for OpenFlux")))
+                }
         } finally {
             GomobileCore.stopProfileProbe()
         }

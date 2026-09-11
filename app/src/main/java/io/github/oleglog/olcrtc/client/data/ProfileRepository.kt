@@ -60,6 +60,7 @@ internal data class SubscriptionProfileSummary(
 internal class ProfileRepository(
     private val olcrtcProfiles: OlcrtcProfileDao,
     private val standardProfiles: StandardProfileDao,
+    private val openfluxProfiles: OpenFluxProfileDao,
     private val subscriptions: SubscriptionDao,
     private val routingRules: RoutingRuleDao,
     private val secrets: SecretCipher,
@@ -78,6 +79,8 @@ internal class ProfileRepository(
     fun listLocal(): List<ProfileSummary> =
         olcrtcProfiles.getAll().map {
             ProfileSummary(it.id, it.name, "olcRTC", "${it.provider} · ${it.roomId}")
+        } + openfluxProfiles.getAll().map {
+            ProfileSummary(OPENFLUX_ID_OFFSET + it.id, it.name, "OpenFlux", "Yandex · ${it.transport}")
         } + standardProfiles.getAll().map {
             ProfileSummary(STANDARD_ID_OFFSET + it.id, it.name, it.protocol, "${it.address}:${it.port}")
         }
@@ -115,16 +118,17 @@ internal class ProfileRepository(
     }
 
     fun deleteLocal(id: Long) {
-        val deleted = if (id >= STANDARD_ID_OFFSET) {
-            standardProfiles.delete(id - STANDARD_ID_OFFSET)
-        } else {
-            olcrtcProfiles.delete(id)
+        val deleted = when {
+            id >= OPENFLUX_ID_OFFSET -> openfluxProfiles.delete(id - OPENFLUX_ID_OFFSET)
+            id >= STANDARD_ID_OFFSET -> standardProfiles.delete(id - STANDARD_ID_OFFSET)
+            else -> olcrtcProfiles.delete(id)
         }
         require(deleted == 1) { "Profile not found" }
     }
 
     fun get(id: Long): ProfileConfig? = when {
         id <= 0 -> null
+        id >= OPENFLUX_ID_OFFSET -> openfluxProfiles.get(id - OPENFLUX_ID_OFFSET)?.toProfile()?.let(ProfileConfig::OpenFlux)
         id >= STANDARD_ID_OFFSET -> standardProfiles.get(id - STANDARD_ID_OFFSET)?.toProfile()?.let(ProfileConfig::Standard)
         else -> olcrtcProfiles.get(id)?.toProfile()?.let(ProfileConfig::Olcrtc)
     }
@@ -160,6 +164,7 @@ internal class ProfileRepository(
     private fun measureLatency(profile: ProfileConfig): Long = when (profile) {
         is ProfileConfig.Standard -> profile.value.measureTcpLatency()
         is ProfileConfig.Olcrtc -> throw IllegalArgumentException("Latency test requires an endpoint profile")
+        is ProfileConfig.OpenFlux -> throw IllegalArgumentException("Latency test not supported for OpenFlux")
     }
 
     private fun StandardProfile.measureTcpLatency(timeoutMillis: Int = 5_000): Long {
@@ -208,6 +213,7 @@ internal class ProfileRepository(
         subscriptions.getProfile(profileId)?.takeUnless(SubscriptionProfileEntity::isDeleted)?.toImportedProfile()?.let { profile ->
             when (profile) {
                 is ImportedProfile.Olcrtc -> ProfileConfig.Olcrtc(profile.value)
+                is ImportedProfile.OpenFlux -> ProfileConfig.OpenFlux(profile.value)
                 is ImportedProfile.Standard -> ProfileConfig.Standard(profile.value)
             }
         }
@@ -484,6 +490,13 @@ internal class ProfileRepository(
             identityHash = ProfileIdentity.hash(profile.value),
             configJson = profile.value.toJson(),
         )
+        is ImportedProfile.OpenFlux -> PreparedSubscriptionProfile(
+            type = "OPENFLUX",
+            name = profile.value.name,
+            compatibilityMode = OlcrtcProfile.CompatibilityMode.CURRENT.value,
+            identityHash = ProfileIdentity.hash(profile.value),
+            configJson = profile.value.toJson(),
+        )
         is ImportedProfile.Standard -> PreparedSubscriptionProfile(
             type = profile.value.protocol.name,
             name = profile.value.name,
@@ -498,29 +511,49 @@ internal class ProfileRepository(
     ): ImportedProfile {
         val value = JSONObject(configJson)
         val profileName = value.stringOrNull("name") ?: name
-        return if (type == "OLCRTC") {
-            ImportedProfile.Olcrtc(
-                OlcrtcProfile(
-                    name = profileName,
-                    provider = OlcrtcProfile.Provider.parse(value.getString("provider")),
-                    transport = OlcrtcProfile.Transport.parse(value.getString("transport")),
-                    compatibilityMode = OlcrtcProfile.CompatibilityMode.parse(compatibilityMode),
-                    roomId = value.getString("roomId"),
-                    roomPassword = value.stringOrNull("roomPassword"),
-                    clientId = value.getString("clientId"),
-                    keyHex = value.getString("keyHex"),
-                    dnsServer = value.stringOrNull("dnsServer"),
-                    vp8Fps = value.getInt("vp8Fps"),
-                    vp8BatchSize = value.getInt("vp8BatchSize"),
-                    keepaliveIntervalSeconds = value.getInt("keepaliveIntervalSeconds"),
-                ),
-            )
-        } else {
-            ImportedProfile.Standard(
-                value.toStandardProfile(profileName, type, value.getString("address"), value.getInt("port")),
-            )
+        return when (type) {
+            "OLCRTC" -> {
+                ImportedProfile.Olcrtc(
+                    OlcrtcProfile(
+                        name = profileName,
+                        provider = OlcrtcProfile.Provider.parse(value.getString("provider")),
+                        transport = OlcrtcProfile.Transport.parse(value.getString("transport")),
+                        compatibilityMode = OlcrtcProfile.CompatibilityMode.parse(compatibilityMode),
+                        roomId = value.getString("roomId"),
+                        roomPassword = value.stringOrNull("roomPassword"),
+                        clientId = value.getString("clientId"),
+                        keyHex = value.getString("keyHex"),
+                        dnsServer = value.stringOrNull("dnsServer"),
+                        vp8Fps = value.getInt("vp8Fps"),
+                        vp8BatchSize = value.getInt("vp8BatchSize"),
+                        keepaliveIntervalSeconds = value.getInt("keepaliveIntervalSeconds"),
+                    ),
+                )
+            }
+            "OPENFLUX" -> {
+                ImportedProfile.OpenFlux(
+                    io.github.oleglog.olcrtc.client.profile.openflux.OpenFluxProfile(
+                        name = profileName,
+                        documentUrl = value.getString("documentUrl"),
+                        transport = io.github.oleglog.olcrtc.client.profile.openflux.OpenFluxProfile.Transport.parse(value.getString("transport")),
+                        dnsServer = value.stringOrNull("dnsServer"),
+                    ),
+                )
+            }
+            else -> {
+                ImportedProfile.Standard(
+                    value.toStandardProfile(profileName, type, value.getString("address"), value.getInt("port")),
+                )
+            }
         }
     }
+
+    private fun io.github.oleglog.olcrtc.client.profile.openflux.OpenFluxProfile.toJson(): String = JSONObject()
+        .put("name", name)
+        .put("documentUrl", documentUrl)
+        .put("transport", transport.value)
+        .put("dnsServer", dnsServer)
+        .toString()
 
     private fun OlcrtcProfile.toJson(): String = JSONObject()
         .put("name", name)
@@ -682,11 +715,13 @@ internal class ProfileRepository(
 
     private fun ProfileConfig.exportUri(): String = when (this) {
         is ProfileConfig.Olcrtc -> OlcrtcUri.serialize(value)
+        is ProfileConfig.OpenFlux -> io.github.oleglog.olcrtc.client.profile.openflux.OpenFluxUri.serialize(value)
         is ProfileConfig.Standard -> StandardUri.serialize(value)
     }
 
     private fun ImportedProfile?.endpointDescription(): String = when (this) {
         is ImportedProfile.Olcrtc -> "${value.provider.value} · ${value.roomId}"
+        is ImportedProfile.OpenFlux -> "OpenFlux · ${value.transport.value}"
         is ImportedProfile.Standard -> "${value.address}:${value.port}"
         null -> "unavailable"
     }
@@ -694,8 +729,35 @@ internal class ProfileRepository(
     private fun JSONObject.stringOrNull(name: String): String? =
         if (isNull(name)) null else getString(name)
 
+    fun insertLocal(profile: io.github.oleglog.olcrtc.client.profile.openflux.OpenFluxProfile): Long {
+        val entity = profile.toEntity()
+        return OPENFLUX_ID_OFFSET + openfluxProfiles.insert(entity)
+    }
+
+    fun update(id: Long, profile: io.github.oleglog.olcrtc.client.profile.openflux.OpenFluxProfile) {
+        val entity = profile.toEntity(id - OPENFLUX_ID_OFFSET)
+        openfluxProfiles.update(entity)
+    }
+
+    private fun io.github.oleglog.olcrtc.client.profile.openflux.OpenFluxProfile.toEntity(id: Long = 0) = OpenFluxProfileEntity(
+        id = id,
+        identityHash = ProfileIdentity.hash(this),
+        name = name,
+        documentUrl = secrets.encrypt(documentUrl),
+        transport = transport.value,
+        dnsServer = dnsServer.orEmpty(),
+    )
+
+    private fun OpenFluxProfileEntity.toProfile() = io.github.oleglog.olcrtc.client.profile.openflux.OpenFluxProfile(
+        name = name,
+        documentUrl = secrets.decrypt(documentUrl),
+        transport = io.github.oleglog.olcrtc.client.profile.openflux.OpenFluxProfile.Transport.parse(transport),
+        dnsServer = dnsServer.takeIf(String::isNotBlank),
+    )
+
     companion object {
         internal const val STANDARD_ID_OFFSET = 1L shl 62
+        internal const val OPENFLUX_ID_OFFSET = 1L shl 61
         private const val DEFAULT_SUBSCRIPTION_INTERVAL_HOURS = 24
 
         fun open(context: Context): ProfileRepository {
@@ -703,6 +765,7 @@ internal class ProfileRepository(
             return ProfileRepository(
                 database.olcrtcProfiles(),
                 database.standardProfiles(),
+                database.openfluxProfiles(),
                 database.subscriptions(),
                 database.routingRules(),
                 SecretCipher(),

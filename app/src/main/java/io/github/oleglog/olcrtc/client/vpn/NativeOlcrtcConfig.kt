@@ -14,6 +14,10 @@ internal fun sessionDns(profile: ProfileConfig, globalDns: String?): SessionDns 
         tunnel = DnsEndpoint.parse(globalDns ?: DnsEndpoint.TUNNEL_DEFAULT),
         carrier = DnsEndpoint.parse(profile.value.dnsServer ?: globalDns ?: DnsEndpoint.DEFAULT),
     )
+    is ProfileConfig.OpenFlux -> SessionDns(
+        tunnel = DnsEndpoint.parse(globalDns ?: DnsEndpoint.TUNNEL_DEFAULT),
+        carrier = DnsEndpoint.parse(profile.value.dnsServer ?: globalDns ?: DnsEndpoint.DEFAULT),
+    )
     is ProfileConfig.Standard -> SessionDns(
         tunnel = DnsEndpoint.parse(profile.value.dnsServer ?: globalDns ?: DnsEndpoint.TUNNEL_DEFAULT),
     )

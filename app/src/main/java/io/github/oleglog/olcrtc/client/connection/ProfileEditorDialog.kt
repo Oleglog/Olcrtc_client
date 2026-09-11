@@ -51,11 +51,13 @@ internal object ProfileEditorDialog {
         }.also(form::addView)
         val build = when (profile) {
             is ProfileConfig.Olcrtc -> olcrtcForm(fragment, form, profile.value)
+            is ProfileConfig.OpenFlux -> openfluxForm(fragment, form, profile.value)
             is ProfileConfig.Standard -> standardForm(fragment, form, profile.value)
         }
         val initialDraft = runCatching(build).getOrNull() ?: profile
         val title = when (profile) {
             is ProfileConfig.Olcrtc -> profile.value.name
+            is ProfileConfig.OpenFlux -> profile.value.name
             is ProfileConfig.Standard -> profile.value.name
         }
         val dialog = MaterialAlertDialogBuilder(context)
@@ -186,6 +188,34 @@ internal object ProfileEditorDialog {
                     vp8Fps = speedPreset.selected.fps,
                     vp8BatchSize = speedPreset.selected.batchSize,
                     keepaliveIntervalSeconds = keepalive.intValue(0..3600, fragment.getString(R.string.profile_value_invalid)),
+                ),
+            )
+        }
+    }
+
+    private fun openfluxForm(
+        fragment: Fragment,
+        form: LinearLayout,
+        profile: io.github.oleglog.olcrtc.client.profile.openflux.OpenFluxProfile,
+    ): () -> ProfileConfig {
+        val name = field(fragment, form, R.string.profile_field_name, profile.name)
+        val url = field(fragment, form, R.string.profile_field_address, profile.documentUrl)
+        val transport = choice(
+            fragment,
+            form,
+            R.string.profile_field_transport,
+            io.github.oleglog.olcrtc.client.profile.openflux.OpenFluxProfile.Transport.entries,
+            profile.transport,
+        )
+        val dns = field(fragment, form, R.string.profile_field_dns, profile.dnsServer.orEmpty())
+
+        return {
+            ProfileConfig.OpenFlux(
+                io.github.oleglog.olcrtc.client.profile.openflux.OpenFluxProfile(
+                    name = name.requiredValue(fragment.getString(R.string.profile_value_required)),
+                    documentUrl = url.requiredValue(fragment.getString(R.string.profile_value_required)),
+                    transport = transport.selected,
+                    dnsServer = dns.optionalValue(),
                 ),
             )
         }

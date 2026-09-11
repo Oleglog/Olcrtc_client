@@ -4,10 +4,12 @@ go 1.26.3
 
 require (
 	github.com/openlibrecommunity/olcrtc v0.0.0-20260909104030-c267dd30b0bc
+	github.com/pierrec/lz4/v4 v4.1.27
 	github.com/pion/rtp v1.10.2
 	github.com/pion/webrtc/v4 v4.2.15
 	github.com/xtaci/kcp-go/v5 v5.6.72
 	github.com/xtls/xray-core v1.260206.0
+	gvisor.dev/gvisor v0.0.0-20260122175437-89a5d21be8f0
 )
 
 require (

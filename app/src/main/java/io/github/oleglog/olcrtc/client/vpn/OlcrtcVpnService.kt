@@ -1001,8 +1001,10 @@ class OlcrtcVpnService : VpnService() {
         val xraySocksPort: Int
         val xrayConfig: String
         val olcrtcConfig: NativeOlcrtcConfig?
+        val openfluxConfig: NativeOpenFluxConfig?
         when (profile) {
             is ProfileConfig.Olcrtc -> {
+                openfluxConfig = null
                 olcrtcConfig = NativeOlcrtcConfig.from(
                     profile.value,
                     freeLoopbackPort(),
@@ -1029,6 +1031,23 @@ class OlcrtcVpnService : VpnService() {
                     routingPolicy = routingPolicy,
                 )
             }
+            is ProfileConfig.OpenFlux -> {
+                olcrtcConfig = null
+                val fluxPort = freeLoopbackPort()
+                openfluxConfig = NativeOpenFluxConfig.from(profile.value, fluxPort)
+                diagnostics.append(
+                    "info",
+                    "OpenFlux runtime transport=${profile.value.transport.value} routing=${routingPolicy.preset}",
+                )
+                xraySocksPort = freeLoopbackPort(fluxPort)
+                xrayConfig = NativeConfig.xrayOpenFlux(
+                    socksPort = xraySocksPort,
+                    openfluxSocksPort = fluxPort,
+                    dns = dns.tunnel,
+                    routingRules = routingRules,
+                    routingPolicy = routingPolicy,
+                )
+            }
             is ProfileConfig.Standard -> {
                 diagnostics.append(
                     "info",
@@ -1037,6 +1056,7 @@ class OlcrtcVpnService : VpnService() {
                         "routing=${routingPolicy.preset}",
                 )
                 olcrtcConfig = null
+                openfluxConfig = null
                 xraySocksPort = freeLoopbackPort()
                 xrayConfig = NativeConfig.xray(
                     socksPort = xraySocksPort,
@@ -1065,6 +1085,7 @@ class OlcrtcVpnService : VpnService() {
                 xrayConfig = xrayConfig,
                 hevConfig = NativeConfig.hev(xraySocksPort),
                 olcrtcConfig = olcrtcConfig,
+                openfluxConfig = openfluxConfig,
             )
             attempt.requireActive()
             return StartedSession(session, xraySocksPort, dns.tunnel)
@@ -1529,6 +1550,10 @@ class OlcrtcVpnService : VpnService() {
                 is ProfileConfig.Olcrtc -> ProfileInfo(
                     name = profile.value.name,
                     protocol = "olcRTC · ${profile.value.provider.value}",
+                )
+                is ProfileConfig.OpenFlux -> ProfileInfo(
+                    name = profile.value.name,
+                    protocol = "OpenFlux · ${profile.value.transport.value}",
                 )
                 is ProfileConfig.Standard -> ProfileInfo(
                     name = profile.value.name,

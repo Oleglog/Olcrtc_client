@@ -1144,6 +1144,9 @@ class ConnectionFragment : Fragment() {
         is ImportedProfile.Olcrtc -> ImportPreview(
             localProfileId = profiles.findDuplicate(profile.value) ?: profiles.insert(profile.value),
         )
+        is ImportedProfile.OpenFlux -> ImportPreview(
+            localProfileId = profiles.insertLocal(profile.value),
+        )
         is ImportedProfile.Standard -> ImportPreview(
             localProfileId = profiles.findDuplicate(profile.value) ?: profiles.insert(profile.value),
         )
@@ -1269,6 +1272,7 @@ class ConnectionFragment : Fragment() {
             val result = runCatching {
                 when (profile) {
                     is ProfileConfig.Olcrtc -> profiles.update(profileId, profile.value)
+                    is ProfileConfig.OpenFlux -> profiles.update(profileId, profile.value)
                     is ProfileConfig.Standard -> profiles.update(profileId, profile.value)
                 }
             }
@@ -1309,6 +1313,7 @@ class ConnectionFragment : Fragment() {
                     profileId,
                     when (profile) {
                         is ProfileConfig.Olcrtc -> ImportedProfile.Olcrtc(profile.value)
+                        is ProfileConfig.OpenFlux -> ImportedProfile.OpenFlux(profile.value)
                         is ProfileConfig.Standard -> ImportedProfile.Standard(profile.value)
                     },
                 )

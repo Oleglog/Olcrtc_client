@@ -19,6 +19,7 @@ import (
 	currentvp8channel "github.com/openlibrecommunity/olcrtc/internal/transport/vp8channel"
 	olcrtc "github.com/openlibrecommunity/olcrtc/mobile"
 	"github.com/openlibrecommunity/olcrtc/mobilecore/legacyvp8channel"
+	"github.com/openlibrecommunity/olcrtc/mobilecore/openflux"
 	xraynet "github.com/xtls/xray-core/common/net"
 	"github.com/xtls/xray-core/common/session"
 	"github.com/xtls/xray-core/core"
@@ -400,6 +401,22 @@ func IsOlcrtcRunning() bool {
 	return olcrtc.IsRunning()
 }
 
+func StartOpenFlux(docURL string, transportType string, socksPort int64) error {
+	return openflux.Start(docURL, transportType, int(socksPort))
+}
+
+func StopOpenFlux() {
+	openflux.Stop()
+}
+
+func IsOpenFluxRunning() bool {
+	return openflux.IsRunning()
+}
+
+func WaitOpenFluxReady(timeoutMillis int64) error {
+	return openflux.WaitReady(int(timeoutMillis))
+}
+
 func TrafficBytesUp() int64 {
 	return 0
 }
@@ -442,6 +459,7 @@ func IsFatalError(message string) bool {
 
 func StopAll() error {
 	olcrtc.Stop()
+	openflux.Stop()
 	return StopXray()
 }
 

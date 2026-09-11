@@ -20,6 +20,13 @@ internal object ProfileIdentity {
         profile.keepaliveIntervalSeconds.toString(),
     )
 
+    fun hash(profile: io.github.oleglog.olcrtc.client.profile.openflux.OpenFluxProfile): String = digest(
+        "OPENFLUX",
+        profile.documentUrl.trim(),
+        profile.transport.value,
+        profile.dnsServer?.let { DnsEndpoint.parse(it).toString() },
+    )
+
     fun hash(profile: StandardProfile): String = digest(
         profile.protocol.name,
         profile.address.lowercase(),

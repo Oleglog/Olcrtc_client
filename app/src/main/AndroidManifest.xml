@@ -65,6 +65,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="olcrtc" />
+                <data android:scheme="openflux" />
                 <data android:scheme="vless" />
                 <data android:scheme="vmess" />
                 <data android:scheme="trojan" />

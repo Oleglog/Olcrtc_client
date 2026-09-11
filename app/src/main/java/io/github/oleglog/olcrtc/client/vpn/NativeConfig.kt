@@ -25,6 +25,21 @@ internal object NativeConfig {
         return config(socksPort, outbound, dns, routingRules, routingPolicy)
     }
 
+    fun xrayOpenFlux(
+        socksPort: Int,
+        openfluxSocksPort: Int,
+        dns: DnsEndpoint = DnsEndpoint.parse(DnsEndpoint.DEFAULT),
+        routingRules: List<RoutingRule> = emptyList(),
+        routingPolicy: RoutingPolicy = RoutingPolicy(),
+    ): String {
+        val outbound = """{
+          "protocol": "socks",
+          "tag": "proxy",
+          "settings": { "servers": [{ "address": "127.0.0.1", "port": $openfluxSocksPort }] }
+        }""".trimIndent()
+        return config(socksPort, outbound, dns, routingRules, routingPolicy)
+    }
+
     fun xray(
         socksPort: Int,
         profile: StandardProfile,

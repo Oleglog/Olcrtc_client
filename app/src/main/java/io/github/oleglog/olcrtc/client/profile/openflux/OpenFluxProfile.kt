@@ -1,0 +1,30 @@
+package io.github.oleglog.olcrtc.client.profile.openflux
+
+import io.github.oleglog.olcrtc.client.routing.DnsEndpoint
+
+data class OpenFluxProfile(
+    val name: String,
+    val documentUrl: String,
+    val transport: Transport = Transport.AUTO,
+    val dnsServer: String? = null,
+) {
+    init {
+        require(name.isNotBlank()) { "name is required" }
+        require(documentUrl.isNotBlank()) { "documentUrl is required" }
+        require(documentUrl.startsWith("http://") || documentUrl.startsWith("https://")) {
+            "documentUrl must be a valid HTTP or HTTPS URL"
+        }
+        dnsServer?.let(DnsEndpoint::parse)
+    }
+
+    enum class Transport(val value: String) {
+        AUTO("auto"),
+        VYANDEX("vyandex"),
+        YANDEX("yandex");
+
+        companion object {
+            fun parse(value: String): Transport = entries.firstOrNull { it.value == value.trim().lowercase() }
+                ?: AUTO
+        }
+    }
+}
