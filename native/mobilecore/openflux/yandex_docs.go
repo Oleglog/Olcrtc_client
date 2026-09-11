@@ -2,7 +2,6 @@ package openflux
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
