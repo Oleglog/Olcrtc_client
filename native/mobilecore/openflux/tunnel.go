@@ -46,7 +46,7 @@ func newTCPTunnel(trans transport) *tcpTunnel {
 	_ = t.gvisorStack.CreateNIC(tunnelNIC, ep)
 
 	var ipBytes [4]byte
-	fmt.Sscanf("10.0.0.2", "%d.%d.%d.%d", &ipBytes[0], &ipBytes[1], &ipBytes[2], &ipBytes[3])
+	fmt.Sscanf("10.10.10.2", "%d.%d.%d.%d", &ipBytes[0], &ipBytes[1], &ipBytes[2], &ipBytes[3])
 	protoAddr := tcpip.ProtocolAddress{
 		Protocol:          ipv4.ProtocolNumber,
 		AddressWithPrefix: tcpip.AddrFrom4(ipBytes).WithPrefix(),
@@ -55,7 +55,7 @@ func newTCPTunnel(trans transport) *tcpTunnel {
 
 	t.gvisorStack.SetRouteTable([]tcpip.Route{
 		{
-			Destination: header.IPv4EmptySubnet(),
+			Destination: header.IPv4EmptySubnet,
 			NIC:         tunnelNIC,
 		},
 	})

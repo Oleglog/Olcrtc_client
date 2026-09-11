@@ -1,8 +1,7 @@
 package openflux
 
 import (
-	"encoding/binary"
-	"fmt"
+	"bytes"
 	"io"
 	"net/http"
 	"strings"
@@ -57,9 +56,8 @@ func detectTransport(docURL string) string {
 }
 
 const (
-	flagUncompressed byte = 0x00
-	flagCompressed   byte = 0x01
-	minCompressSize       = 200
+	minCompressSize   = 200
+	compressionMarker = 0x1F
 )
 
 type compressedTransport struct {
@@ -70,57 +68,50 @@ func newCompressedTransport(inner transport) *compressedTransport {
 	return &compressedTransport{inner: inner}
 }
 
-func (c *compressedTransport) Start() error { return c.inner.Start() }
-func (c *compressedTransport) Stop() error  { return c.inner.Stop() }
+func (c *compressedTransport) Start() error       { return c.inner.Start() }
+func (c *compressedTransport) Stop() error        { return c.inner.Stop() }
 func (c *compressedTransport) IsConnected() bool { return c.inner.IsConnected() }
 
 func (c *compressedTransport) Send(data []byte) error {
-	if len(data) < minCompressSize {
-		pkt := make([]byte, 1+len(data))
-		pkt[0] = flagUncompressed
-		copy(pkt[1:], data)
-		return c.inner.Send(pkt)
+	if len(data) <= minCompressSize {
+		out := make([]byte, 1, len(data)+1)
+		out[0] = 0x00
+		out = append(out, data...)
+		return c.inner.Send(out)
 	}
 
-	compressed := make([]byte, lz4.CompressBlockBound(len(data)))
-	n, err := lz4.CompressBlock(data, compressed, nil)
-	if err != nil || n >= len(data) {
-		pkt := make([]byte, 1+len(data))
-		pkt[0] = flagUncompressed
-		copy(pkt[1:], data)
-		return c.inner.Send(pkt)
+	var buf bytes.Buffer
+	buf.WriteByte(compressionMarker)
+	w := lz4.NewWriter(&buf)
+	_, _ = w.Write(data)
+	_ = w.Close()
+
+	if buf.Len() >= len(data)+1 {
+		out := make([]byte, 1, len(data)+1)
+		out[0] = 0x00
+		out = append(out, data...)
+		return c.inner.Send(out)
 	}
 
-	pkt := make([]byte, 1+4+n)
-	pkt[0] = flagCompressed
-	binary.BigEndian.PutUint32(pkt[1:5], uint32(len(data)))
-	copy(pkt[5:], compressed[:n])
-	return c.inner.Send(pkt)
+	return c.inner.Send(buf.Bytes())
 }
 
 func (c *compressedTransport) Receive(handler func(data []byte)) {
 	c.inner.Receive(func(data []byte) {
-		if len(data) == 0 {
+		if len(data) < 1 {
+			handler(data)
 			return
 		}
-		flag := data[0]
-		payload := data[1:]
-
-		switch flag {
-		case flagUncompressed:
-			handler(payload)
-		case flagCompressed:
-			if len(payload) < 4 {
-				return
-			}
-			origSize := binary.BigEndian.Uint32(payload[:4])
-			compressedData := payload[4:]
-			decompressed := make([]byte, origSize)
-			n, err := lz4.DecompressSafe(compressedData, decompressed)
-			if err != nil || uint32(n) != origSize {
-				return
-			}
-			handler(decompressed)
+		if data[0] == 0x00 {
+			handler(data[1:])
+			return
 		}
+		r := lz4.NewReader(bytes.NewReader(data[1:]))
+		decompressed, err := io.ReadAll(r)
+		if err != nil {
+			handler(data)
+			return
+		}
+		handler(decompressed)
 	})
 }

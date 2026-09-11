@@ -4,10 +4,8 @@ import (
 	"bytes"
 	"crypto/tls"
 	"encoding/base64"
-	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"net/http"
 	"net/url"
@@ -231,7 +229,6 @@ func (t *yandexVolgaTransport) wsReadLoop() {
 		}
 
 		if t.recvHandler != nil && len(message) > 0 {
-			// Check if message is base64 packet payload
 			if bytes.HasPrefix(message, []byte("data:")) {
 				rawPayload := bytes.TrimPrefix(message, []byte("data:"))
 				decoded, err := base64.StdEncoding.DecodeString(string(rawPayload))
