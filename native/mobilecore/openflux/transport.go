@@ -10,26 +10,6 @@ import (
 	"github.com/pierrec/lz4/v4"
 )
 
-type transport interface {
-	Start() error
-	Stop() error
-	Send(data []byte) error
-	Receive(handler func(data []byte))
-	IsConnected() bool
-}
-
-type config struct {
-	MaxPacketSize int
-	MaxQueueSize  int
-}
-
-func defaultConfig() config {
-	return config{
-		MaxPacketSize: 1500,
-		MaxQueueSize:  10000,
-	}
-}
-
 func detectTransport(docURL string) string {
 	httpClient := &http.Client{Timeout: 10 * time.Second}
 	req, err := http.NewRequest("GET", docURL, nil)
@@ -61,16 +41,17 @@ const (
 )
 
 type compressedTransport struct {
-	inner transport
+	inner Transport
 }
 
-func newCompressedTransport(inner transport) *compressedTransport {
+func newCompressedTransport(inner Transport) *compressedTransport {
 	return &compressedTransport{inner: inner}
 }
 
 func (c *compressedTransport) Start() error       { return c.inner.Start() }
 func (c *compressedTransport) Stop() error        { return c.inner.Stop() }
 func (c *compressedTransport) IsConnected() bool { return c.inner.IsConnected() }
+func (c *compressedTransport) Stats() TransportStats { return c.inner.Stats() }
 
 func (c *compressedTransport) Send(data []byte) error {
 	if len(data) <= minCompressSize {

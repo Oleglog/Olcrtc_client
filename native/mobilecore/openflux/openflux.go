@@ -7,13 +7,11 @@ import (
 	"time"
 )
 
-// SOCKS5 and tunnel bridge for OpenFlux embedded in mobilecore.
-
 var (
 	fluxMu     sync.Mutex
 	fluxServer *socksServer
 	fluxTun    *tcpTunnel
-	fluxTrans  *compressedTransport
+	fluxTrans  Transport
 )
 
 func Start(docURL string, transportType string, socksPort int) error {
@@ -29,12 +27,12 @@ func Start(docURL string, transportType string, socksPort int) error {
 		detected = detectTransport(docURL)
 	}
 
-	cfg := defaultConfig()
-	var rawTrans transport
+	cfg := DefaultTransportConfig()
+	var rawTrans Transport
 	if detected == "vyandex" {
-		rawTrans = newYandexVolgaTransport(docURL, cfg)
+		rawTrans = NewYandexVolgaTransport(docURL, cfg)
 	} else {
-		rawTrans = newYandexDocsTransport(docURL, cfg)
+		rawTrans = NewYandexDocsTransport(docURL, cfg)
 	}
 
 	compressed := newCompressedTransport(rawTrans)

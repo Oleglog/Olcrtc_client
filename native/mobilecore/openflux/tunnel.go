@@ -17,10 +17,10 @@ import (
 type tcpTunnel struct {
 	gvisorStack *stack.Stack
 	tunnelEP    *tunnelLinkEndpoint
-	transport   transport
+	transport   Transport
 }
 
-func newTCPTunnel(trans transport) *tcpTunnel {
+func newTCPTunnel(trans Transport) *tcpTunnel {
 	t := &tcpTunnel{
 		transport: trans,
 	}

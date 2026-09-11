@@ -1067,7 +1067,12 @@ class OlcrtcVpnService : VpnService() {
                 )
             }
         }
-        val verifyDatapath = { verifyDatapath(xraySocksPort, dns.tunnel) }
+        val isCovertTransport = profile is ProfileConfig.OpenFlux
+        val verifyDatapath = {
+            if (!isCovertTransport) {
+                verifyDatapath(xraySocksPort, dns.tunnel)
+            }
+        }
         val session = NativeSession(
             nativeCore = GomobileCore,
             hevTunnel = HevTunnel(),
@@ -1301,6 +1306,7 @@ class OlcrtcVpnService : VpnService() {
     }
 
     private fun scheduleTunnelHealthProbe(now: Long) {
+        if (activeProfile is ProfileConfig.OpenFlux) return
         if (healthProbeInFlight || now - lastHealthProbeAt < TunnelHealthPolicy.TUNNEL_HEALTH_INTERVAL_MILLIS) return
         val session = nativeSession ?: return
         val socksPort = activeSocksPort ?: return
