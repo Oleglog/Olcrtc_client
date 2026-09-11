@@ -241,55 +241,25 @@ internal data class ConnectionSessionTotals(
 internal data class AppRoutingEntryEntity(
     @PrimaryKey val packageName: String,
     val selected: Boolean,
+    val labelSnapshot: String,
 )
 
 @Dao
 internal interface AppRoutingEntryDao {
-    @Query("SELECT * FROM app_routing_entries ORDER BY packageName")
+    @Query("SELECT * FROM app_routing_entries ORDER BY labelSnapshot, packageName")
     fun getAll(): List<AppRoutingEntryEntity>
 
-    @Query("DELETE FROM app_routing_entries")
-    fun clear()
+    @Query("SELECT packageName FROM app_routing_entries WHERE selected = 1 ORDER BY packageName")
+    fun getSelectedPackages(): List<String>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    fun insertAll(entries: List<AppRoutingEntryEntity>)
-}
+    fun upsert(entries: List<AppRoutingEntryEntity>)
 
-@Entity(
-    tableName = "routing_rules",
-    indices = [Index(value = ["matchType", "value"], unique = true)],
-)
-internal data class RoutingRuleEntity(
-    @PrimaryKey(autoGenerate = true) val id: Long = 0,
-    val matchType: String,
-    val value: String,
-    val action: String,
-    val enabled: Boolean,
-    val sortOrder: Int,
-)
+    @Query("UPDATE app_routing_entries SET selected = :selected WHERE packageName IN (:packageNames)")
+    fun setSelected(packageNames: List<String>, selected: Boolean): Int
 
-@Dao
-internal interface RoutingRuleDao {
-    @Query("SELECT * FROM routing_rules ORDER BY sortOrder, id")
-    fun getAll(): List<RoutingRuleEntity>
-
-    @Query("SELECT * FROM routing_rules WHERE id = :id")
-    fun get(id: Long): RoutingRuleEntity?
-
-    @Query("SELECT * FROM routing_rules WHERE matchType = :matchType AND value = :value LIMIT 1")
-    fun find(matchType: String, value: String): RoutingRuleEntity?
-
-    @Insert(onConflict = OnConflictStrategy.ABORT)
-    fun insert(rule: RoutingRuleEntity): Long
-
-    @Update
-    fun update(rule: RoutingRuleEntity): Int
-
-    @Query("UPDATE routing_rules SET enabled = :enabled WHERE id = :id")
-    fun setEnabled(id: Long, enabled: Boolean): Int
-
-    @Query("DELETE FROM routing_rules WHERE id = :id")
-    fun delete(id: Long): Int
+    @Query("DELETE FROM app_routing_entries WHERE packageName IN (:packageNames)")
+    fun delete(packageNames: List<String>): Int
 }
 
 @Dao
@@ -298,12 +268,8 @@ internal interface ConnectionSessionDao {
     fun insert(session: ConnectionSessionEntity): Long
 
     @Query(
-        "UPDATE connection_sessions SET " +
-            "endedAt = :endedAt, " +
-            "bytesUp = :bytesUp, " +
-            "bytesDown = :bytesDown, " +
-            "disconnectReason = :disconnectReason " +
-            "WHERE id = :id",
+        "UPDATE connection_sessions SET endedAt = :endedAt, bytesUp = :bytesUp, " +
+            "bytesDown = :bytesDown, disconnectReason = :disconnectReason WHERE id = :id AND endedAt IS NULL",
     )
     fun finish(
         id: Long,
@@ -366,192 +332,205 @@ internal abstract class SubscriptionDao {
     @Query("SELECT * FROM profile_groups WHERE id = :id")
     abstract fun getGroup(id: Long): ProfileGroupEntity?
 
-    @Query("SELECT * FROM profile_groups WHERE type = 'subscription' ORDER BY sortOrder, id")
-    abstract fun getSubscriptionGroups(): List<ProfileGroupEntity>
-
-    @Query("SELECT * FROM profile_groups WHERE type = 'local' LIMIT 1")
+    @Query("SELECT * FROM profile_groups WHERE type = 'LOCAL'")
     abstract fun getLocalGroup(): ProfileGroupEntity?
 
-    @Query("SELECT * FROM subscriptions WHERE groupId = :groupId")
-    abstract fun getSubscription(groupId: Long): SubscriptionEntity?
+    @Query("SELECT COUNT(*) FROM profile_groups")
+    abstract fun countGroups(): Int
 
     @Query("SELECT * FROM subscriptions WHERE id = :id")
-    abstract fun getSubscriptionById(id: Long): SubscriptionEntity?
+    abstract fun getSubscription(id: Long): SubscriptionEntity?
 
-    @Query("SELECT * FROM subscriptions WHERE enabled = 1")
-    abstract fun getEnabledSubscriptions(): List<SubscriptionEntity>
+    @Query("SELECT * FROM subscriptions ORDER BY name, id")
+    abstract fun getSubscriptions(): List<SubscriptionEntity>
 
-    @Query("SELECT * FROM subscriptions")
-    abstract fun getAllSubscriptions(): List<SubscriptionEntity>
-
-    @Query("SELECT * FROM subscription_profiles WHERE id = :id AND isDeleted = 0")
-    abstract fun getProfile(id: String): SubscriptionProfileEntity?
-
-    @Query("SELECT * FROM subscription_profiles WHERE groupId = :groupId AND isDeleted = 0 ORDER BY sortOrder, id")
-    abstract fun getProfiles(groupId: Long): List<SubscriptionProfileEntity>
-
-    @Query("SELECT * FROM subscription_profiles WHERE groupId = :groupId ORDER BY sortOrder, id")
-    abstract fun getAllProfiles(groupId: Long): List<SubscriptionProfileEntity>
-
-    @Query("SELECT * FROM subscription_profiles WHERE isDeleted = 0 ORDER BY groupId, sortOrder, id")
-    abstract fun getAllActiveProfiles(): List<SubscriptionProfileEntity>
-
-    @Query("SELECT * FROM subscription_profiles WHERE isDeleted = 0 AND (favorite = 1 OR groupId = (SELECT id FROM profile_groups WHERE type = 'local' LIMIT 1)) ORDER BY groupId, sortOrder, id")
-    abstract fun getQuickProfiles(): List<SubscriptionProfileEntity>
-
-    @Query("UPDATE subscriptions SET enabled = :enabled WHERE id = :id")
-    abstract fun setSubscriptionEnabled(id: Long, enabled: Boolean)
-
-    @Query("UPDATE subscription_profiles SET favorite = :favorite WHERE id = :id")
-    abstract fun setProfileFavorite(id: String, favorite: Boolean)
-
-    @Query("UPDATE subscription_profiles SET sortOrder = :sortOrder WHERE id = :id")
-    abstract fun setProfileSortOrder(id: String, sortOrder: Int)
-
-    @Query("UPDATE subscription_profiles SET isDeleted = 1, updatedAt = :updatedAt WHERE id = :id")
-    abstract fun markProfileDeleted(id: String, updatedAt: Long)
-
-    @Query("SELECT profile_groups.id AS group_id, subscriptions.id AS subscription_id FROM profile_groups INNER JOIN subscriptions ON subscriptions.groupId = profile_groups.id WHERE profile_groups.type = 'subscription'")
-    abstract fun getSubscriptionGroupRows(): List<SubscriptionGroupRow>
+    @Query("UPDATE subscriptions SET name = :name, encryptedUrl = :encryptedUrl WHERE id = :id")
+    abstract fun updateSubscriptionSource(id: Long, name: String, encryptedUrl: ByteArray): Int
 
     @Transaction
-    open fun createSubscription(
-        name: String,
-        encryptedUrl: ByteArray,
-        updateIntervalHours: Int,
+    open fun updateSubscriptionMetadata(subscription: SubscriptionEntity) = updateSubscription(subscription)
+
+    @Query("SELECT * FROM subscription_profiles WHERE groupId = :groupId ORDER BY sortOrder")
+    abstract fun getProfiles(groupId: Long): List<SubscriptionProfileEntity>
+
+    @Query("SELECT * FROM subscription_profiles WHERE groupId = :groupId AND isDeleted = 0 ORDER BY sortOrder")
+    abstract fun getVisibleProfiles(groupId: Long): List<SubscriptionProfileEntity>
+
+    @Query("SELECT * FROM subscription_profiles WHERE id = :id")
+    abstract fun getProfile(id: String): SubscriptionProfileEntity?
+
+    @Query("UPDATE subscription_profiles SET lastLatencyMs = :latencyMs, lastCheckedAt = :checkedAt WHERE id = :id")
+    abstract fun updateProfileLatency(id: String, latencyMs: Long?, checkedAt: Long): Int
+
+    @Query("UPDATE subscription_profiles SET favorite = :favorite WHERE id = :id")
+    abstract fun updateProfileFavorite(id: String, favorite: Boolean): Int
+
+    @Update
+    abstract fun updateProfile(profile: SubscriptionProfileEntity)
+
+    @Query("SELECT COUNT(*) FROM subscriptions")
+    abstract fun countSubscriptions(): Int
+
+    @Query(
+        "SELECT id FROM subscriptions WHERE enabled = 1 " +
+            "AND (lastSuccessAt IS NULL OR lastSuccessAt + updateIntervalHours * 3600000 <= :now) " +
+            "ORDER BY id",
+    )
+    abstract fun getStaleSubscriptionIds(now: Long): List<Long>
+
+    @Query("SELECT COUNT(*) FROM subscription_profiles")
+    abstract fun countProfiles(): Int
+
+    @Query("SELECT g.id AS group_id, s.id AS subscription_id FROM profile_groups g JOIN subscriptions s ON s.groupId = g.id WHERE s.id = :subscriptionId")
+    abstract fun getSubscriptionGroup(subscriptionId: Long): SubscriptionGroupRow?
+
+    @Transaction
+    open fun insertSubscriptionGroup(
+        group: ProfileGroupEntity,
+        subscription: SubscriptionEntity,
         profiles: List<SubscriptionProfileEntity>,
-        now: Long,
-        serverVersion: String? = null,
-        encryptedMirrorType: ByteArray? = null,
-        encryptedMirrorUrl: ByteArray? = null,
-        encryptedMirrorKey: ByteArray? = null,
     ): Long {
-        val maxSort = getSubscriptionGroups().maxOfOrNull { it.sortOrder } ?: 0
-        val groupId = insertGroup(
-            ProfileGroupEntity(
-                name = name,
-                type = "subscription",
-                subscriptionId = null,
-                sortOrder = maxSort + 1,
-                createdAt = now,
-            ),
-        )
-        val subId = insertSubscription(
-            SubscriptionEntity(
-                groupId = groupId,
-                name = name,
-                kind = "plain",
-                encryptedUrl = encryptedUrl,
-                serverVersion = serverVersion,
-                encryptedMirrorType = encryptedMirrorType,
-                encryptedMirrorUrl = encryptedMirrorUrl,
-                encryptedMirrorKey = encryptedMirrorKey,
-                lastSuccessAt = now,
+        val groupId = insertGroup(group)
+        val subscriptionId = insertSubscription(subscription.copy(groupId = groupId))
+        insertProfiles(profiles.map { it.copy(groupId = groupId) })
+        attachSubscription(groupId, subscriptionId)
+        return subscriptionId
+    }
+
+    @Transaction
+    open fun deleteSubscription(
+        subscriptionId: Long,
+        retainedOlcrtcProfiles: List<OlcrtcProfileEntity> = emptyList(),
+        retainedStandardProfiles: List<StandardProfileEntity> = emptyList(),
+    ) {
+        val subscription = requireNotNull(getSubscription(subscriptionId)) { "Subscription not found" }
+        if (retainedOlcrtcProfiles.isNotEmpty()) insertOlcrtcProfiles(retainedOlcrtcProfiles)
+        if (retainedStandardProfiles.isNotEmpty()) insertStandardProfiles(retainedStandardProfiles)
+        deleteGroup(subscription.groupId)
+    }
+
+    @Transaction
+    open fun markSubscriptionRefresh(
+        subscriptionId: Long,
+        now: Long,
+        errorCode: String?,
+        etag: String? = null,
+        lastModified: String? = null,
+        successful: Boolean = false,
+    ) {
+        val subscription = requireNotNull(getSubscription(subscriptionId)) { "Subscription not found" }
+        updateSubscription(
+            subscription.copy(
+                lastSuccessAt = if (successful) now else subscription.lastSuccessAt,
                 lastAttemptAt = now,
-                lastErrorCode = null,
-                updateIntervalHours = updateIntervalHours,
-                etag = null,
-                lastModified = null,
-                enabled = true,
+                lastErrorCode = errorCode,
+                etag = etag ?: subscription.etag,
+                lastModified = lastModified ?: subscription.lastModified,
             ),
         )
-        attachSubscription(groupId, subId)
-        if (profiles.isNotEmpty()) {
-            insertProfiles(profiles.map { it.copy(groupId = groupId) })
-        }
-        return subId
     }
 
     @Transaction
     open fun replaceSubscriptionProfiles(
-        groupId: Long,
-        newProfiles: List<SubscriptionProfileEntity>,
-        retainedOlcrtcProfiles: List<OlcrtcProfileEntity> = emptyList(),
-        retainedStandardProfiles: List<StandardProfileEntity> = emptyList(),
+        subscription: SubscriptionEntity,
+        profiles: List<SubscriptionProfileEntity>,
     ) {
-        val existing = getProfiles(groupId)
-        val deleteIds = existing.map { it.id }
-        if (deleteIds.isNotEmpty()) {
-            deleteProfiles(deleteIds)
+        val existing = getProfiles(subscription.groupId)
+        val existingByIdentity = existing.associateBy(SubscriptionProfileEntity::identityHash)
+        val incomingIdentities = profiles.mapTo(mutableSetOf(), SubscriptionProfileEntity::identityHash)
+        val matchedIds = mutableSetOf<String>()
+        val updates = profiles.map { incoming ->
+            val current = existingByIdentity[incoming.identityHash]
+                ?.takeUnless { it.id in matchedIds }
+                ?: existing.firstOrNull { candidate ->
+                    candidate.id !in matchedIds &&
+                        candidate.isLocallyModified &&
+                        candidate.type == incoming.type &&
+                        candidate.sortOrder == incoming.sortOrder
+                }
+            if (current != null) matchedIds += current.id
+            if (current == null) {
+                incoming.copy(groupId = subscription.groupId)
+            } else {
+                incoming.copy(
+                    id = current.id,
+                    groupId = subscription.groupId,
+                    name = if (current.isLocallyModified) current.name else incoming.name,
+                    encryptedConfigJson = if (current.isLocallyModified) {
+                        current.encryptedConfigJson
+                    } else {
+                        incoming.encryptedConfigJson
+                    },
+                    compatibilityMode = current.compatibilityMode,
+                    isLocallyModified = current.isLocallyModified,
+                    isDeleted = false,
+                    favorite = current.favorite,
+                    lastLatencyMs = current.lastLatencyMs,
+                    lastCheckedAt = current.lastCheckedAt,
+                    createdAt = current.createdAt,
+                )
+            }
         }
-        if (newProfiles.isNotEmpty()) {
-            insertProfiles(newProfiles.map { it.copy(groupId = groupId) })
-        }
-        if (retainedOlcrtcProfiles.isNotEmpty()) {
-            insertOlcrtcProfiles(retainedOlcrtcProfiles)
-        }
-        if (retainedStandardProfiles.isNotEmpty()) {
-            insertStandardProfiles(retainedStandardProfiles)
-        }
-    }
+        val existingIds = existing.mapTo(mutableSetOf(), SubscriptionProfileEntity::id)
+        val inserts = updates.filterNot { it.id in existingIds }
+        val changed = updates.filter { it.id in existingIds }
+        val deleted = existing
+            .filter { !it.isLocallyModified && !it.isDeleted && it.identityHash !in incomingIdentities }
+            .map(SubscriptionProfileEntity::id)
 
-    @Transaction
-    open fun deleteSubscription(id: Long) {
-        val sub = getSubscriptionById(id) ?: return
-        deleteGroup(sub.groupId)
-    }
-
-    @Transaction
-    open fun updateSubscriptionMetadata(
-        id: Long,
-        serverVersion: String?,
-        encryptedMirrorType: ByteArray?,
-        encryptedMirrorUrl: ByteArray?,
-        encryptedMirrorKey: ByteArray?,
-        etag: String?,
-        lastModified: String?,
-        lastAttemptAt: Long?,
-        lastSuccessAt: Long?,
-        lastErrorCode: String?,
-    ) {
-        val sub = getSubscriptionById(id) ?: return
-        updateSubscription(
-            sub.copy(
-                serverVersion = serverVersion ?: sub.serverVersion,
-                encryptedMirrorType = encryptedMirrorType ?: sub.encryptedMirrorType,
-                encryptedMirrorUrl = encryptedMirrorUrl ?: sub.encryptedMirrorUrl,
-                encryptedMirrorKey = encryptedMirrorKey ?: sub.encryptedMirrorKey,
-                etag = etag ?: sub.etag,
-                lastModified = lastModified ?: sub.lastModified,
-                lastAttemptAt = lastAttemptAt ?: sub.lastAttemptAt,
-                lastSuccessAt = lastSuccessAt ?: sub.lastSuccessAt,
-                lastErrorCode = lastErrorCode,
-            ),
-        )
+        if (inserts.isNotEmpty()) insertProfiles(inserts)
+        if (changed.isNotEmpty()) updateProfiles(changed)
+        if (deleted.isNotEmpty()) deleteProfiles(deleted)
+        updateSubscription(subscription)
     }
 }
 
-internal val localGroupCallback = object : RoomDatabase.Callback() {
-    override fun onCreate(db: SupportSQLiteDatabase) {
-        db.execSQL(
-            """INSERT INTO profile_groups (id, name, type, subscriptionId, sortOrder, createdAt)
-               VALUES (1, 'Saved', 'local', NULL, 0, strftime('%s', 'now') * 1000)""",
-        )
-    }
+@Entity(
+    tableName = "routing_rules",
+    indices = [Index(value = ["matchType", "value"], unique = true)],
+)
+internal data class RoutingRuleEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val matchType: String,
+    val value: String,
+    val action: String,
+    val enabled: Boolean,
+    val sortOrder: Int,
+)
+
+@Dao
+internal interface RoutingRuleDao {
+    @Query("SELECT * FROM routing_rules ORDER BY sortOrder, id")
+    fun getAll(): List<RoutingRuleEntity>
+
+    @Query("SELECT * FROM routing_rules WHERE enabled = 1 ORDER BY sortOrder, id")
+    fun getEnabled(): List<RoutingRuleEntity>
+
+    @Query("SELECT * FROM routing_rules WHERE matchType = :matchType AND value = :value LIMIT 1")
+    fun find(matchType: String, value: String): RoutingRuleEntity?
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    fun insert(rule: RoutingRuleEntity): Long
+
+    @Update
+    fun update(rule: RoutingRuleEntity): Int
+
+    @Query("UPDATE routing_rules SET enabled = :enabled WHERE id = :id")
+    fun setEnabled(id: Long, enabled: Boolean): Int
+
+    @Query("DELETE FROM routing_rules WHERE id = :id")
+    fun delete(id: Long): Int
 }
 
-internal class AppRoutingRepository(private val db: ClientDatabase) {
-    private val dao = db.appRoutingEntries()
+internal class RoutingRuleRepository(
+    private val rules: RoutingRuleDao,
+) {
+    fun getAll(): List<RoutingRule> = rules.getAll().map { it.toRule() }
 
-    fun getAll(): Set<String> = dao.getAll().mapTo(LinkedHashSet()) { it.packageName }
-
-    fun replaceAll(packageNames: Set<String>) {
-        val entries = packageNames.map { AppRoutingEntryEntity(it, true) }
-        db.runInTransaction {
-            dao.clear()
-            dao.insertAll(entries)
-        }
-    }
-}
-
-internal class RoutingRuleRepository(db: ClientDatabase) {
-    private val rules = db.routingRules()
-
-    fun list(): List<RoutingRule> = rules.getAll()
+    fun getEnabled(): List<RoutingRule> = rules.getEnabled()
         .map { it.toRule() }
         .sortedWith(
-            compareBy<RoutingRule> { it.action != RoutingRule.Action.DIRECT }
-                .thenByDescending(RoutingRule::specificity)
+            compareByDescending<RoutingRule> { it.specificity }
                 .thenBy(RoutingRule::sortOrder)
                 .thenBy(RoutingRule::id),
         )
@@ -656,13 +635,42 @@ internal abstract class ClientDatabase : RoomDatabase() {
         internal val MIGRATION_2_3 = object : Migration(2, 3) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE `olcrtc_profiles` ADD COLUMN `identityHash` TEXT")
-                database.execSQL("CREATE INDEX IF NOT EXISTS `index_olcrtc_profiles_identityHash` ON `olcrtc_profiles` (`identityHash`)")
                 database.execSQL("ALTER TABLE `standard_profiles` ADD COLUMN `identityHash` TEXT")
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_olcrtc_profiles_identityHash` ON `olcrtc_profiles` (`identityHash`)")
                 database.execSQL("CREATE INDEX IF NOT EXISTS `index_standard_profiles_identityHash` ON `standard_profiles` (`identityHash`)")
             }
         }
 
         internal val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `profile_groups` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `name` TEXT NOT NULL, `type` TEXT NOT NULL, `subscriptionId` INTEGER, `sortOrder` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL)""",
+                )
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `subscriptions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `groupId` INTEGER NOT NULL, `name` TEXT NOT NULL, `kind` TEXT NOT NULL, `encryptedUrl` BLOB NOT NULL, `serverVersion` TEXT, `encryptedMirrorType` BLOB, `encryptedMirrorUrl` BLOB, `encryptedMirrorKey` BLOB, `lastSuccessAt` INTEGER, `lastAttemptAt` INTEGER, `lastErrorCode` TEXT, `updateIntervalHours` INTEGER NOT NULL, `etag` TEXT, `lastModified` TEXT, `enabled` INTEGER NOT NULL, FOREIGN KEY(`groupId`) REFERENCES `profile_groups`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)""",
+                )
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_subscriptions_groupId` ON `subscriptions` (`groupId`)")
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `subscription_profiles` (`id` TEXT NOT NULL, `groupId` INTEGER NOT NULL, `type` TEXT NOT NULL, `name` TEXT NOT NULL, `encryptedConfigJson` BLOB NOT NULL, `encryptedUpstreamConfigJson` BLOB, `identityHash` TEXT NOT NULL, `isLocallyModified` INTEGER NOT NULL, `favorite` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL, `lastLatencyMs` INTEGER, `lastCheckedAt` INTEGER, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`id`), FOREIGN KEY(`groupId`) REFERENCES `profile_groups`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE)""",
+                )
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_subscription_profiles_groupId` ON `subscription_profiles` (`groupId`)")
+                database.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_subscription_profiles_groupId_identityHash` ON `subscription_profiles` (`groupId`, `identityHash`)")
+                database.execSQL(INSERT_LOCAL_GROUP)
+            }
+        }
+
+        internal val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """CREATE TABLE IF NOT EXISTS `routing_rules` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `matchType` TEXT NOT NULL, `value` TEXT NOT NULL, `action` TEXT NOT NULL, `enabled` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL)""",
+                )
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_routing_rules_matchType_value` ON `routing_rules` (`matchType`, `value`)",
+                )
+            }
+        }
+
+        internal val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
                     """CREATE TABLE IF NOT EXISTS `connection_sessions` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `profileId` TEXT, `profileNameSnapshot` TEXT NOT NULL, `protocolSnapshot` TEXT NOT NULL, `startedAt` INTEGER NOT NULL, `endedAt` INTEGER, `bytesUp` INTEGER NOT NULL, `bytesDown` INTEGER NOT NULL, `disconnectReason` TEXT, `networkType` TEXT NOT NULL)""",
@@ -672,26 +680,10 @@ internal abstract class ClientDatabase : RoomDatabase() {
             }
         }
 
-        internal val MIGRATION_4_5 = object : Migration(4, 5) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE `subscriptions` ADD COLUMN `serverVersion` TEXT")
-                database.execSQL("ALTER TABLE `subscriptions` ADD COLUMN `encryptedMirrorType` BLOB")
-                database.execSQL("ALTER TABLE `subscriptions` ADD COLUMN `encryptedMirrorUrl` BLOB")
-                database.execSQL("ALTER TABLE `subscriptions` ADD COLUMN `encryptedMirrorKey` BLOB")
-            }
-        }
-
-        internal val MIGRATION_5_6 = object : Migration(5, 6) {
-            override fun migrate(database: SupportSQLiteDatabase) {
-                database.execSQL("ALTER TABLE `olcrtc_profiles` ADD COLUMN `compatibilityMode` TEXT NOT NULL DEFAULT 'legacy'")
-                database.execSQL("ALTER TABLE `subscription_profiles` ADD COLUMN `compatibilityMode` TEXT NOT NULL DEFAULT 'legacy'")
-            }
-        }
-
         internal val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
-                    """CREATE TABLE IF NOT EXISTS `app_routing_entries` (`packageName` TEXT NOT NULL, `selected` INTEGER NOT NULL, PRIMARY KEY(`packageName`))""",
+                    """CREATE TABLE IF NOT EXISTS `app_routing_entries` (`packageName` TEXT NOT NULL, `selected` INTEGER NOT NULL, `labelSnapshot` TEXT NOT NULL, PRIMARY KEY(`packageName`))""",
                 )
             }
         }
@@ -705,10 +697,10 @@ internal abstract class ClientDatabase : RoomDatabase() {
         internal val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
-                    """CREATE TABLE IF NOT EXISTS `routing_rules` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `matchType` TEXT NOT NULL, `value` TEXT NOT NULL, `action` TEXT NOT NULL, `enabled` INTEGER NOT NULL, `sortOrder` INTEGER NOT NULL)""",
+                    "ALTER TABLE `olcrtc_profiles` ADD COLUMN `compatibilityMode` TEXT NOT NULL DEFAULT 'legacy'",
                 )
                 database.execSQL(
-                    """CREATE UNIQUE INDEX IF NOT EXISTS `index_routing_rules_matchType_value` ON `routing_rules` (`matchType`, `value`)""",
+                    "ALTER TABLE `subscription_profiles` ADD COLUMN `compatibilityMode` TEXT NOT NULL DEFAULT 'legacy'",
                 )
             }
         }
@@ -723,5 +715,35 @@ internal abstract class ClientDatabase : RoomDatabase() {
                 )
             }
         }
+
+        fun open(context: Context): ClientDatabase = Room.databaseBuilder(
+            context.applicationContext,
+            ClientDatabase::class.java,
+            "olcrtc-client.db",
+        ).addMigrations(
+            MIGRATION_1_2,
+            MIGRATION_2_3,
+            MIGRATION_3_4,
+            MIGRATION_4_5,
+            MIGRATION_5_6,
+            MIGRATION_6_7,
+            MIGRATION_7_8,
+            MIGRATION_8_9,
+            MIGRATION_9_10,
+        )
+            .addCallback(localGroupCallback)
+            .enableMultiInstanceInvalidation()
+            .build()
+
+        private val localGroupCallback = object : Callback() {
+            override fun onCreate(database: SupportSQLiteDatabase) {
+                database.execSQL(INSERT_LOCAL_GROUP)
+            }
+        }
+
+        private const val INSERT_LOCAL_GROUP =
+            "INSERT INTO `profile_groups` (`name`, `type`, `subscriptionId`, `sortOrder`, `createdAt`) " +
+                "SELECT 'Local', 'LOCAL', NULL, 0, CAST(strftime('%s', 'now') AS INTEGER) * 1000 " +
+                "WHERE NOT EXISTS (SELECT 1 FROM `profile_groups` WHERE `type` = 'LOCAL')"
     }
 }
