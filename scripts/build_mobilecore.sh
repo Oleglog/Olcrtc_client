@@ -19,6 +19,8 @@ gomobile init
   cd "$MODULE"
   echo "Running go mod tidy..."
   go mod tidy
+  echo "Formatting with gofmt..."
+  gofmt -w .
   echo "Checking gofmt..."
   test -z "$(gofmt -l .)" || { echo "gofmt failed on:"; gofmt -l .; exit 1; }
   echo "Running go test..."
