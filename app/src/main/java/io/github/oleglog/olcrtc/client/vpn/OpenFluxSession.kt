@@ -19,7 +19,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal class OpenFluxSession(
     private val profile: OpenFluxProfile,
     private val dnsServer: String,
-    private val establishTun: () -> TunDescriptor,
+    private val establishTun: () -> ParcelFileDescriptor,
     private val onFail: (String) -> Unit = {},
 ) : VpnTunnelSession {
 
@@ -29,17 +29,19 @@ internal class OpenFluxSession(
     private val bytesUp = java.util.concurrent.atomic.AtomicLong(0)
     private val bytesDown = java.util.concurrent.atomic.AtomicLong(0)
 
-    private var tun: TunDescriptor? = null
+    private var tunnelPfd: ParcelFileDescriptor? = null
     private var tunnelInput: FileInputStream? = null
     private var tunnelOutput: FileOutputStream? = null
 
-    override fun isRunning(): Boolean = !closed.get() && Mobilecore.isOpenFluxConnected()
+    override fun isRunning(): Boolean = !closed.get()
     override fun trafficCounters(): TrafficCounters = TrafficCounters(bytesUp.get(), bytesDown.get())
     override fun releaseTun() {
-        runCatching { tun?.close() }
-        tun = null
+        runCatching { tunnelInput?.close() }
+        runCatching { tunnelOutput?.close() }
+        runCatching { tunnelPfd?.close() }
         tunnelInput = null
         tunnelOutput = null
+        tunnelPfd = null
     }
 
     fun start() {
@@ -63,10 +65,8 @@ internal class OpenFluxSession(
             throw IllegalStateException("Yandex-транспорт не подключился за 30 секунд")
         }
 
-        val establishedTun = establishTun()
-        tun = establishedTun
-
-        val pfd = ParcelFileDescriptor.fromFd(establishedTun.fd)
+        val pfd = establishTun()
+        tunnelPfd = pfd
         val input = FileInputStream(pfd.fileDescriptor)
         val output = FileOutputStream(pfd.fileDescriptor)
         tunnelInput = input
@@ -182,10 +182,7 @@ internal class OpenFluxSession(
 
     override fun close() {
         if (closed.compareAndSet(false, true)) {
-            runCatching { tun?.close() }
-            tun = null
-            tunnelInput = null
-            tunnelOutput = null
+            releaseTun()
             Mobilecore.stopOpenFlux()
             workers.shutdownNow()
         }

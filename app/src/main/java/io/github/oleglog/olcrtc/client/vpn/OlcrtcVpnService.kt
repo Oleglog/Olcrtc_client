@@ -937,21 +937,17 @@ class OlcrtcVpnService : VpnService() {
         }
     }
 
-    private fun establishOpenFluxTun(network: Network, dnsServer: String): TunDescriptor {
+    private fun establishOpenFluxTun(dnsServer: String): ParcelFileDescriptor {
         val builder = Builder()
             .setSession(getString(R.string.app_name))
             .setMtu(1400)
             .addAddress("10.10.10.2", 24)
             .addRoute("0.0.0.0", 0)
             .addDnsServer(dnsServer)
-        builder.setUnderlyingNetworks(arrayOf(network))
-        applyPerAppPolicy(builder, routingSettings.getPerAppPolicy())
-        val descriptor = builder.establish()
+        // Exclude our own package so Go sockets bypass TUN and route directly to Internet
+        builder.addDisallowedApplication(packageName)
+        return builder.establish()
             ?: error("failed to establish VPN interface for OpenFlux")
-        return object : TunDescriptor {
-            override val fd = descriptor.fd
-            override fun close() = descriptor.close()
-        }
     }
 
     private fun applyPerAppPolicy(builder: Builder, policy: PerAppPolicy) {
@@ -995,7 +991,7 @@ class OlcrtcVpnService : VpnService() {
             val session = OpenFluxSession(
                 profile = profile.value,
                 dnsServer = dnsIp,
-                establishTun = { establishOpenFluxTun(attempt.network, dnsIp) },
+                establishTun = { establishOpenFluxTun(dnsIp) },
                 onFail = { error ->
                     diagnostics.append("error", "OpenFlux error: $error")
                     handleConnectionFailure(IllegalStateException(error))
@@ -1332,7 +1328,7 @@ class OlcrtcVpnService : VpnService() {
     }
 
     private fun scheduleTunnelHealthProbe(now: Long) {
-        if (activeProfileInfo?.protocol?.startsWith("OpenFlux") == true) return
+        if (activeProfileInfo?.protocol?.contains("OpenFlux", ignoreCase = true) == true) return
         if (healthProbeInFlight || now - lastHealthProbeAt < TunnelHealthPolicy.TUNNEL_HEALTH_INTERVAL_MILLIS) return
         val session = nativeSession ?: return
         val socksPort = activeSocksPort ?: return
