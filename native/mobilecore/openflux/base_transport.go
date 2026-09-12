@@ -111,32 +111,45 @@ func (b *BaseTransport) Stats() TransportStats {
 	b.Mu.RLock()
 	defer b.Mu.RUnlock()
 
-	stats := b.stats
-	stats.Connected = b.IsConnected()
-	if b.IsRunning() {
-		stats.Uptime = time.Since(b.startTime)
+	return TransportStats{
+		BytesSent:     atomic.LoadUint64(&b.stats.BytesSent),
+		BytesReceived: atomic.LoadUint64(&b.stats.BytesReceived),
+		PacketsSent:   atomic.LoadUint64(&b.stats.PacketsSent),
+		PacketsRecv:   atomic.LoadUint64(&b.stats.PacketsRecv),
+		Reconnects:    uint64(b.reconnectAttempts.Load()),
+		Connected:     b.IsConnected(),
+		Uptime:        time.Since(b.startTime),
 	}
-	return stats
+}
+
+func (b *BaseTransport) RecordSend(bytes int) {
+	atomic.AddUint64(&b.stats.BytesSent, uint64(bytes))
+	atomic.AddUint64(&b.stats.PacketsSent, 1)
+}
+
+func (b *BaseTransport) RecordReceive(bytes int) {
+	atomic.AddUint64(&b.stats.BytesReceived, uint64(bytes))
+	atomic.AddUint64(&b.stats.PacketsRecv, 1)
+}
+
+func (b *BaseTransport) RecordReconnect() {
+	b.reconnectAttempts.Add(1)
+}
+
+func (b *BaseTransport) GetConfig() TransportConfig {
+	return b.config
 }
 
 func (b *BaseTransport) AddSentBytes(n int) {
-	b.Mu.Lock()
-	b.stats.BytesSent += uint64(n)
-	b.stats.PacketsSent++
-	b.Mu.Unlock()
+	b.RecordSend(n)
 }
 
 func (b *BaseTransport) AddRecvBytes(n int) {
-	b.Mu.Lock()
-	b.stats.BytesReceived += uint64(n)
-	b.stats.PacketsRecv++
-	b.Mu.Unlock()
+	b.RecordReceive(n)
 }
 
 func (b *BaseTransport) AddReconnect() {
-	b.Mu.Lock()
-	b.stats.Reconnects++
-	b.Mu.Unlock()
+	b.RecordReconnect()
 }
 
 func (b *BaseTransport) GetReconnectDelay() time.Duration {
