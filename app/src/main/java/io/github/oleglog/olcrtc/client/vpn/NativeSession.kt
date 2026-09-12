@@ -98,13 +98,13 @@ internal class NativeSession(
         }
     }
 
-    fun trafficCounters(): TrafficCounters = hevTunnel.trafficCounters()
+    override fun trafficCounters(): TrafficCounters = hevTunnel.trafficCounters()
 
-    fun isRunning(): Boolean =
+    override fun isRunning(): Boolean =
         !closed && coreStarted && tun != null && hevTunnel.isRunning() &&
             nativeCore.isXrayRunning() && (!olcrtcStarted || nativeCore.isOlcrtcRunning())
 
-    fun releaseTun() {
+    override fun releaseTun() {
         val descriptor = synchronized(lifecycle) {
             if (closed) return
             tun.also { tun = null }
