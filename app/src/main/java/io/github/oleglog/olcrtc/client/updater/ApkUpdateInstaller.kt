@@ -28,6 +28,7 @@ internal fun updateInstallAction(canRequestPackageInstalls: Boolean): UpdateInst
 
 internal class ApkUpdateInstaller(
     private val context: Context,
+    private val proxy: java.net.Proxy? = null,
     private val expectedPackageName: String = context.packageName,
     private val expectedSigningCertSha256: String = io.github.oleglog.olcrtc.client.BuildConfig.EXPECTED_SIGNING_CERT_SHA256,
 ) {
@@ -59,21 +60,43 @@ internal class ApkUpdateInstaller(
     fun canRequestPackageInstalls(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.O || context.packageManager.canRequestPackageInstalls()
 
+    private fun openUrlConnection(targetUrl: String): java.net.HttpURLConnection {
+        var currentUrl = targetUrl
+        for (hop in 0 until 5) {
+            val url = URL(currentUrl)
+            val connection = (if (proxy != null) url.openConnection(proxy) else url.openConnection()) as java.net.HttpURLConnection
+            connection.connectTimeout = TIMEOUT_MILLIS
+            connection.readTimeout = TIMEOUT_MILLIS
+            connection.instanceFollowRedirects = true
+            val code = connection.responseCode
+            if (code in 300..399) {
+                val location = connection.getHeaderField("Location") ?: break
+                connection.disconnect()
+                currentUrl = if (location.startsWith("http://") || location.startsWith("https://")) {
+                    location
+                } else {
+                    URL(url, location).toString()
+                }
+                continue
+            }
+            return connection
+        }
+        val fallbackUrl = URL(currentUrl)
+        return (if (proxy != null) fallbackUrl.openConnection(proxy) else fallbackUrl.openConnection()) as java.net.HttpURLConnection
+    }
+
     private fun downloadApk(
         asset: GitHubRelease.ReleaseAsset,
         onProgress: ((downloaded: Long, total: Long) -> Unit)?,
     ): File {
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
         val file = File(dir, asset.name)
-        val connection = URL(asset.downloadUrl).openConnection() as HttpsURLConnection
-        connection.connectTimeout = TIMEOUT_MILLIS
-        connection.readTimeout = TIMEOUT_MILLIS
-        connection.requestMethod = "GET"
-        connection.use {
-            require(responseCode in 200..299) { "APK download failed: HTTP $responseCode" }
-            val total = asset.size.takeIf { it > 0 } ?: contentLengthLong.takeIf { it > 0 } ?: 0L
+        val connection = openUrlConnection(asset.downloadUrl)
+        try {
+            require(connection.responseCode in 200..299) { "APK download failed: HTTP ${connection.responseCode}" }
+            val total = asset.size.takeIf { it > 0 } ?: connection.contentLengthLong.takeIf { it > 0 } ?: 0L
             var downloaded = 0L
-            inputStream.use { input ->
+            connection.inputStream.use { input ->
                 file.outputStream().use { output ->
                     val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                     while (true) {
@@ -85,19 +108,20 @@ internal class ApkUpdateInstaller(
                     }
                 }
             }
+        } finally {
+            connection.disconnect()
         }
         return file
     }
 
     private fun fetchText(url: String): String {
         require(url.startsWith("https://", ignoreCase = true)) { "Checksum download must use HTTPS" }
-        val connection = URL(url).openConnection() as HttpsURLConnection
-        connection.connectTimeout = TIMEOUT_MILLIS
-        connection.readTimeout = TIMEOUT_MILLIS
-        connection.requestMethod = "GET"
-        return connection.use {
-            require(responseCode in 200..299) { "Checksum download failed: HTTP $responseCode" }
-            inputStream.reader().use { it.readText() }
+        val connection = openUrlConnection(url)
+        return try {
+            require(connection.responseCode in 200..299) { "Checksum download failed: HTTP ${connection.responseCode}" }
+            connection.inputStream.reader().use { it.readText() }
+        } finally {
+            connection.disconnect()
         }
     }
 

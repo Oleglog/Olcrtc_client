@@ -179,6 +179,8 @@ class OlcrtcVpnService : VpnService() {
         override fun checkForUpdate(currentVersion: String): Bundle =
             checkForUpdateThroughProxy(currentVersion)
 
+        override fun getActiveSocksPort(): Int = activeSocksPort ?: 0
+
         override fun testConnectionLatency(): Long = measureConnectionLatency()
 
         override fun getTrafficSnapshot(): LongArray = longArrayOf(
@@ -994,7 +996,9 @@ class OlcrtcVpnService : VpnService() {
                 establishTun = { establishOpenFluxTun(dnsIp) },
                 onFail = { error ->
                     diagnostics.append("error", "OpenFlux error: $error")
-                    handleConnectionFailure(IllegalStateException(error))
+                    commands.execute {
+                        handleConnectionFailure(IllegalStateException(error))
+                    }
                 },
             )
             attempt.session = session

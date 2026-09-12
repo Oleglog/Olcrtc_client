@@ -413,7 +413,14 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, R.string.settings_update_downloading, Toast.LENGTH_SHORT).show()
             return
         }
-        val installer = ApkUpdateInstaller(applicationContext)
+        val socksPort = runCatching { vpn?.activeSocksPort }.getOrNull() ?: 0
+        val proxy = if (socksPort > 0) {
+            java.net.Proxy(
+                java.net.Proxy.Type.SOCKS,
+                java.net.InetSocketAddress.createUnresolved("127.0.0.1", socksPort),
+            )
+        } else null
+        val installer = ApkUpdateInstaller(applicationContext, proxy = proxy)
         if (updateInstallAction(installer.canRequestPackageInstalls()) == UpdateInstallAction.REQUEST_PERMISSION) {
             pendingInstall = PendingInstall(release, asset)
             Toast.makeText(this, R.string.settings_update_install_permission, Toast.LENGTH_LONG).show()

@@ -97,7 +97,7 @@ internal class OpenFluxSession(
                     }
                 }
             }
-        } catch (e: IOException) {
+        } catch (e: Throwable) {
             if (!closed.get()) onFail("Чтение TUN: ${e.message}")
         }
     }
@@ -112,10 +112,8 @@ internal class OpenFluxSession(
                 }
                 inject(output, packet)
             }
-        } catch (e: IOException) {
+        } catch (e: Throwable) {
             if (!closed.get()) onFail("Запись TUN: ${e.message}")
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
         }
     }
 
@@ -174,8 +172,10 @@ internal class OpenFluxSession(
         if (closed.get()) return
         synchronized(outputLock) {
             if (!closed.get()) {
-                output.write(packet)
-                bytesDown.addAndGet(packet.size.toLong())
+                runCatching {
+                    output.write(packet)
+                    bytesDown.addAndGet(packet.size.toLong())
+                }
             }
         }
     }

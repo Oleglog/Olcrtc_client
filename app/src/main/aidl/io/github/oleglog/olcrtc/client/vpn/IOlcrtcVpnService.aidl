@@ -16,4 +16,5 @@ interface IOlcrtcVpnService {
     void registerCallback(IVpnStateCallback callback);
     void unregisterCallback(IVpnStateCallback callback);
     Bundle checkForUpdate(String currentVersion);
+    int getActiveSocksPort();
 }
