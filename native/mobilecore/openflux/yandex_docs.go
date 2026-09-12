@@ -1,10 +1,12 @@
-package openflux
+﻿package openflux
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
 	"regexp"
 	"strings"
@@ -13,7 +15,8 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-)
+
+		)
 
 type YandexDocsInfo struct {
 	CookieStr   string
@@ -45,8 +48,8 @@ func (s *DocSession) safeWrite(messageType int, data []byte) error {
 type YandexDocsTransport struct {
 	*BaseTransport
 
-	url     string
-	session *DocSession
+	url      string
+	session  *DocSession
 
 	userCounter atomic.Int32
 	baseUserID  string
@@ -67,48 +70,32 @@ func (t *YandexDocsTransport) Start() error {
 	}
 
 	t.baseUserID = randUserID()
-	go t.keepAliveLoop()
+	SafeGo("yandex.keepAlive", t.keepAliveLoop)
 	t.connectToDoc(0)
-
-	return nil
-}
-
-func (t *YandexDocsTransport) Stop() error {
-	_ = t.BaseTransport.Stop()
-
-	t.Mu.Lock()
-	if t.session != nil && t.session.Conn != nil {
-		_ = t.session.Conn.Close()
-		t.session = nil
-	}
-	t.Mu.Unlock()
 
 	return nil
 }
 
 func (t *YandexDocsTransport) Send(data []byte) error {
 	if !t.IsConnected() {
-		return fmt.Errorf("not connected")
+		return fmt.Errorf("transport not connected")
 	}
 
 	t.Mu.RLock()
-	s := t.session
+	session := t.session
 	t.Mu.RUnlock()
 
-	if s == nil || s.Conn == nil {
+	if session == nil {
 		return fmt.Errorf("no active session")
 	}
 
-	encoded := base64.StdEncoding.EncodeToString(data)
-	msg := fmt.Sprintf(`42["message",{"type":"chat","data":"%s"}]`, encoded)
-
-	err := s.safeWrite(websocket.TextMessage, []byte(msg))
-	if err != nil {
-		return err
+	select {
+	case session.WriteQueue <- data:
+		t.RecordSend(len(data))
+		return nil
+	default:
+		return fmt.Errorf("write queue full")
 	}
-
-	t.AddSentBytes(len(data))
-	return nil
 }
 
 func (t *YandexDocsTransport) connectToDoc(attempt int) {
@@ -116,181 +103,359 @@ func (t *YandexDocsTransport) connectToDoc(attempt int) {
 		return
 	}
 
-	for {
-		if !t.IsRunning() {
+	Debugf("[YDOCS] connectToDoc attempt ...")
+
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				Debugf("[PANIC] recovered in yandex.connect: %v", r)
+			}
+		}()
+		t.Mu.Lock()
+		existingSession := t.session
+		t.Mu.Unlock()
+
+		var userID string
+		if existingSession != nil {
+			userID = existingSession.UserID
+		} else {
+			suffix := fmt.Sprintf("%03d", t.userCounter.Add(1)%1000)
+			userID = t.baseUserID + suffix
+		}
+
+		info, err := t.fetchDocInfo(t.url, userID)
+		if err != nil {
+			Debugf("[YDOCS] fetchDocInfo failed: %v", err)
+			t.scheduleReconnect(attempt)
 			return
 		}
 
-		info, err := t.fetchDocInfo()
+		// Hard TCP dial timeout so a stuck connect/DNS to the balancer host
+		// can't hang the whole transport (HandshakeTimeout alone proved
+		// insufficient on iOS).
+		dialer := websocket.Dialer{
+			HandshakeTimeout: 15 * time.Second,
+			NetDialContext: (&net.Dialer{
+				Timeout:   10 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+		}
+		headers := http.Header{}
+		headers.Set("User-Agent", "Mozilla/5.0")
+		headers.Set("Origin", info.Origin)
+		headers.Set("Cookie", info.CookieStr)
+		headers.Set("Host", info.Host)
+
+		Debugf("[YDOCS] WebSocket dial %s", info.WsURL)
+		conn, resp, err := dialer.Dial(info.WsURL, headers)
 		if err != nil {
-			t.handleReconnect(attempt, err)
+			status := 0
+			if resp != nil {
+				status = resp.StatusCode
+			}
+			Debugf("[YDOCS] WebSocket dial failed (http %d): %v", status, err)
+			t.scheduleReconnect(attempt)
 			return
 		}
+		Debugf("[YDOCS] WebSocket connected to %s", info.Host)
 
-		session, err := t.startWsSession(info)
-		if err != nil {
-			t.handleReconnect(attempt, err)
-			return
+		writeQueue := make(chan []byte, t.GetConfig().MaxQueueSize)
+		if existingSession != nil {
+			writeQueue = existingSession.WriteQueue
+		}
+
+		session := &DocSession{
+			Info:       info,
+			Conn:       conn,
+			WriteQueue: writeQueue,
+			UserID:     userID,
 		}
 
 		t.Mu.Lock()
 		t.session = session
+		t.SetConnected(true)
 		t.Mu.Unlock()
 
-		t.SetConnected(true)
-		t.ResetReconnectAttempts()
-
-		t.readLoop(session)
-
-		t.SetConnected(false)
-		t.AddReconnect()
-
-		if !t.IsRunning() {
-			return
-		}
-	}
-}
-
-func (t *YandexDocsTransport) handleReconnect(attempt int, err error) {
-	if !t.IsRunning() {
-		return
-	}
-
-	delay := t.GetReconnectDelay()
-	time.Sleep(delay)
-	go t.connectToDoc(attempt + 1)
-}
-
-func (t *YandexDocsTransport) fetchDocInfo() (*YandexDocsInfo, error) {
-	client := &http.Client{
-		Timeout: 10 * time.Second,
-	}
-
-	req, err := http.NewRequest("GET", t.url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	html := string(body)
-	info := &YandexDocsInfo{}
-
-	tokenRe := regexp.MustCompile(`"token":"([^"]+)"`)
-	if m := tokenRe.FindStringSubmatch(html); len(m) > 1 {
-		info.Token = m[1]
-	}
-
-	idRe := regexp.MustCompile(`"id":"([^"]+)"`)
-	if m := idRe.FindStringSubmatch(html); len(m) > 1 {
-		info.DocID = m[1]
-	}
-
-	balancerRe := regexp.MustCompile(`"balancer_url":"([^"]+)"`)
-	if m := balancerRe.FindStringSubmatch(html); len(m) > 1 {
-		info.WsURL = m[1]
-	}
-
-	if info.DocID == "" || info.WsURL == "" {
-		return nil, fmt.Errorf("failed to parse Yandex doc info")
-	}
-
-	return info, nil
-}
-
-func (t *YandexDocsTransport) startWsSession(info *YandexDocsInfo) (*DocSession, error) {
-	wsURL := fmt.Sprintf("%s/socket.io/1/?t=%d", info.WsURL, time.Now().UnixNano())
-	resp, err := http.Get(wsURL)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	parts := strings.Split(string(body), ":")
-	if len(parts) < 1 {
-		return nil, fmt.Errorf("invalid socket.io handshake")
-	}
-	sid := parts[0]
-
-	realWsURL := fmt.Sprintf("%s/socket.io/1/websocket/%s", strings.Replace(info.WsURL, "https://", "wss://", 1), sid)
-
-	dialer := websocket.Dialer{
-		HandshakeTimeout: 10 * time.Second,
-	}
-
-	conn, _, err := dialer.Dial(realWsURL, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	session := &DocSession{
-		Info:       *info,
-		Conn:       conn,
-		WriteQueue: make(chan []byte, 1000),
-		UserID:     t.baseUserID,
-	}
-
-	return session, nil
-}
-
-func (t *YandexDocsTransport) readLoop(session *DocSession) {
-	for t.IsRunning() {
-		_, message, err := session.Conn.ReadMessage()
-		if err != nil {
-			return
+		if existingSession == nil {
+			SafeGo("yandex.writer", t.writerLoop)
 		}
 
-		msg := string(message)
-		if strings.HasPrefix(msg, `42["message",`) {
-			idx := strings.Index(msg, `"data":"`)
-			if idx != -1 {
-				idx += len(`"data":"`)
-				end := strings.Index(msg[idx:], `"`)
-				if end != -1 {
-					rawB64 := msg[idx : idx+end]
-					decoded, err := base64.StdEncoding.DecodeString(rawB64)
-					if err == nil {
-						t.AddRecvBytes(len(decoded))
-						t.CallReceive(decoded)
-					}
+		// Auth - use safeWrite
+		auth1 := fmt.Sprintf(`40{"token":"%s"}`, info.Token)
+		session.safeWrite(websocket.TextMessage, []byte(auth1))
+
+		authData := map[string]interface{}{
+			"type": "auth", "docid": info.DocID, "token": "fghhfgsjdgfjs",
+			"user": map[string]interface{}{"id": userID}, "editorType": 0,
+			"lastOtherSaveTime": -1, "permissions": info.Permissions,
+			"openCmd": info.OpenCmd, "coEditingMode": "fast", "jwtOpen": info.Token,
+		}
+		messagePart, _ := json.Marshal([]interface{}{"message", authData})
+		session.safeWrite(websocket.TextMessage, []byte(fmt.Sprintf("42%s", string(messagePart))))
+
+		connectedAt := time.Now()
+		for t.IsRunning() {
+			_, message, err := conn.ReadMessage()
+			if err != nil {
+				Debugf("[YDOCS] Read error: %v", err)
+				t.SetConnected(false)
+				// If the session was healthy for a while, treat the next
+				// connect as fresh (attempt -1 -> next attempt 0) so backoff
+				// doesn't keep growing across normal long-lived reconnects.
+				next := attempt
+				if time.Since(connectedAt) > 15*time.Second {
+					next = -1
 				}
+				t.scheduleReconnect(next)
+				return
 			}
+			t.handleMessage(session, message)
+		}
+	}()
+}
+
+func (t *YandexDocsTransport) writerLoop() {
+	for t.IsRunning() {
+		t.Mu.Lock()
+		session := t.session
+		t.Mu.Unlock()
+
+		if session == nil || session.Conn == nil {
+			time.Sleep(10 * time.Millisecond)
+			continue
+		}
+
+		select {
+		case packet := <-session.WriteQueue:
+			payload := base64.StdEncoding.EncodeToString(packet)
+			msg := fmt.Sprintf(`42["message",{"type":"cursor","cursor":"18;%s"}]`, payload)
+
+			if err := session.safeWrite(websocket.TextMessage, []byte(msg)); err != nil {
+				Debugf("[YDOCS] Write error: %v", err)
+			}
+		default:
+			time.Sleep(10 * time.Millisecond)
 		}
 	}
 }
 
 func (t *YandexDocsTransport) keepAliveLoop() {
-	ticker := time.NewTicker(15 * time.Second)
+	ticker := time.NewTicker(t.GetConfig().KeepAliveInterval)
 	defer ticker.Stop()
+	keepAliveMsg := `42["message",{"type":"cursor","cursor":"18;---KA---"}]`
 
 	for t.IsRunning() {
 		<-ticker.C
-		t.Mu.RLock()
-		s := t.session
-		t.Mu.RUnlock()
+		t.Mu.Lock()
+		session := t.session
+		t.Mu.Unlock()
 
-		if s != nil && s.Conn != nil && t.IsConnected() {
-			_ = s.safeWrite(websocket.TextMessage, []byte("2::"))
+		if session != nil && session.Conn != nil {
+			if err := session.safeWrite(websocket.TextMessage, []byte(keepAliveMsg)); err != nil {
+				Debugf("[YDOCS] Keep-alive failed: %v", err)
+				t.SetConnected(false)
+			}
 		}
 	}
 }
 
+func (t *YandexDocsTransport) handleMessage(session *DocSession, data []byte) {
+	text := string(data)
+
+	if strings.Contains(text, "---KA---") {
+		return
+	}
+
+	// Socket.IO ping - respond with pong (use safeWrite)
+	if text == "2" {
+		if session != nil && session.Conn != nil {
+			session.safeWrite(websocket.TextMessage, []byte("3"))
+		}
+		return
+	}
+	if text == "3" {
+		return
+	}
+
+	if strings.Contains(text, "saveChanges") || strings.Contains(text, "cursor") {
+		base64Str := t.extractBase64String(text)
+		if base64Str == "" {
+			return
+		}
+
+		decoded, err := base64.StdEncoding.DecodeString(base64Str)
+		if err != nil {
+			Debugf("[YDOCS] Base64 decode error: %v", err)
+			return
+		}
+
+		t.RecordReceive(len(decoded))
+		t.CallReceive(decoded)
+	}
+}
+
+func (t *YandexDocsTransport) extractBase64String(response string) string {
+	if strings.Contains(response, "saveChanges") {
+		marker := `"excelAdditionalInfo":"`
+		left := strings.Index(response, marker) + len(marker)
+		if left < len(marker) {
+			return ""
+		}
+		right := strings.Index(response[left:], `"`)
+		if right == -1 {
+			return ""
+		}
+		return response[left : left+right]
+	}
+
+	re := regexp.MustCompile(`"cursor":"[^;]+;([^"]+)"`)
+	matches := re.FindStringSubmatch(response)
+	if len(matches) > 1 {
+		return matches[1]
+	}
+	return ""
+}
+
+func (t *YandexDocsTransport) scheduleReconnect(attempt int) {
+	next := attempt + 1
+	if !t.IsRunning() || next >= t.GetConfig().MaxReconnectAttempts {
+		return
+	}
+
+	// Back off before retrying so a server that closes us immediately doesn't
+	// turn into a tight connect/close loop (previously reconnect was instant).
+	d := reconnectBackoff(next)
+	Debugf("[YDOCS] reconnecting in %v (attempt %d)", d, next)
+	time.Sleep(d)
+	if !t.IsRunning() {
+		return
+	}
+
+	t.RecordReconnect()
+	t.connectToDoc(next)
+}
+
+// reconnectBackoff returns an exponential backoff with jitter, capped at 15s.
+func reconnectBackoff(n int) time.Duration {
+	if n < 1 {
+		n = 1
+	}
+	shift := n - 1
+	if shift > 5 {
+		shift = 5
+	}
+	d := 500 * time.Millisecond * time.Duration(1<<uint(shift))
+	if d > 15*time.Second {
+		d = 15 * time.Second
+	}
+	// add up to +50% jitter
+	d += time.Duration(rand.Int63n(int64(d/2) + 1))
+	return d
+}
+
+func (t *YandexDocsTransport) fetchDocInfo(url, userID string) (YandexDocsInfo, error) {
+	client := &http.Client{
+		// Cap redirects so an auth/login redirect loop fails fast instead of
+		// hanging until the timeout (a private doc redirects to passport).
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return fmt.Errorf("stopped after 10 redirects (login required? doc not public?)")
+			}
+			return nil
+		},
+		Timeout: 15 * time.Second,
+	}
+
+	Debugf("[YDOCS] fetchDocInfo GET %s", url)
+	req, _ := http.NewRequest("GET", url, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0")
+	resp, err := client.Do(req)
+	if err != nil {
+		return YandexDocsInfo{}, err
+	}
+	defer resp.Body.Close()
+
+	htmlBytes, _ := io.ReadAll(resp.Body)
+	html := string(htmlBytes)
+	Debugf("[YDOCS] response status=%d finalURL=%s body=%dB", resp.StatusCode, resp.Request.URL.String(), len(html))
+
+	var cookies []string
+	for _, c := range resp.Cookies() {
+		cookies = append(cookies, fmt.Sprintf("%s=%s", c.Name, c.Value))
+	}
+
+	re := regexp.MustCompile(`<script[^>]*id="client-config"[^>]*>(.*?)</script>`)
+	matches := re.FindStringSubmatch(html)
+	if len(matches) < 2 {
+		// Help diagnose: is this a login page, a new-editor page, etc.?
+		hint := "no client-config script"
+		if strings.Contains(html, "passport") || strings.Contains(strings.ToLower(html), "login") {
+			hint = "looks like a login page (doc not public?)"
+		}
+		return YandexDocsInfo{}, fmt.Errorf("config not found: %s (status %d, final %s)", hint, resp.StatusCode, resp.Request.URL.String())
+	}
+
+	var config map[string]interface{}
+	if err := json.Unmarshal([]byte(matches[1]), &config); err != nil {
+		return YandexDocsInfo{}, fmt.Errorf("client-config is not valid JSON: %w", err)
+	}
+
+	officeAction, ok := config["officeActionData"].(map[string]interface{})
+	if !ok || officeAction == nil {
+		return YandexDocsInfo{}, fmt.Errorf("officeActionData missing - will reconnect")
+	}
+
+	editorConfigRaw, ok := officeAction["editor_config"].(map[string]interface{})
+	if !ok || editorConfigRaw == nil {
+		return YandexDocsInfo{}, fmt.Errorf("editor_config nil - will reconnect")
+	}
+
+	balancerURL, ok := officeAction["balancer_url"].(string)
+	if !ok || balancerURL == "" {
+		return YandexDocsInfo{}, fmt.Errorf("officeActionData.balancer_url missing - will reconnect")
+	}
+	host := strings.TrimPrefix(balancerURL, "https://")
+
+	document, ok := editorConfigRaw["document"].(map[string]interface{})
+	if !ok || document == nil {
+		return YandexDocsInfo{}, fmt.Errorf("editor_config.document missing - will reconnect")
+	}
+
+	token, ok := editorConfigRaw["token"].(string)
+	if !ok || token == "" {
+		return YandexDocsInfo{}, fmt.Errorf("editor_config.token missing - will reconnect")
+	}
+
+	docKey, ok := document["key"].(string)
+	if !ok || docKey == "" {
+		return YandexDocsInfo{}, fmt.Errorf("editor_config.document.key missing - will reconnect")
+	}
+
+	perms, _ := document["permissions"].(map[string]interface{})
+	if perms == nil {
+		perms = make(map[string]interface{})
+	}
+
+	return YandexDocsInfo{
+		CookieStr:   strings.Join(cookies, "; "),
+		Token:       token,
+		DocID:       docKey,
+		Origin:      balancerURL,
+		Host:        host,
+		WsURL:       fmt.Sprintf("wss://%s/2024.1.1-375/doc/%s/c/?EIO=4&transport=websocket", host, docKey),
+		Permissions: perms,
+		OpenCmd: map[string]interface{}{
+			"c":      "open",
+			"id":     docKey,
+			"userid": userID,
+			"format": document["fileType"],
+			"url":    document["url"],
+			"title":  document["title"],
+			"lcid":   25,
+		},
+	}, nil
+}
+
 func randUserID() string {
-	return fmt.Sprintf("user-%d", rand.Intn(1000000))
+	return fmt.Sprintf("%010d", rand.New(rand.NewSource(time.Now().UnixNano())).Intn(1000000000))
 }

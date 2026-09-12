@@ -1306,7 +1306,7 @@ class OlcrtcVpnService : VpnService() {
     }
 
     private fun scheduleTunnelHealthProbe(now: Long) {
-        if (activeProfile is ProfileConfig.OpenFlux) return
+        if (activeProfileInfo?.protocol?.startsWith("OpenFlux") == true) return
         if (healthProbeInFlight || now - lastHealthProbeAt < TunnelHealthPolicy.TUNNEL_HEALTH_INTERVAL_MILLIS) return
         val session = nativeSession ?: return
         val socksPort = activeSocksPort ?: return

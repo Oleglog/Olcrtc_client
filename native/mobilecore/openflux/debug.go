@@ -23,7 +23,9 @@ func EnableDebug() {
 func Debugf(format string, args ...interface{}) {
 	if verbose {
 		message := fmt.Sprintf(format, args...)
-		debugLog.Output(2, message)
+		if debugLog != nil {
+			debugLog.Output(2, message)
+		}
 
 		logSinkMu.RLock()
 		sink := logSink
@@ -32,6 +34,17 @@ func Debugf(format string, args ...interface{}) {
 			sink(message)
 		}
 	}
+}
+
+func SafeGo(name string, fn func()) {
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				Debugf("[%s] recovered panic: %v", name, r)
+			}
+		}()
+		fn()
+	}()
 }
 
 func SetLogSink(sink func(string)) {

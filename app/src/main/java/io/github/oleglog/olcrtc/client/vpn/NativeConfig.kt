@@ -37,7 +37,7 @@ internal object NativeConfig {
           "tag": "proxy",
           "settings": { "servers": [{ "address": "127.0.0.1", "port": $openfluxSocksPort }] }
         }""".trimIndent()
-        return config(socksPort, outbound, dns, routingRules, routingPolicy)
+        return config(socksPort, outbound, dns, routingRules, routingPolicy, domainStrategy = "IPOnDemand")
     }
 
     fun xray(
@@ -89,6 +89,7 @@ internal object NativeConfig {
         dns: DnsEndpoint,
         routingRules: List<RoutingRule>,
         routingPolicy: RoutingPolicy,
+        domainStrategy: String = "IPIfNonMatch",
     ) = """
         {
           "log": { "loglevel": "warning" },
@@ -106,11 +107,15 @@ internal object NativeConfig {
             { "protocol": "dns", "tag": "$DNS_OUT_TAG", "settings": { "nonIPQuery": "reject" } },
             { "protocol": "freedom", "tag": "direct" },
             { "protocol": "blackhole", "tag": "block" }
-          ]${routing(routingRules, routingPolicy)}
+          ]${routing(routingRules, routingPolicy, domainStrategy)}
         }
     """.trimIndent()
 
-    private fun routing(rules: List<RoutingRule>, policy: RoutingPolicy): String {
+    private fun routing(
+        rules: List<RoutingRule>,
+        policy: RoutingPolicy,
+        domainStrategy: String = "IPIfNonMatch",
+    ): String {
         val xrayRules = buildList {
             add("{ \"type\": \"field\", \"inboundTag\": [\"$LATENCY_TEST_TAG\"], \"outboundTag\": \"proxy\" }")
             add("{ \"type\": \"field\", \"inboundTag\": [\"$DNS_TAG\"], \"outboundTag\": \"proxy\" }")
@@ -138,7 +143,7 @@ internal object NativeConfig {
             }
             add("{ \"type\": \"field\", \"network\": \"tcp,udp\", \"outboundTag\": \"proxy\" }")
         }
-        return ",\n  \"routing\": { \"domainStrategy\": \"IPIfNonMatch\", \"rules\": [${xrayRules.joinToString(",")}] }"
+        return ",\n  \"routing\": { \"domainStrategy\": \"$domainStrategy\", \"rules\": [${xrayRules.joinToString(",")}] }"
     }
 
     private fun fieldRule(field: String, value: String, outboundTag: String, rawValue: Boolean = false): String {

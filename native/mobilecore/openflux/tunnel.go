@@ -68,6 +68,21 @@ func newTCPTunnel(trans Transport) *tcpTunnel {
 }
 
 func (t *tcpTunnel) DialTCP(address string) (net.Conn, error) {
+	host, portStr, err := net.SplitHostPort(address)
+	if err == nil {
+		if parsedIP := net.ParseIP(host); parsedIP != nil {
+			if ip4 := parsedIP.To4(); ip4 != nil {
+				var port uint16
+				fmt.Sscanf(portStr, "%d", &port)
+				return gonet.DialTCP(t.gvisorStack, tcpip.FullAddress{
+					NIC:  1,
+					Addr: tcpip.AddrFrom4([4]byte{ip4[0], ip4[1], ip4[2], ip4[3]}),
+					Port: port,
+				}, ipv4.ProtocolNumber)
+			}
+		}
+	}
+
 	tcpAddr, err := net.ResolveTCPAddr("tcp", address)
 	if err != nil {
 		return nil, fmt.Errorf("resolve: %w", err)

@@ -162,10 +162,11 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.ref_name }}
-          name: olcRTC Client ${{ github.event.inputs.tag || github.ref_name }}
+          name: OlConnect ${{ github.event.inputs.tag || github.ref_name }}
           files: release-artifacts/*
           generate_release_notes: true
-          draft: true
+          draft: false
+          make_latest: true
 
       - name: Keep latest fifteen GitHub Releases
         shell: bash

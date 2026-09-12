@@ -402,6 +402,7 @@ func IsOlcrtcRunning() bool {
 }
 
 func StartOpenFlux(docURL string, transportType string, socksPort int64) error {
+	openflux.EnableDebug()
 	return openflux.Start(docURL, transportType, int(socksPort))
 }
 
