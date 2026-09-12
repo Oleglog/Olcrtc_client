@@ -1052,7 +1052,7 @@ class SettingsFragment : Fragment() {
     private companion object {
         const val MAX_DIALOG_LOG_CHARS = 12_000
         const val MAX_SAFE_ERROR_CHARS = 240
-        const val REPOSITORY_URL = "https://github.com/Oleglog/Olcrtc_client"
+        const val REPOSITORY_URL = "https://github.com/Oleglog/OlConnect"
         const val TELEGRAM_URL = "https://t.me/Linkloun"
     }
 }

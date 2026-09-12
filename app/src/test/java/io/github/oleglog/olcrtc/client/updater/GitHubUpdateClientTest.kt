@@ -67,7 +67,7 @@ class GitHubUpdateClientTest {
     private class FakeConnection(
         private val status: Int,
         private val body: ByteArray = byteArrayOf(),
-    ) : HttpsURLConnection(URL("https://api.github.com/repos/Oleglog/Olcrtc_client/releases/latest")) {
+    ) : HttpsURLConnection(URL("https://api.github.com/repos/Oleglog/OlConnect/releases/latest")) {
         var disconnected = false
 
         override fun getResponseCode(): Int = status

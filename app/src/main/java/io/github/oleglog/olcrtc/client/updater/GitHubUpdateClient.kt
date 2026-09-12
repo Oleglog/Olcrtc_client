@@ -50,7 +50,7 @@ internal class GitHubUpdateClient(
 
     companion object {
         private const val TIMEOUT_MILLIS = 15_000
-        private const val LATEST_RELEASE_URL = "https://api.github.com/repos/Oleglog/Olcrtc_client/releases/latest"
+        private const val LATEST_RELEASE_URL = "https://api.github.com/repos/Oleglog/OlConnect/releases/latest"
 
         private fun defaultOpenConnection(url: URL, proxy: Proxy?): HttpsURLConnection =
             (if (proxy == null) url.openConnection() else url.openConnection(proxy)) as HttpsURLConnection
