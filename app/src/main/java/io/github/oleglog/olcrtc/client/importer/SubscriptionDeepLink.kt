@@ -20,7 +20,7 @@ internal object SubscriptionDeepLinkParser {
 
     fun parseOrNull(raw: String): SubscriptionDeepLink? {
         val uri = runCatching { URI(raw.trim()) }.getOrNull() ?: return null
-        if (!uri.scheme.equals("olcrtc", ignoreCase = true) || !uri.host.equals("subscription", ignoreCase = true)) {
+        if ((!uri.scheme.equals("olconnect", ignoreCase = true) && !uri.scheme.equals("olcrtc", ignoreCase = true)) || !uri.host.equals("subscription", ignoreCase = true)) {
             return null
         }
         require(raw.length <= MAX_LINK_CHARS) { "subscription link is too large" }

@@ -250,10 +250,10 @@
     <string name="settings_update_no_asset">Release found, but no compatible APK asset is available</string>
     <string name="settings_system_screen_unavailable">System settings screen is unavailable on this device</string>
     <string name="battery_optimization_prompt_title">Improve background VPN stability</string>
-    <string name="battery_optimization_prompt_message">Android may suspend the VPN when the screen is off. Disable battery optimization for olcRTC Client for more reliable background operation and reconnects.</string>
+    <string name="battery_optimization_prompt_message">Android may suspend the VPN when the screen is off. Disable battery optimization for OlConnect for more reliable background operation and reconnects.</string>
     <string name="battery_optimization_prompt_never">Do not show again</string>
     <string name="battery_optimization_prompt_open">Open app settings</string>
-    <string name="battery_optimization_already_disabled">Battery optimization is already disabled for olcRTC Client</string>
+    <string name="battery_optimization_already_disabled">Battery optimization is already disabled for OlConnect</string>
     <string name="settings_about_message">Version: %1$s\nDeveloper: %2$s</string>
     <string name="settings_about_repository">Original repository on GitHub</string>
     <string name="settings_about_telegram">Developer Telegram</string>
@@ -318,7 +318,7 @@
     <string name="settings_export_diagnostics">Share connection log</string>
     <string name="settings_report_issue">Report a problem</string>
     <string name="settings_no_diagnostics">No diagnostic logs yet</string>
-    <string name="settings_diagnostics_summary">App: %1$s\nXray: %2$s\nolcRTC core: %3$s\nState: %4$s\nProfile: %5$s\nNetwork: %6$s\nLast error: %7$s</string>
+    <string name="settings_diagnostics_summary">App: %1$s\nXray: %2$s\nOlConnect core: %3$s\nState: %4$s\nProfile: %5$s\nNetwork: %6$s\nLast error: %7$s</string>
     <string name="settings_diagnostics_profile_local">Saved connection</string>
     <string name="settings_diagnostics_profile_subscription">Subscription connection</string>
     <string name="settings_diagnostics_profile_none">None</string>
@@ -370,10 +370,10 @@
     <string name="camera_error">Unable to start the camera</string>
     <string name="import_qr_image">QR image</string>
     <string name="import_file">File</string>
-    <string name="manual_olcrtc">Manual olcRTC</string>
+    <string name="manual_olcrtc">Manual OlConnect</string>
     <string name="manual_standard">Manual link</string>
     <string name="manual_profile_title">Manual profile</string>
-    <string name="manual_olcrtc_hint">name=olcRTC\nprovider=wbstream\ntransport=vp8channel\nroom=room\nclient=client\nkey=64-hex\nauth=optional\ndns=77.88.8.8:53</string>
+    <string name="manual_olcrtc_hint">name=OlConnect\nprovider=wbstream\ntransport=vp8channel\nroom=room\nclient=client\nkey=64-hex\nauth=optional\ndns=77.88.8.8:53</string>
     <string name="manual_standard_hint">Paste vless://, vmess://, trojan:// or ss:// link</string>
     <string name="import_preview">Review the imported content, then tap Import and connect</string>
     <string name="profile_saved">Connection saved</string>
@@ -396,7 +396,7 @@
     <string name="invalid_profile">Invalid profile</string>
     <string name="vpn_permission_denied">VPN permission denied</string>
     <string name="vpn_notification_channel">VPN connection</string>
-    <string name="vpn_notification_title">olcRTC VPN</string>
+    <string name="vpn_notification_title">OlConnect VPN</string>
     <string name="vpn_notification_connecting">Preparing connection</string>
     <string name="vpn_notification_connected">Connected</string>
     <string name="vpn_notification_reconnecting">Reconnecting</string>
@@ -426,7 +426,7 @@
     <string name="vpn_notification_profile_chooser_empty">No connections available</string>
     <string name="vpn_notification_reconnect">Reconnect</string>
     <string name="vpn_notification_disconnect">Disconnect</string>
-    <string name="vpn_tile_label">olcRTC VPN</string>
+    <string name="vpn_tile_label">OlConnect VPN</string>
     <string name="vpn_tile_connecting">Connecting</string>
     <string name="vpn_native_unavailable">Native VPN components are not installed</string>
     <string name="statistics_duration_label">Duration</string>

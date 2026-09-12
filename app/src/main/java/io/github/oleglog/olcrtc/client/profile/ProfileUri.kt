@@ -15,7 +15,7 @@ internal sealed interface ImportedProfile {
 
 internal object ProfileUri {
     fun parse(raw: String): ImportedProfile = when (raw.substringBefore(':').lowercase()) {
-        "olcrtc" -> ImportedProfile.Olcrtc(OlcrtcUri.parse(raw))
+        "olconnect", "olcrtc" -> ImportedProfile.Olcrtc(OlcrtcUri.parse(raw))
         "openflux" -> ImportedProfile.OpenFlux(OpenFluxUri.parse(raw))
         "vless", "vmess", "trojan", "ss" -> ImportedProfile.Standard(StandardUri.parse(raw))
         else -> throw IllegalArgumentException("Unsupported profile scheme")

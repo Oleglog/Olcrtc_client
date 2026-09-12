@@ -1,85 +1,68 @@
-# olcRTC Client
+# OlConnect
 
-Android VPN client for olcRTC and standard proxy profiles. The app is designed for Android 8+ and routes traffic through Android VpnService, HevSocks5Tunnel, Xray, and optionally the olcRTC mobile core.
+Современный клиент VPN и прокси-соединений для Android 8+. Маршрутизирует трафик через системный `VpnService`, обеспечивая обход блокировок и цензуры с использованием инновационных транспортов маскировки и стандартных протоколов.
 
-## Scope
+---
 
-Supported profile families for the 1.0.0 target:
+## Поддерживаемые протоколы
 
-- olcRTC: wbstream, telemost and jitsi within the provider/transport matrix defined by the technical specification.
-- VLESS, VMess and Trojan.
-- TCP/raw, WebSocket and gRPC for standard profiles.
-- XHTTP for VLESS.
-- TLS, REALITY and VLESS Vision flow.
+### 1. OpenFlux
+- Высокоскоростной L3 IP-туннель, инкапсулированный в протоколы Yandex Docs (поддерживаются как новый движок Volga, так и классический редактор).
+- Встроенный резолвер DNS-over-HTTPS (DoH: Cloudflare, Google, Quad9, Yandex).
+- Работает напрямую без необходимости создания комнат видеоконференций.
 
-Unsupported by design: Clash YAML, sing-box JSON, arbitrary Xray JSON, KCP, QUIC, HTTPUpgrade, Shadowsocks, WireGuard, Android TV, Wear OS, cloud sync, telemetry and admin-panel features.
+### 2. OlConnect (WebRTC)
+- Инкапсуляция TCP/IP-трафика внутри сессий видеоконференций доверенных белых сервисов:
+  - **Яндекс.Телемост** (`vp8channel`, `videochannel`);
+  - **Jitsi Meet** (`vp8channel`, `datachannel`, `seichannel`, `videochannel`);
+  - **WB Stream** (`vp8channel`, `datachannel`).
+- Поддержка аппаратного и программного кодирования VP8 с контролем целостности пакетов.
 
-## Importing profiles
+### 3. Стандартные протоколы (на базе ядра Xray)
+- **VLESS**: поддержка транспортов TCP/raw, WebSocket, gRPC, XHTTP, а также протоколов безопасности TLS, REALITY и VLESS Vision flow.
+- **VMess** и **Trojan**.
+- **Shadowsocks**.
 
-The client validates every incoming configuration before saving it. Supported import paths are:
+---
 
-- QR camera scan.
-- QR image import through Android Photo Picker.
-- Explicit clipboard paste.
-- Deep links for `olcrtc://`, `vless://`, `vmess://` and `trojan://`.
-- Plain text files through Storage Access Framework.
-- Subscription payloads: plain UTF-8 lists, Base64 lists, olcRTC bundle JSON, `olcrtc+gz` and multipart QR.
+## Импорт конфигураций и подписки
 
-External intents do not auto-connect. Imported data is first parsed, validated and stored locally.
+- **Глубокие ссылки (Deep Links)**: клик по ссылкам вида `olconnect://`, `olcrtc://`, `openflux://`, `vless://`, `vmess://`, `trojan://`, `ss://`.
+- **QR-коды**: сканирование камерой или импорт изображения QR из галереи.
+- **Вставка из буфера обмена** или импорт файлов конфигураций.
+- **Умные подписки с зеркалами**:
+  - Поддержка публичных ссылок на подписки `https://.../sub/<slug>`.
+  - Автоматический fallback на зашифрованное зеркало в **Яндекс.Диске** (AES-256-GCM), если основной сервер недоступен или заблокирован.
 
-## Routing
+---
 
-The app captures allowed per-app traffic through Android VpnService and applies routing inside Xray:
+## Маршрутизация
 
-1. User domain/IP/CIDR rules.
-2. LAN direct rule when enabled.
-3. GeoIP/GeoSite preset.
-4. Default route.
+- **Пресеты маршрутизации**:
+  - *Весь трафик через VPN*;
+  - *Россия напрямую (Bypass Russia)*: трафик к российским ресурсам (`geoip:ru`, `geosite:category-ru`) идет напрямую, зарубежный трафик — через защищенный туннель.
+- **Выборочная маршрутизация приложений (Per-App)**:
+  - Все приложения;
+  - Все, кроме выбранных;
+  - Только выбранные приложения.
 
-Routing presets:
+---
 
-- All traffic through VPN.
-- Russia direct: `geoip:ru`, `geosite:category-ru` and `geosite:ru-available-only-inside` go direct, other traffic uses VPN.
+## Встроенное обновление приложения
 
-Per-app routing supports all apps, all except selected, and only selected. The package list is local-only and is never exported in diagnostics.
+Приложение умеет автоматически проверять обновления и безопасно скачивать APK-файлы релизов с GitHub прямо через активный туннель или напрямую, с проверкой контрольной суммы SHA-256 и сертификата подписи.
 
-## Privacy and diagnostics
+---
 
-olcRTC Client has no telemetry, analytics or automatic crash upload. Diagnostics are stored locally, rotated, and redacted before display or export. Redaction covers:
+## Сборка
 
-- raw share links;
-- keys, UUIDs, passwords, auth tokens and client IDs;
-- subscription URL query strings;
-- mirror keys;
-- authorization headers.
+Сборка нативных компонентов и приложения осуществляется через GitHub Actions. Локальные требования для сборки:
+- JDK 17
+- Android SDK 36 (NDK 28.2)
+- Go (согласно `native/mobilecore/go.mod`)
 
-Logs are kept for up to 7 days and capped at 20 MiB.
+---
 
-## Building
+## Лицензия
 
-The Android CI workflow builds the native components before Gradle verification:
-
-```bash
-scripts/build_mobilecore.sh
-scripts/build_hev.sh
-./gradlew --no-daemon lintDebug testDebugUnitTest assembleDebug assembleRelease
-./gradlew --no-daemon :app:assembleDebugAndroidTest
-```
-
-Required toolchain:
-
-- JDK 17.
-- Android SDK 36.
-- Android NDK 28.2.13676358.
-- The Go version declared in `native/mobilecore/go.mod`.
-
-## Troubleshooting
-
-- If the VPN cannot start, re-check VpnService permission and selected profile validity.
-- If only selected apps mode is enabled, at least one selected installed package must exist.
-- If a subscription update fails, the previous working profiles are kept.
-- If diagnostics are shared, use the redacted copy/export action from Settings.
-
-## License
-
-The repository contains proprietary Android application code. Third-party notices are documented in `THIRD_PARTY_NOTICES.md`.
+Proprietary / Open Source dependencies (см. `THIRD_PARTY_NOTICES.md`).

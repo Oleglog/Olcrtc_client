@@ -20,7 +20,7 @@ object OlcrtcUri {
 
     fun parse(raw: String): OlcrtcProfile {
         val uri = URI(raw)
-        require(uri.scheme.equals("olcrtc", ignoreCase = true)) { "Unsupported URI scheme" }
+        require(uri.scheme.equals("olconnect", ignoreCase = true) || uri.scheme.equals("olcrtc", ignoreCase = true)) { "Unsupported URI scheme" }
         val authority = uri.rawAuthority?.split('@')?.takeIf { it.size == 2 }
         val provider = (uri.userInfo ?: authority?.firstOrNull()?.let(::decode))
             ?.let(OlcrtcProfile.Provider::parse)
