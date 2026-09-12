@@ -6,13 +6,10 @@ internal interface NativeCore {
     fun setProtector(protector: SocketProtector)
     fun startOlcrtc(config: NativeOlcrtcConfig)
     fun waitOlcrtcReady(timeoutMillis: Int)
-    fun startOpenFlux(config: NativeOpenFluxConfig)
-    fun waitOpenFluxReady(timeoutMillis: Int)
     fun startXray(assetDirectory: String, configJson: String)
     fun waitXrayReady(socksPort: Int, timeoutMillis: Int)
     fun isXrayRunning(): Boolean
     fun isOlcrtcRunning(): Boolean
-    fun isOpenFluxRunning(): Boolean = false
     fun trafficCounters(): TrafficCounters = TrafficCounters()
     fun stopAll()
 }

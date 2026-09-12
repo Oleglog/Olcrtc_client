@@ -401,21 +401,28 @@ func IsOlcrtcRunning() bool {
 	return olcrtc.IsRunning()
 }
 
-func StartOpenFlux(docURL string, transportType string, socksPort int64) error {
-	openflux.EnableDebug()
-	return openflux.Start(docURL, transportType, int(socksPort))
+func StartOpenFlux(docURL string, transportType string) string {
+	return openflux.Start(docURL, transportType)
 }
 
 func StopOpenFlux() {
 	openflux.Stop()
 }
 
-func IsOpenFluxRunning() bool {
-	return openflux.IsRunning()
+func IsOpenFluxConnected() bool {
+	return openflux.IsConnected()
 }
 
-func WaitOpenFluxReady(timeoutMillis int64) error {
-	return openflux.WaitReady(int(timeoutMillis))
+func SendOpenFlux(packet []byte) string {
+	return openflux.Send(packet)
+}
+
+func ReadOpenFlux() []byte {
+	return openflux.Read()
+}
+
+func ReadOpenFluxLogs() string {
+	return openflux.ReadLogs()
 }
 
 func TrafficBytesUp() int64 {

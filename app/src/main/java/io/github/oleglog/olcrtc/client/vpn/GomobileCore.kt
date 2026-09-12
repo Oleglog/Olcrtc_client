@@ -32,20 +32,6 @@ internal object GomobileCore : NativeCore {
         Mobilecore.waitOlcrtcReady(timeoutMillis.toLong())
     }
 
-    override fun startOpenFlux(config: NativeOpenFluxConfig) {
-        Mobilecore.startOpenFlux(
-            config.documentUrl,
-            config.transport,
-            config.socksPort.toLong(),
-        )
-    }
-
-    override fun waitOpenFluxReady(timeoutMillis: Int) {
-        Mobilecore.waitOpenFluxReady(timeoutMillis.toLong())
-    }
-
-    override fun isOpenFluxRunning(): Boolean = Mobilecore.isOpenFluxRunning()
-
     override fun startXray(assetDirectory: String, configJson: String) {
         Mobilecore.startXray(assetDirectory, configJson)
     }

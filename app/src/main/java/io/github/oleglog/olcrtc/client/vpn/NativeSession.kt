@@ -11,14 +11,13 @@ internal class NativeSession(
     verifyDatapath: () -> Unit,
     reportStage: (ConnectionStage, Long?, Throwable?) -> Unit = { _, _, _ -> },
     reportStop: (routeReleasedMillis: Long, totalMillis: Long) -> Unit = { _, _ -> },
-) : Closeable {
+) : VpnTunnelSession {
     private val lifecycle = Any()
     private val verifyDatapath = verifyDatapath
     private val reportStage = reportStage
     private val reportStop = reportStop
     @Volatile private var coreStarted = false
     @Volatile private var olcrtcStarted = false
-    @Volatile private var openfluxStarted = false
     @Volatile private var tun: TunDescriptor? = null
     @Volatile private var closed = false
 
@@ -28,7 +27,6 @@ internal class NativeSession(
         xrayConfig: String,
         hevConfig: ByteArray,
         olcrtcConfig: NativeOlcrtcConfig? = null,
-        openfluxConfig: NativeOpenFluxConfig? = null,
     ) {
         checkOpen()
         startSafely {
@@ -38,7 +36,7 @@ internal class NativeSession(
                     establishTun().also { tun = it }
                 }
             }
-            startRuntime(descriptor, socksPort, assetDirectory, xrayConfig, hevConfig, olcrtcConfig, openfluxConfig)
+            startRuntime(descriptor, socksPort, assetDirectory, xrayConfig, hevConfig, olcrtcConfig)
         }
     }
 
@@ -49,7 +47,6 @@ internal class NativeSession(
         xrayConfig: String,
         hevConfig: ByteArray,
         olcrtcConfig: NativeOlcrtcConfig?,
-        openfluxConfig: NativeOpenFluxConfig?,
     ) {
         if (olcrtcConfig != null) {
             stage(ConnectionStage.START_CARRIER) {
@@ -60,16 +57,6 @@ internal class NativeSession(
                     olcrtcStarted = true
                 }
                 nativeCore.waitOlcrtcReady(olcrtcConfig.readyTimeoutMillis)
-            }
-        } else if (openfluxConfig != null) {
-            stage(ConnectionStage.START_CARRIER) {
-                synchronized(lifecycle) {
-                    checkOpen()
-                    coreStarted = true
-                    nativeCore.startOpenFlux(openfluxConfig)
-                    openfluxStarted = true
-                }
-                nativeCore.waitOpenFluxReady(15_000)
             }
         }
         stage(ConnectionStage.START_XRAY) {

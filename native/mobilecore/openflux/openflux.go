@@ -2,102 +2,140 @@ package openflux
 
 import (
 	"fmt"
-	"net"
+	"strings"
 	"sync"
-	"time"
 )
 
-var (
-	fluxMu     sync.Mutex
-	fluxServer *socksServer
-	fluxTun    *tcpTunnel
-	fluxTrans  Transport
-)
+var client = packetClient{}
 
-func Start(docURL string, transportType string, socksPort int) error {
-	fluxMu.Lock()
-	defer fluxMu.Unlock()
+type packetClient struct {
+	mu        sync.Mutex
+	running   bool
+	transport Transport
+	packets   [][]byte
+	logs      []string
+}
 
-	if fluxServer != nil {
-		return fmt.Errorf("openflux is already running")
+func appendLog(message string) {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	client.logs = append(client.logs, message)
+	if len(client.logs) > 500 {
+		client.logs = append([]string(nil), client.logs[len(client.logs)-500:]...)
+	}
+}
+
+func Start(documentURL string, transportType string) string {
+	if documentURL == "" {
+		return "Ссылка на документ не указана"
 	}
 
+	client.mu.Lock()
+	if client.running {
+		client.mu.Unlock()
+		return ""
+	}
+	client.running = true
+	client.packets = nil
+	client.logs = nil
+	client.mu.Unlock()
+
+	EnableDebug()
+	SetLogSink(appendLog)
+
+	config := DefaultTransportConfig()
 	detected := transportType
 	if detected == "" || detected == "auto" {
-		detected = detectTransport(docURL)
+		detected = detectTransport(documentURL)
 	}
 
-	cfg := DefaultTransportConfig()
-	var rawTrans Transport
+	var innerTrans Transport
 	if detected == "vyandex" {
-		rawTrans = NewYandexVolgaTransport(docURL, cfg)
+		appendLog("[ANDROID] Обнаружен редактор Volga. Запуск транспорта vyandex")
+		innerTrans = NewYandexVolgaTransport(documentURL, config)
 	} else {
-		rawTrans = NewYandexDocsTransport(docURL, cfg)
+		appendLog("[ANDROID] Запуск классического транспорта yandex")
+		innerTrans = NewYandexDocsTransport(documentURL, config)
 	}
 
-	compressed := newCompressedTransport(rawTrans)
-	if err := compressed.Start(); err != nil {
-		return fmt.Errorf("start transport: %w", err)
+	trans := newCompressedTransport(innerTrans)
+	trans.Receive(func(data []byte) {
+		packet := append([]byte(nil), data...)
+		client.mu.Lock()
+		if !client.running {
+			client.mu.Unlock()
+			return
+		}
+		if len(client.packets) >= config.MaxQueueSize {
+			client.packets = client.packets[1:]
+		}
+		client.packets = append(client.packets, packet)
+		client.mu.Unlock()
+	})
+
+	if err := trans.Start(); err != nil {
+		appendLog(fmt.Sprintf("[ANDROID] Ошибка запуска: %v", err))
+		client.mu.Lock()
+		client.running = false
+		client.mu.Unlock()
+		return err.Error()
 	}
 
-	tun := newTCPTunnel(compressed)
-	server := newSOCKSServer(fmt.Sprintf("127.0.0.1:%d", socksPort), tun)
-	if err := server.Start(); err != nil {
-		_ = compressed.Stop()
-		return fmt.Errorf("start SOCKS5: %w", err)
-	}
-
-	fluxServer = server
-	fluxTun = tun
-	fluxTrans = compressed
-	return nil
+	client.mu.Lock()
+	client.transport = trans
+	client.mu.Unlock()
+	return ""
 }
 
 func Stop() {
-	fluxMu.Lock()
-	defer fluxMu.Unlock()
-
-	if fluxServer != nil {
-		_ = fluxServer.Stop()
-		fluxServer = nil
+	client.mu.Lock()
+	trans := client.transport
+	client.running = false
+	client.transport = nil
+	client.packets = nil
+	client.mu.Unlock()
+	appendLog("[ANDROID] Остановка транспорта")
+	if trans != nil {
+		_ = trans.Stop()
 	}
-	if fluxTrans != nil {
-		_ = fluxTrans.Stop()
-		fluxTrans = nil
-	}
-	fluxTun = nil
 }
 
-func IsRunning() bool {
-	fluxMu.Lock()
-	defer fluxMu.Unlock()
-	return fluxServer != nil
+func IsConnected() bool {
+	client.mu.Lock()
+	trans := client.transport
+	client.mu.Unlock()
+	return trans != nil && trans.IsConnected()
 }
 
-func WaitReady(timeoutMillis int) error {
-	deadline := time.Now().Add(time.Duration(timeoutMillis) * time.Millisecond)
-	for {
-		fluxMu.Lock()
-		running := fluxServer != nil
-		var port string
-		if running && fluxServer.listener != nil {
-			port = fluxServer.listener.Addr().String()
-		}
-		fluxMu.Unlock()
-
-		if !running {
-			return fmt.Errorf("openflux not running")
-		}
-		if port != "" {
-			conn, err := net.DialTimeout("tcp", port, 100*time.Millisecond)
-			if err == nil {
-				_ = conn.Close()
-				return nil
-			}
-		}
-		if time.Now().After(deadline) {
-			return fmt.Errorf("timeout waiting for OpenFlux SOCKS5")
-		}
-		time.Sleep(50 * time.Millisecond)
+func Send(packet []byte) string {
+	client.mu.Lock()
+	trans := client.transport
+	running := client.running
+	client.mu.Unlock()
+	if !running || trans == nil {
+		return "Транспорт не запущен"
 	}
+	if err := trans.Send(packet); err != nil {
+		return err.Error()
+	}
+	return ""
+}
+
+func Read() []byte {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	if len(client.packets) == 0 {
+		return nil
+	}
+	packet := client.packets[0]
+	client.packets = client.packets[1:]
+	return packet
+}
+
+func ReadLogs() string {
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	logs := strings.Join(client.logs, "\n")
+	client.logs = nil
+	return logs
 }

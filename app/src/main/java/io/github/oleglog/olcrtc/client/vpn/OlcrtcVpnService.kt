@@ -91,7 +91,7 @@ class OlcrtcVpnService : VpnService() {
     private var notificationTicker: ScheduledFuture<*>? = null
     @Volatile private var activeSocksPort: Int? = null
     @Volatile private var activeDnsEndpoint: DnsEndpoint? = null
-    @Volatile private var nativeSession: NativeSession? = null
+    @Volatile private var nativeSession: VpnTunnelSession? = null
     private var connectionAttempt: ConnectionAttempt? = null
     private var connectionFuture: Future<*>? = null
     private var nextConnectionGeneration = 0L
@@ -937,6 +937,23 @@ class OlcrtcVpnService : VpnService() {
         }
     }
 
+    private fun establishOpenFluxTun(network: Network, dnsServer: String): TunDescriptor {
+        val builder = Builder()
+            .setSession(getString(R.string.app_name))
+            .setMtu(1400)
+            .addAddress("10.10.10.2", 24)
+            .addRoute("0.0.0.0", 0)
+            .addDnsServer(dnsServer)
+        builder.setUnderlyingNetworks(arrayOf(network))
+        applyPerAppPolicy(builder, routingSettings.getPerAppPolicy())
+        val descriptor = builder.establish()
+            ?: error("failed to establish VPN interface for OpenFlux")
+        return object : TunDescriptor {
+            override val fd = descriptor.fd
+            override fun close() = descriptor.close()
+        }
+    }
+
     private fun applyPerAppPolicy(builder: Builder, policy: PerAppPolicy) {
         val packages = policy.packagesWithVpnAppExcluded(packageName)
         if (policy.mode == PerAppPolicy.Mode.ALL) {
@@ -967,6 +984,35 @@ class OlcrtcVpnService : VpnService() {
     ): StartedSession {
         attempt.requireActive()
         GomobileCore.stopProfileProbe()
+
+        if (profile is ProfileConfig.OpenFlux) {
+            diagnostics.append(
+                "info",
+                "OpenFlux native runtime transport=${profile.value.transport.value}",
+            )
+            val dnsEndpoint = sessionDns(profile, routingSettings.getDnsServer())
+            val dnsIp = profile.value.dnsServer?.takeIf(String::isNotBlank) ?: "1.1.1.1"
+            val session = OpenFluxSession(
+                profile = profile.value,
+                dnsServer = dnsIp,
+                establishTun = { establishOpenFluxTun(attempt.network, dnsIp) },
+                onFail = { error ->
+                    diagnostics.append("error", "OpenFlux error: $error")
+                    handleConnectionFailure(IllegalStateException(error))
+                },
+            )
+            attempt.session = session
+            try {
+                attempt.requireActive()
+                session.start()
+                attempt.requireActive()
+                return StartedSession(session, 0, dnsEndpoint.tunnel)
+            } catch (error: Throwable) {
+                runCatching { session.close() }
+                throw error
+            }
+        }
+
         val routingRules = profiles.getEnabledRoutingRules()
         val requestedRoutingPolicy = routingSettings.get()
         val preparedGeoAssets = if (requiresGeoAssets(requestedRoutingPolicy)) {
@@ -1001,10 +1047,8 @@ class OlcrtcVpnService : VpnService() {
         val xraySocksPort: Int
         val xrayConfig: String
         val olcrtcConfig: NativeOlcrtcConfig?
-        val openfluxConfig: NativeOpenFluxConfig?
         when (profile) {
             is ProfileConfig.Olcrtc -> {
-                openfluxConfig = null
                 olcrtcConfig = NativeOlcrtcConfig.from(
                     profile.value,
                     freeLoopbackPort(),
@@ -1031,23 +1075,6 @@ class OlcrtcVpnService : VpnService() {
                     routingPolicy = routingPolicy,
                 )
             }
-            is ProfileConfig.OpenFlux -> {
-                olcrtcConfig = null
-                val fluxPort = freeLoopbackPort()
-                openfluxConfig = NativeOpenFluxConfig.from(profile.value, fluxPort)
-                diagnostics.append(
-                    "info",
-                    "OpenFlux runtime transport=${profile.value.transport.value} routing=${routingPolicy.preset}",
-                )
-                xraySocksPort = freeLoopbackPort(fluxPort)
-                xrayConfig = NativeConfig.xrayOpenFlux(
-                    socksPort = xraySocksPort,
-                    openfluxSocksPort = fluxPort,
-                    dns = dns.tunnel,
-                    routingRules = routingRules,
-                    routingPolicy = routingPolicy,
-                )
-            }
             is ProfileConfig.Standard -> {
                 diagnostics.append(
                     "info",
@@ -1056,7 +1083,6 @@ class OlcrtcVpnService : VpnService() {
                         "routing=${routingPolicy.preset}",
                 )
                 olcrtcConfig = null
-                openfluxConfig = null
                 xraySocksPort = freeLoopbackPort()
                 xrayConfig = NativeConfig.xray(
                     socksPort = xraySocksPort,
@@ -1066,6 +1092,7 @@ class OlcrtcVpnService : VpnService() {
                     routingPolicy = routingPolicy,
                 )
             }
+            is ProfileConfig.OpenFlux -> error("OpenFlux handled earlier")
         }
         val isCovertTransport = profile is ProfileConfig.OpenFlux
         val verifyDatapath = {
@@ -1090,7 +1117,6 @@ class OlcrtcVpnService : VpnService() {
                 xrayConfig = xrayConfig,
                 hevConfig = NativeConfig.hev(xraySocksPort),
                 olcrtcConfig = olcrtcConfig,
-                openfluxConfig = openfluxConfig,
             )
             attempt.requireActive()
             return StartedSession(session, xraySocksPort, dns.tunnel)
@@ -1570,7 +1596,7 @@ class OlcrtcVpnService : VpnService() {
     }
 
     private data class StartedSession(
-        val session: NativeSession,
+        val session: VpnTunnelSession,
         val socksPort: Int,
         val dns: DnsEndpoint,
     )
@@ -1582,7 +1608,7 @@ class OlcrtcVpnService : VpnService() {
         val startedAt: Long,
     ) {
         val cancelled = AtomicBoolean(false)
-        @Volatile var session: NativeSession? = null
+        @Volatile var session: VpnTunnelSession? = null
 
         fun requireActive() {
             if (cancelled.get()) throw CancellationException("connection attempt cancelled")

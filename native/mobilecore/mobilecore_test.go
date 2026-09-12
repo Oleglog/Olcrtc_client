@@ -65,12 +65,12 @@ func TestWaitXrayReadyRejectsInvalidArguments(t *testing.T) {
 }
 
 func TestOpenFluxStartStop(t *testing.T) {
-	if IsOpenFluxRunning() {
-		t.Fatal("OpenFlux should not be running initially")
+	if IsOpenFluxConnected() {
+		t.Fatal("OpenFlux should not be connected initially")
 	}
 	StopOpenFlux()
-	if IsOpenFluxRunning() {
-		t.Fatal("OpenFlux should still be stopped")
+	if IsOpenFluxConnected() {
+		t.Fatal("OpenFlux should still be disconnected")
 	}
 }
 
